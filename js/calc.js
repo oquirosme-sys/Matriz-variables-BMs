@@ -95,7 +95,7 @@
         const red = falta(sin) - r;
         if (red <= 0) continue;
         const ok = r === 0;
-        if (!mejor || (ok && !mejor.ok) || (ok === mejor.ok && (ok ? canalesDe(m) < canalesDe(mejor.m) : red > mejor.red || (red === mejor.red && (canalesDe(m) < canalesDe(mejor.m) || (canalesDe(m) === canalesDe(mejor.m) && m.ui < mejor.m.ui))))))
+        if (!mejor || (ok && !mejor.ok) || (ok === mejor.ok && (ok ? canalesDe(m) < canalesDe(mejor.m) : red > mejor.red || (red === mejor.red && (canalesDe(m) < canalesDe(mejor.m) || (canalesDe(m) === canalesDe(mejor.m) && (m.ui || 0) + (m.uio || 0) < (mejor.m.ui || 0) + (mejor.m.uio || 0)))))))
           mejor = { m, red, ok };
       }
       if (!mejor) break;
@@ -109,13 +109,18 @@
   function sugerir(req, marcaId) {
     const M = BMS.catCt.marcas[marcaId];
     if (!M || !falta(req)) return { base: null, baseQty: 0, modulos: {} };
-    let mejor = null;
+    let mejor = null, mejorOk = null, mejorTope = null;
+    const mas = (a, b) => !b || a.score[0] < b.score[0] || (a.score[0] === b.score[0] && (a.score[1] < b.score[1] || (a.score[1] === b.score[1] && a.score[2] < b.score[2])));
     for (const b of M.bases) {
       const s = resolver(req, M, b);
       const ev = evaluar(s, marcaId, req);
-      const score = [ev.falta, ev.canales, Object.values(s.modulos).reduce((a, x) => a + x, 0) + s.baseQty];
-      if (!mejor || score[0] < mejor.score[0] || (score[0] === mejor.score[0] && (score[1] < mejor.score[1] || (score[1] === mejor.score[1] && score[2] < mejor.score[2])))) mejor = { s, score };
+      const cand = { s, score: [ev.falta, ev.canales, Object.values(s.modulos).reduce((a, x) => a + x, 0) + s.baseQty] };
+      if (mas(cand, mejor)) mejor = cand;
+      /* Un controlador base con tope (maxBases) tiene prioridad mientras el panel quepa en esa cantidad; si no cabe se pasa a los demás. */
+      if (!ev.falta && b.maxBases && s.baseQty <= b.maxBases && mas(cand, mejorTope)) mejorTope = cand;
+      else if (!ev.falta && !b.maxBases && mas(cand, mejorOk)) mejorOk = cand;
     }
+    mejor = mejorTope || mejorOk || mejor;
     return mejor.s;
   }
 
