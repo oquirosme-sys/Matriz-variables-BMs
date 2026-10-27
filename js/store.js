@@ -48,6 +48,20 @@
     const [p, ce, cc] = await Promise.all([BMS.Repo.cargarProyecto(), BMS.Repo.cargarCatalogoEquipos(), BMS.Repo.cargarCatalogoControladores()]);
     BMS.estado = p && p.niveles ? p : BMS.proyectoNuevo();
     BMS.catEq = ce && ce.tipos ? ce : clone(window.BMS_CATALOGO_EQUIPOS);
+    /* Migración del catálogo de equipos: agrega categorías y tipos nuevos y reemplaza los corregidos; respeta el resto de lo editado. */
+    const base = window.BMS_CATALOGO_EQUIPOS;
+    if ((BMS.catEq.version || 1) < base.version) {
+      const ids = new Set(BMS.catEq.tipos.map((t) => t.id));
+      base.categorias.forEach((c) => { if (!BMS.catEq.categorias.some((x) => x.id === c.id)) BMS.catEq.categorias.push(clone(c)); });
+      BMS.catEq.categorias.sort((a, b) => base.categorias.findIndex((x) => x.id === a.id) - base.categorias.findIndex((x) => x.id === b.id));
+      base.tipos.forEach((t) => {
+        const i = BMS.catEq.tipos.findIndex((x) => x.id === t.id);
+        if (i < 0) BMS.catEq.tipos.push(clone(t));
+        else if ((base.corregidos || []).includes(t.id)) BMS.catEq.tipos[i] = clone(t);
+      });
+      BMS.catEq.version = base.version; BMS.catEq.corregidos = base.corregidos;
+      BMS.guardarCatEq();
+    }
     BMS.catCt = cc && cc.marcas ? cc : clone(window.BMS_CATALOGO_CONTROLADORES);
     if ((BMS.catCt.version || 1) < window.BMS_CATALOGO_CONTROLADORES.version) {
       BMS.catCt.marcas.Honeywell = clone(window.BMS_CATALOGO_CONTROLADORES.marcas.Honeywell);

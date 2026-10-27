@@ -27,7 +27,7 @@
       const cuerpo = h('tbody');
       const celda = (p, k, w) => h('td', null, h('input', { class: 'in', style: { width: w || '100%' }, value: p[k] || '', onchange: (e) => { p[k] = e.target.value; BMS.guardarCatEq(); } }));
       const cnum = (p, k) => h('td', null, h('input', { class: 'in n', style: { width: '56px' }, type: 'number', min: 0, value: p[k], onchange: (e) => { p[k] = Math.max(0, Math.round(num(e.target.value))); e.target.value = p[k]; BMS.guardarCatEq(); } }));
-      tipo.pts.forEach((p, i) => cuerpo.append(h('tr', null, h('td', { class: 'c' }, i + 1), celda(p, 'n'), ['ai', 'ao', 'di', 'do', 'int'].map((k) => cnum(p, k)), celda(p, 'alm', '90px'), celda(p, 'tend', '80px'), celda(p, 'ifc', '140px'),
+      tipo.pts.forEach((p, i) => cuerpo.append(h('tr', null, h('td', { class: 'c' }, i + 1), celda(p, 'n', '320px'), ['ai', 'ao', 'di', 'do', 'int'].map((k) => cnum(p, k)), celda(p, 'alm', '90px'), celda(p, 'tend', '80px'), celda(p, 'ifc', '140px'),
         h('td', { class: 'c' }, h('button', { class: 'b s', disabled: i === 0, onclick: () => { tipo.pts.splice(i - 1, 0, tipo.pts.splice(i, 1)[0]); BMS.guardarCatEq(); BMS.rerender(); } }, '↑'), ' ',
           h('button', { class: 'b x', onclick: () => { tipo.pts.splice(i, 1); BMS.guardarCatEq(); BMS.rerender(); } }, '✕')))));
       const sumas = tipo.pts.reduce((a, p) => { a.ai += p.ai; a.ao += p.ao; a.di += p.di; a.do += p.do; a.int += p.int; return a; }, { ai: 0, ao: 0, di: 0, do: 0, int: 0 });
@@ -40,7 +40,8 @@
           } })),
           h('label', { class: 'f' }, 'Sistema', h('select', { class: 'in', value: tipo.cat, onchange: (e) => { tipo.cat = e.target.value; BMS.guardarCatEq(); BMS.rerender(); } }, CAT.categorias.map((c) => h('option', { value: c.id }, c.nombre)))),
           h('label', { class: 'f' }, 'Prefijo de tag (termina en "-" para numerar)', h('input', { class: 'in', value: tipo.tag || '', onchange: (e) => { tipo.tag = e.target.value.trim(); BMS.guardarCatEq(); } })),
-          h('label', { class: 'f' }, 'Integración / gateway', h('input', { class: 'in', placeholder: 'GW-VRF, GW-MODBUS…', value: tipo.gw || '', onchange: (e) => { tipo.gw = e.target.value.trim(); BMS.guardarCatEq(); } })))),
+          h('label', { class: 'f' }, 'Integración / gateway', h('input', { class: 'in', placeholder: 'GW-VRF, GW-MODBUS…', value: tipo.gw || '', onchange: (e) => { tipo.gw = e.target.value.trim(); BMS.guardarCatEq(); } })),
+          h('label', { class: 'f', style: { gridColumn: '1 / -1' } }, 'Nota / origen de las variables', h('input', { class: 'in', value: tipo.nota || '', onchange: (e) => { tipo.nota = e.target.value; BMS.guardarCatEq(); } })))),
         h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['#', 'Descripción / punto', 'AI', 'AO', 'DI', 'DO', 'INT', 'Alarma', 'Tendencia', 'Interfaz', ''].map((x) => h('th', null, x)))), cuerpo,
           h('tfoot', null, h('tr', { class: 'tot' }, h('td'), h('td', null, 'Total por equipo'), ['ai', 'ao', 'di', 'do', 'int'].map((k) => h('td', { class: 'r' }, sumas[k])), h('td', { colspan: 4 }))))),
         h('div', { class: 'fila' },
@@ -58,7 +59,7 @@
         if (!nombre) return;
         if (CAT.tipos.some((t) => normaliza(t.nombre) === normaliza(nombre))) { alert('Ya existe un equipo con ese nombre.'); return; }
         const id = 'u_' + uid();
-        CAT.tipos.push({ id, cat: (tipo && tipo.cat) || CAT.categorias[0].id, nombre, tag: '', gw: '', pts: [{ id: id + '_1', n: 'Estado', ai: 0, ao: 0, di: 1, do: 0, int: 0, alm: '', tend: '', ifc: 'Cableado' }] });
+        CAT.tipos.push({ id, cat: (tipo && tipo.cat) || CAT.categorias[0].id, nombre, tag: '', gw: '', nota: '', pts: [{ id: id + '_1', n: 'Estado', ai: 0, ao: 0, di: 1, do: 0, int: 0, alm: '', tend: '', ifc: 'Cableado' }] });
         BMS.ui.tipoSel = id; BMS.guardarCatEq(); BMS.rerender();
       } }, '+ Nuevo equipo en el catálogo'),
       h('button', { class: 'b', onclick: () => BMS.descargar('catalogo-equipos.json', JSON.stringify(CAT, null, 1), 'application/json') }, 'Exportar catálogo'),

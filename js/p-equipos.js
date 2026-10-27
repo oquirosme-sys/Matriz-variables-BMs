@@ -66,6 +66,7 @@
         if (abierto && tipo) {
           const pc = (pt, k) => { const e = h('td', { class: 'r calc' }); pcel[eq.id + ':' + pt.p.id + ':' + k] = e; return e; };
           cuerpo.append(h('tr', { class: 'det' }, h('td', { colspan: 13 },
+            tipo.nota ? h('div', { class: 'mute', style: { padding: '4px 2px', fontSize: '12px' } }, 'Origen: ' + tipo.nota) : null,
             h('table', { class: 't' }, h('thead', null, h('tr', null, ['Incl.', 'Descripción / punto', 'Qty', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total AI', 'Total AO', 'Total DI', 'Total DO', 'Total INT', 'Total puntos', 'Alarma', 'Tendencia', 'Interfaz'].map((x) => h('th', null, x)))),
               h('tbody', null, f.puntos.map((pt) => h('tr', null,
                 h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: pt.incl, onchange: (e) => { eq.excl = eq.excl || []; if (e.target.checked) eq.excl = eq.excl.filter((x) => x !== pt.p.id); else eq.excl.push(pt.p.id); BMS.touch(); actualizar(); } })),
