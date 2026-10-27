@@ -1,8 +1,8 @@
 /* Página 5: selector de controladores (JCI / Honeywell), automático con ajuste manual. */
 (function () {
   const { h, num } = BMS;
-  const CAN = ['ui', 'bi', 'co', 'bo', 'ao'];
-  const TXT = { ui: 'UI', bi: 'BI', co: 'CO', bo: 'BO', ao: 'AO' };
+  const CAN = ['ui', 'bi', 'co', 'bo', 'ao', 'uio'];
+  const TXT = { ui: 'UI', bi: 'BI', co: 'CO', bo: 'BO', ao: 'AO', uio: 'UIO' };
 
   const resumenCfg = (cfg) => !cfg.base ? 'Sin hardware' : cfg.baseQty + '× ' + cfg.base + Object.keys(cfg.modulos || {}).filter((k) => cfg.modulos[k]).map((k) => ' + ' + cfg.modulos[k] + '× ' + k).join('');
 
@@ -12,7 +12,7 @@
     const res = C.todo(), mot = C.motor(res, P.marca);
 
     root.append(h('h2', null, 'Selector de controladores'),
-      h('p', { class: 'hint' }, 'La selección es automática según los puntos de cada controlador (con reserva) y puede cambiarla a manual. UI = entrada universal, BI = entrada binaria, CO = salida configurable, BO = salida binaria, AO = salida analógica.'));
+      h('p', { class: 'hint' }, 'La selección es automática según los puntos de cada controlador (con reserva) y puede cambiarla a manual. UI = entrada universal, BI = entrada binaria, CO = salida configurable, BO = salida binaria, AO = salida analógica, UIO = entrada/salida universal.'));
 
     root.append(h('div', { class: 'card' }, h('div', { class: 'grid' },
       h('label', { class: 'f' }, 'Marca de controladores', h('select', { class: 'in', value: P.marca, onchange: (e) => { P.marca = e.target.value; P.motor = 'auto'; BMS.touch(); BMS.rerender(); } },
@@ -20,6 +20,7 @@
       h('label', { class: 'f' }, 'Reserva de puntos (%)', h('input', { class: 'in n', type: 'number', min: 0, max: 100, value: P.reserva, onchange: (e) => { P.reserva = Math.max(0, num(e.target.value)); BMS.touch(); BMS.rerender(); } })),
       h('label', { class: 'f' }, 'Motor de red / supervisor', h('select', { class: 'in', value: P.motor || 'auto', onchange: (e) => { P.motor = e.target.value; BMS.touch(); BMS.rerender(); } },
         h('option', { value: 'auto' }, 'Automático' + (mot.motor ? ' (' + mot.motor.cod + ')' : '')), (M ? M.motores : []).map((m) => h('option', { value: m.cod }, m.cod + ' — hasta ' + m.maxDisp + ' dispositivos')))))));
+    if (M && M.nota) root.append(h('div', { class: 'warnbox' }, M.nota));
     if (M && M.confirmar) root.append(h('div', { class: 'warnbox' }, 'Los datos de canales y modelos de ' + P.marca + ' son valores de referencia POR CONFIRMAR con el fabricante. Corríjalos en "Catálogo de controladores".'));
     root.append(h('div', { class: 'kpis' },
       h('div', { class: 'kpi' }, h('b', null, mot.disp), h('span', null, 'Dispositivos en la red (controladores + módulos + integraciones)')),

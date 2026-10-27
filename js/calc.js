@@ -64,8 +64,8 @@
   }
 
   /* ---- Selección de controladores ---- */
-  const CANALES = ['ui', 'bi', 'co', 'bo', 'ao'];
-  const capVacia = () => ({ ui: 0, bi: 0, co: 0, bo: 0, ao: 0 });
+  const CANALES = ['ui', 'bi', 'co', 'bo', 'ao', 'uio'];
+  const capVacia = () => ({ ui: 0, bi: 0, co: 0, bo: 0, ao: 0, uio: 0 });
   const capSumar = (c, m, q) => { const r = { ...c }; for (const k of CANALES) r[k] += (m[k] || 0) * q; return r; };
   const canalesDe = (m) => CANALES.reduce((s, k) => s + (m[k] || 0), 0);
   const falta = (r) => r.ai + r.ao + r.di + r.do;
@@ -78,6 +78,8 @@
     tomar('ao', 'ao'); tomar('ao', 'co');
     tomar('do', 'bo'); tomar('do', 'co');
     tomar('di', 'bi'); tomar('di', 'ui');
+    /* Universales (UIO): cubren lo que falte de cualquier clase */
+    tomar('ai', 'uio'); tomar('ao', 'uio'); tomar('do', 'uio'); tomar('di', 'uio');
     return n;
   }
 
@@ -86,7 +88,7 @@
     while (guard++ < 400) {
       const sin = asignar(req, cap);
       if (!falta(sin)) return { base: base.cod, baseQty: nBase, modulos: mods };
-      if (nMods >= M.maxModulosPorBase * nBase) { nBase++; cap = capSumar(cap, base, 1); continue; }
+      if (nMods >= (base.maxMod || M.maxModulosPorBase) * nBase) { nBase++; cap = capSumar(cap, base, 1); continue; }
       let mejor = null;
       for (const m of M.modulos) {
         const r = falta(asignar(req, capSumar(cap, m, 1)));

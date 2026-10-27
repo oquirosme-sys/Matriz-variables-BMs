@@ -49,6 +49,11 @@
     BMS.estado = p && p.niveles ? p : BMS.proyectoNuevo();
     BMS.catEq = ce && ce.tipos ? ce : clone(window.BMS_CATALOGO_EQUIPOS);
     BMS.catCt = cc && cc.marcas ? cc : clone(window.BMS_CATALOGO_CONTROLADORES);
+    if ((BMS.catCt.version || 1) < window.BMS_CATALOGO_CONTROLADORES.version) {
+      BMS.catCt.marcas.Honeywell = clone(window.BMS_CATALOGO_CONTROLADORES.marcas.Honeywell);
+      BMS.catCt.version = window.BMS_CATALOGO_CONTROLADORES.version;
+      BMS.guardarCatCt();
+    }
   };
 
   let t1, t2, t3;
