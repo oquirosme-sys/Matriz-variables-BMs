@@ -24,18 +24,61 @@
 
     /* Niveles */
     const cuerpoN = h('tbody');
+
+    /* Valor de la serie: "S2" -> "S3", "Nivel 2" -> "Nivel 3"; con la celda de arriba se toma el paso (S1, S3 -> S5). */
+    const partir = (s) => { const m = /^(.*?)(\d+)$/.exec(String(s || '')); return m ? { pre: m[1], n: parseInt(m[2], 10), w: m[2].length } : null; };
+    const valorSerie = (campo, i, k) => {
+      const a = partir(E.niveles[i][campo]);
+      if (!a) return E.niveles[i][campo];
+      const b = i > 0 ? partir(E.niveles[i - 1][campo]) : null;
+      const paso = b && b.pre === a.pre && a.n !== b.n ? a.n - b.n : 1;
+      const v = a.n + paso * k;
+      return v < 0 ? E.niveles[i][campo] : a.pre + (String(v).length < a.w ? String(v).padStart(a.w, '0') : v);
+    };
+    /* Asa de relleno (cuadrito abajo a la derecha de la celda): se arrastra hacia abajo como en Excel. */
+    const conAsa = (input, campo, i) => {
+      const asa = h('span', { class: 'asa', title: 'Arrastre hacia abajo para rellenar con la serie' });
+      asa.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault(); asa.setPointerCapture(ev.pointerId);
+        const filas = [...cuerpoN.children], alto = filas[0].getBoundingClientRect().height, y0 = ev.clientY;
+        let k = 0;
+        const marca = () => filas.forEach((tr, j) => tr.classList.toggle('rel', j > i && j <= i + k));
+        const mueve = (e) => { k = Math.max(0, Math.round((e.clientY - y0) / alto)); marca(); asa.title = k ? '+' + k : ''; };
+        const suelta = () => {
+          asa.removeEventListener('pointermove', mueve); asa.removeEventListener('pointerup', suelta); asa.removeEventListener('pointercancel', suelta);
+          filas.forEach((tr) => tr.classList.remove('rel'));
+          if (!k) return;
+          const val = (j) => valorSerie(campo, i, j - i);
+          let omitidos = 0;
+          for (let j = i + 1; j <= i + k; j++) {
+            const nuevo = !E.niveles[j];
+            let v = val(j);
+            if (campo === 'codigo') {
+              v = String(v).trim().toUpperCase().replace(/\s+/g, '');
+              if (!v || E.niveles.some((x, q) => q !== j && x.codigo === v)) { omitidos++; continue; }
+            }
+            if (nuevo) E.niveles.push({ id: uid(), codigo: campo === 'codigo' ? v : 'N' + (j + 1) + '_' + uid().slice(0, 3).toUpperCase(), nombre: campo === 'nombre' ? v : '' });
+            else E.niveles[j][campo] = v;
+          }
+          if (omitidos) alert(omitidos + ' códigos no se llenaron por estar vacíos o repetidos.');
+          BMS.touch(); BMS.rerender();
+        };
+        asa.addEventListener('pointermove', mueve); asa.addEventListener('pointerup', suelta); asa.addEventListener('pointercancel', suelta);
+      });
+      return h('div', { class: 'celda' }, input, asa);
+    };
     const pintaNiveles = () => {
       cuerpoN.replaceChildren();
       E.niveles.forEach((n, i) => {
         const usos = E.equipos.filter((q) => q.nivel === n.id).length;
         cuerpoN.append(h('tr', null,
           h('td', { class: 'c' }, i + 1),
-          h('td', null, h('input', { class: 'in', style: { width: '80px' }, value: n.codigo, onchange: (e) => {
+          h('td', null, conAsa(h('input', { class: 'in', style: { width: '80px' }, value: n.codigo, onchange: (e) => {
             const v = e.target.value.trim().toUpperCase().replace(/\s+/g, '');
             if (!v || E.niveles.some((x) => x !== n && x.codigo === v)) { alert('El código de nivel está vacío o repetido.'); e.target.value = n.codigo; return; }
             n.codigo = v; e.target.value = v; BMS.touch(); BMS.rerender();
-          } })),
-          h('td', null, h('input', { class: 'in', style: { width: '100%' }, value: n.nombre, onchange: (e) => { n.nombre = e.target.value; BMS.touch(); } })),
+          } }), 'codigo', i)),
+          h('td', null, conAsa(h('input', { class: 'in', style: { width: '100%' }, value: n.nombre, onchange: (e) => { n.nombre = e.target.value; BMS.touch(); } }), 'nombre', i)),
           h('td', { class: 'c' }, usos + ' equipos'),
           h('td', { class: 'c' },
             h('button', { class: 'b s', title: 'Subir', disabled: i === 0, onclick: () => { E.niveles.splice(i - 1, 0, E.niveles.splice(i, 1)[0]); BMS.touch(); BMS.rerender(); } }, '↑'), ' ',

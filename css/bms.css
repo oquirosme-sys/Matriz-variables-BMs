@@ -88,3 +88,7 @@ table.t td.nm { max-width: 460px; }
   header.top, nav.tabs, .noprint { display: none !important; }
   body { background: #fff; } .diag { border: 0; } main { padding: 0; max-width: none; }
 }
+.celda { position: relative; display: block; }
+.celda .asa { position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; background: var(--accent); border: 1px solid var(--panel); cursor: crosshair; display: none; touch-action: none; z-index: 2; }
+.celda:hover .asa, .celda:focus-within .asa { display: block; }
+table.t tr.rel td { background: var(--accent-soft); }
