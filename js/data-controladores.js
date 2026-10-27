@@ -3,11 +3,12 @@
    JCI: tomado de la hoja JCI_Catalogo del Excel (LIT-1900346 / LIT-1900349 y Guía de configuración Metasys 12.0).
    Honeywell: Optimizer en Español (Honeywell LATAM 2023). Se corrigen en la pestaña "Catálogo de controladores". */
 window.BMS_CATALOGO_CONTROLADORES = {
-  version: 3, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador
+  version: 4, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador
   marcas: {
     JCI: {
       nombre: 'Johnson Controls (Metasys)',
       maxModulosPorBase: 10,
+      bus: 'B', // clave de cableado de la troncal de controladores (BACnet MS/TP)
       confirmar: false,
       bases: [
         { cod: 'FEC1611', desc: 'Controlador de campo de 10 puntos', ui: 2, bi: 1, co: 4, bo: 3, ao: 0, fuente: 'LIT-1900346' },
@@ -32,6 +33,7 @@ window.BMS_CATALOGO_CONTROLADORES = {
     Honeywell: {
       nombre: 'Honeywell Optimizer',
       maxModulosPorBase: 3,
+      bus: 'A', // Unitary BACnet IP (versión MS/TP: clave B)
       confirmar: false,
       nota: 'Fuente: presentación "Optimizer en Español" (Honeywell LATAM, 2023). UIO = entrada/salida universal (sirve como AI, DI, AO o DO). Los módulos IO se conectan al Unitary por Modbus RTU (roadmap, lámina 14); el límite de 3 módulos por Unitary sale de la lámina de integración Modbus RTU (cadena de 3 dispositivos) y es conservador: confirmar con Honeywell. Cuando un panel necesitaría más de 2 Unitary, la selección automática usa un Optimizer Advanced con módulos IO (hasta 64 módulos por canal RS485).',
       bases: [

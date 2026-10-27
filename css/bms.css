@@ -79,7 +79,7 @@ table.t td.nm { max-width: 460px; }
 .mods label { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; }
 .warnbox { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 8px 12px; margin: 8px 0; }
 .diag { background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: auto; }
-.diag svg { display: block; width: 100%; height: auto; min-width: 900px; }
+.diag svg { display: block; width: 100%; height: auto; min-width: 1500px; }
 .det td { background: var(--bg); }
 .det table.t th { position: static; background: #4a5260; }
 .mute { color: var(--mute); }
