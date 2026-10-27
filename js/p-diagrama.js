@@ -13,17 +13,18 @@
     return e;
   };
   const line = (g, x1, y1, x2, y2, o = {}) => g.append(s('line', { x1, y1, x2, y2, stroke: INK, 'stroke-width': o.w || 1, 'stroke-dasharray': o.dash || null }));
-  const rect = (g, x, y, w, hh, o = {}) => g.append(s('rect', { x, y, width: w, height: hh, rx: o.r || 0, fill: o.fill || '#fff', stroke: INK, 'stroke-width': o.w || 1, 'stroke-dasharray': o.dash || null }));
+  const rect = (g, x, y, w, hh, o = {}) => g.append(s('rect', { x, y, width: w, height: hh, rx: o.r || 0, fill: o.fill || '#fff', stroke: o.stroke || INK, 'stroke-width': o.w || 1, 'stroke-dasharray': o.dash || null }));
   const txt = (g, x, y, t, o = {}) => g.append(s('text', { x, y, 'font-size': o.size || 9, 'font-weight': o.bold ? 700 : 400, 'text-anchor': o.anchor || 'start', fill: o.fill || INK }, String(t).toUpperCase()));
   const wrap = (t, n) => { const out = []; let cur = ''; String(t).split(' ').forEach((w) => { if ((cur + ' ' + w).trim().length > n) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }); if (cur) out.push(cur); return out; };
   const para = (g, x, y, t, n, o = {}) => { const ls = wrap(t, n); ls.forEach((l, i) => txt(g, x, y + i * (o.lh || 11), l, o)); return ls.length; };
   const clave = (g, x, y, k) => { g.append(s('circle', { cx: x, cy: y, r: 8, fill: '#fff', stroke: INK, 'stroke-width': 1 })); txt(g, x, y + 3.5, k, { size: 10, anchor: 'middle' }); };
-  const equipoX = (g, x, y) => { rect(g, x, y, 12, 12); line(g, x, y, x + 12, y + 12); line(g, x + 12, y, x, y + 12); };
+  const equipoX = (g, x, y, z = 12) => { rect(g, x, y, z, z, { w: 1.2 }); line(g, x, y, x + z, y + z); line(g, x + z, y, x, y + z); };
+  const plug = (g, x, y) => { line(g, x, y, x + 12, y, { w: 1.2 }); line(g, x + 12, y - 6, x + 12, y + 6, { w: 1.8 }); line(g, x + 16, y - 6, x + 16, y + 6, { w: 1.8 }); line(g, x + 16, y, x + 22, y, { w: 1.2 }); };
   const dot = (g, x, y) => g.append(s('circle', { cx: x, cy: y, r: 2.5, fill: INK }));
 
   /* ---- símbolos ---- */
   const simCP = (g, x, y, w = 128, hh = 64) => { rect(g, x, y, w, hh); rect(g, x + 6, y + 8, w - 12, hh - 16); [0.33, 0.66].forEach((f) => line(g, x + 6 + (w - 12) * f, y + 8, x + 6 + (w - 12) * f, y + hh - 8)); };
-  const simCS = (g, x, y, w = 56, hh = 80) => { rect(g, x, y, w, hh); rect(g, x + 8, y + 8, w - 20, hh - 16); for (let i = 0; i < 7; i++) line(g, x + w - 10, y + 10 + i * 9, x + w - 4, y + 10 + i * 9); rect(g, x + 14, y + hh - 22, w - 32, 8); };
+  const simCS = (g, x, y, w = 56, hh = 80, marco = true) => { if (marco) rect(g, x - 6, y - 6, w + 12, hh + 12, { stroke: '#bbb', w: 0.6 }); rect(g, x, y, w, hh); rect(g, x + 8, y + 8, w - 20, hh - 16); for (let i = 0; i < 7; i++) line(g, x + w - 10, y + 10 + i * 9, x + w - 4, y + 10 + i * 9); rect(g, x + 14, y + hh - 22, w - 32, 8); };
   const simGW = (g, x, y, w = 110) => { rect(g, x, y, w, 30, { r: 6 }); txt(g, x + w / 2, y + 19, 'GATEWAY', { size: 10, anchor: 'middle' }); };
   const simOtros = (g, x, y, w, t) => { rect(g, x, y, w, 24, { r: 5 }); txt(g, x + w / 2, y + 10, 'OTROS', { size: 7, anchor: 'middle' }); txt(g, x + w / 2, y + 19, 'EQUIPOS', { size: 7, anchor: 'middle' }); };
   const simPC = (g, x, y) => { rect(g, x, y, 56, 36); rect(g, x + 5, y + 5, 46, 26); rect(g, x - 6, y + 38, 68, 10); line(g, x + 10, y + 43, x + 50, y + 43); };
@@ -79,11 +80,12 @@
   const ITH = 44;
   const dibujaItem = (g, x, yy, it, n) => {
     const directo = it.t.ai + it.t.ao + it.t.di + it.t.do === 0 && it.t.int > 0;
-    clave(g, x, yy, directo ? 'A' : 'D'); line(g, x + 8, yy, x + 14, yy); equipoX(g, x + 14, yy - 6);
+    clave(g, x + 18, yy - 22, directo ? 'A' : 'D');
+    line(g, x, yy - 14, x + 14, yy, { w: 1.8 }); equipoX(g, x + 14, yy - 9, 18);
     const nom = etiqueta(it) + (it.tags[0] && !etiqueta(it).toUpperCase().includes(it.tags[0].toUpperCase().replace(/-$/, '')) ? ' ' + it.tags[0] : '') + (it.qty > 1 ? ' ×' + it.qty : '');
     const ls = wrap(nom, n).slice(0, 2);
-    ls.forEach((l, i) => txt(g, x + 32, yy - 2 + i * 9.5, i === 1 && wrap(nom, n).length > 2 ? cut(l, n) : l, { size: 8.5 }));
-    txt(g, x + 32, yy - 2 + ls.length * 9.5 + 1, directo ? `INT ${it.t.int} · red IP` : `AI ${it.t.ai} AO ${it.t.ao} DI ${it.t.di} DO ${it.t.do}`, { size: 7.5, fill: GRIS });
+    ls.forEach((l, i) => txt(g, x + 38, yy - 3 + i * 9.5, i === 1 && wrap(nom, n).length > 2 ? cut(l, n) : l, { size: 8.5 }));
+    txt(g, x + 38, yy - 3 + ls.length * 9.5 + 1, directo ? `INT ${it.t.int} · red IP` : `AI ${it.t.ai} AO ${it.t.ao} DI ${it.t.di} DO ${it.t.do}`, { size: 7.5, fill: GRIS });
   };
   const etiqueta = (it) => it.tipo.nombre.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
 
@@ -100,7 +102,7 @@
       nodos.push({ k: 'gw', gw, n: i + 1, ...r, clave: gw === 'GW-MODBUS' ? 'C' : 'A' });
     });
     const itsP = principal ? itemsCtrl(res, principal.id) : [];
-    const altNodo = (n) => n.k === 'ctrl' ? 22 + 80 + 34 + Math.min(n.its.length, MAXIT + 1) * ITH : 22 + 30 + 30 + 40 + n.items.length * 30;
+    const altNodo = (n) => n.k === 'ctrl' ? 140 + Math.min(n.its.length, MAXIT + 1) * ITH : 200 + n.items.length * 36;
     const filas = [];
     for (let i = 0; i < Math.max(1, nodos.length); i += PORFILA) filas.push(nodos.slice(i, i + PORFILA));
     const altP = 22 + 70 + 70 + Math.min(itsP.length, MAXIT + 1) * ITH;
@@ -124,27 +126,26 @@
       line(g, 2290, 240, 2340, 215, { dash: '5 4', w: 0.8 }); line(g, 2290, 250, 2340, 150, { dash: '5 4', w: 0.8 });
       para(g, 2400, 60, '2 licencias para estaciones remotas de monitoreo por contratista de BMS. Software workstation standar', 36, { anchor: 'middle', size: 8.5 });
     }
-    line(g, 40, 270, 2056, 270, { w: 2 });
+    line(g, 40, 270, 2056, 270, { w: 2.4 });
     txt(g, 700, 262, 'LAN Ethernet Local Area Network (por otros)', { size: 14 });
 
     /* ---- controlador principal ---- */
     const busIni = principal ? 192 : 60;
     if (principal) {
       const d = det[principal.id], pBus = pos[0].busY;
-      line(g, 108, 270, 108, pBus - 40, { w: 1.5 }); rect(g, 103, 330, 10, 10); clave(g, 128, 352, 'A');
+      line(g, 108, 270, 108, pBus - 40, { w: 2 }); rect(g, 103, 330, 10, 10); clave(g, 128, 352, 'A');
       txt(g, 140, 336, 'Salida de TO, ver láminas T-2XX (por otros)', { size: 8.5 });
-      line(g, 108, pBus - 40, 108, pBus + 10, { w: 1.5 });
+      line(g, 108, pBus - 40, 108, pBus + 10, { w: 2 });
       simCP(g, 44, pBus + 10);
-      txt(g, 44, pBus - 18, C.nombreCtrl(principal), { size: 12, bold: true });
-      txt(g, 44, pBus - 6, 'Controlador principal', { size: 9 });
-      txt(g, 46, pBus + 88, '120 V, UPS', { size: 8, fill: GRIS });
+      txt(g, 120, pBus - 36, C.nombreCtrl(principal), { size: 12, bold: true });
+      txt(g, 120, pBus - 24, 'Controlador', { size: 9 }); txt(g, 120, pBus - 13, 'principal', { size: 9 });
+      plug(g, 20, pBus + 40); txt(g, 8, pBus + 66, '120 V,', { size: 7.5 }); txt(g, 8, pBus + 75, 'UPS', { size: 7.5 });
       txt(g, 46, pBus + 100, mot.motor ? 'Motor de red ' + mot.motor.cod : 'Motor de red por definir', { size: 8.5 });
       txt(g, 46, pBus + 111, d && d.cfg.base ? d.cfg.baseQty + '×' + d.cfg.base : '', { size: 8.5 });
-      line(g, 172, pBus + 28, busIni + 22, pBus + 28, { w: 1.3 }); line(g, busIni + 22, pBus + 28, busIni + 30, pBus, { w: 1.3 });
-      itsP.slice(0, MAXIT).forEach((it, i) => {
-        const yy = pBus + 138 + i * ITH, x = 62;
-        line(g, x, i === 0 ? pBus + 74 : yy - ITH + 8, x, yy, { w: 1 }); dibujaItem(g, x, yy, it, 34);
-      });
+      line(g, 172, pBus + 40, busIni + 20, pBus + 40, { w: 2.4 }); line(g, busIni + 20, pBus + 40, busIni + 48, pBus, { w: 2.4 });
+      const kP = Math.min(itsP.length, MAXIT);
+      if (kP) line(g, 62, pBus + 74, 62, pBus + 138 + (kP - 1) * ITH - 14, { w: 1.8 });
+      itsP.slice(0, MAXIT).forEach((it, i) => dibujaItem(g, 62, pBus + 138 + i * ITH, it, 34));
       if (itsP.length > MAXIT) txt(g, 80, pBus + 138 + MAXIT * ITH, '+ ' + (itsP.length - MAXIT) + ' tipos de equipo más (ver matriz)', { size: 8, fill: GRIS });
     } else {
       rect(g, 44, pos[0].busY, 128, 50, { dash: '5 4' }); txt(g, 108, pos[0].busY + 28, 'Sin controlador principal', { size: 8.5, anchor: 'middle' });
@@ -155,35 +156,33 @@
     let numG = 0;
     filas.forEach((fila, ri) => {
       const { busY } = pos[ri], n = fila.length;
-      const xIni = ri === 0 ? busIni + 30 : 40, xFin = n ? X0 + (n - 1) * COLW + 28 + 40 : xIni + 40;
-      line(g, ri === 0 && principal ? busIni + 30 : xIni, busY, xFin, busY, { w: 1.4 });
+      const xIni = ri === 0 ? busIni + 30 : 40, xFin = n ? X0 + (n - 1) * COLW + 50 + 60 : xIni + 40;
+      const xs0 = ri === 0 && principal ? busIni + 48 : xIni;
+      g.append(s('path', { d: `M${xs0} ${busY} ` + fila.map((_, i) => { const c0 = X0 + i * COLW + 50; return `H${c0 - 16} L${c0} ${busY + 22} L${c0 + 16} ${busY}`; }).join(' ') + ` H${xFin}`, fill: 'none', stroke: INK, 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
       if (ri > 0) { txt(g, 40, busY - 10, 'Continúa troncal (fila ' + (ri + 1) + ')', { size: 8.5 }); clave(g, 150, busY, busK); }
       fila.forEach((nd, i) => {
-        const x = X0 + i * COLW, cx = x + 28;
-        if (i > 0) clave(g, x - COLW / 2 + 28, busY, nd.k === 'gw' ? busK : busK);
-        if (i === 0 && (ri > 0 || !principal)) clave(g, x - 40, busY, busK);
-        dot(g, cx, busY);
-        line(g, cx, busY, cx, busY + 22);
+        const x = X0 + i * COLW, xs = x + 22, cx = xs + 28;
+        if (i > 0) clave(g, cx - COLW / 2, busY, busK);
+        if (i === 0 && (ri > 0 || !principal)) clave(g, cx - 56, busY, busK);
         if (nd.k === 'ctrl') {
           const d = det[nd.c.id], t = d.t, esCP = nd.c.tipo === 'CP';
           txt(g, cx, busY - 8, C.nombreCtrl(nd.c), { size: 11, bold: true, anchor: 'middle' });
-          simCS(g, x, busY + 22);
-          if (esCP) rect(g, x + 22, busY + 36, 12, 8, { fill: '#000' });
-          txt(g, x - 2, busY + 118, '120 V, UPS', { size: 7.5, fill: GRIS });
+          simCS(g, xs, busY + 28);
+          if (esCP) rect(g, xs + 22, busY + 42, 12, 8, { fill: '#000' });
+          plug(g, x - 6, busY + 78); txt(g, x - 8, busY + 100, '120 V,', { size: 7.5 }); txt(g, x - 8, busY + 109, 'UPS', { size: 7.5 });
           const n1 = C.nivelDe(nd.c.nivel);
-          txt(g, x + 64, busY + 36, (n1 ? 'Nivel ' + n1.codigo + ' — ' + n1.nombre : ''), { size: 8.5, bold: true });
-          txt(g, x + 64, busY + 48, `AI ${t.ai} · AO ${t.ao} · DI ${t.di} · DO ${t.do}`, { size: 8.5 });
-          if (t.int) txt(g, x + 64, busY + 59, `INT ${t.int} (por gateway)`, { size: 8, fill: GRIS });
+          txt(g, xs + 68, busY + 40, cut(n1 ? 'Nivel ' + n1.codigo + ' — ' + n1.nombre : '', 22), { size: 8.5, bold: true });
+          txt(g, xs + 68, busY + 52, `AI ${t.ai} · AO ${t.ao} · DI ${t.di} · DO ${t.do}`, { size: 8.5 });
+          if (t.int) txt(g, xs + 68, busY + 63, `INT ${t.int} (por gateway)`, { size: 8, fill: GRIS });
           const mod = d.cfg.base ? d.cfg.baseQty + '×' + d.cfg.base : 'Sin hardware';
-          txt(g, x + 64, busY + 72, cut(mod, 30), { size: 8 });
+          txt(g, xs + 68, busY + 75, cut(mod, 24), { size: 8 });
           const mods = Object.keys(d.cfg.modulos || {}).filter((k) => d.cfg.modulos[k]).map((k) => d.cfg.modulos[k] + '×' + k).join(' + ');
-          if (mods) { const ls = wrap(mods, 30); ls.slice(0, 3).forEach((l, q) => txt(g, x + 64, busY + 83 + q * 10, l, { size: 7.5, fill: GRIS })); }
-          if (d.ev.falta) { g.append(s('circle', { cx: x + 50, cy: busY + 28, r: 5, fill: '#c00' })); }
-          nd.its.slice(0, MAXIT).forEach((it, q) => {
-            const yy = busY + 22 + 80 + 22 + q * ITH;
-            line(g, cx, q === 0 ? busY + 102 : yy - ITH + 8, cx, yy); dibujaItem(g, cx, yy, it, 28);
-          });
-          if (nd.its.length > MAXIT) txt(g, cx + 32, busY + 22 + 80 + 22 + MAXIT * ITH, '+ ' + (nd.its.length - MAXIT) + ' tipos más (ver matriz)', { size: 8, fill: GRIS });
+          if (mods) { const ls = wrap(mods, 24); ls.slice(0, 3).forEach((l, q) => txt(g, xs + 68, busY + 86 + q * 10, l, { size: 7.5, fill: GRIS })); }
+          if (d.ev.falta) { g.append(s('circle', { cx: xs + 62, cy: busY + 34, r: 5, fill: '#c00' })); }
+          const kC = Math.min(nd.its.length, MAXIT);
+          if (kC) line(g, cx, busY + 114, cx, busY + 142 + (kC - 1) * ITH - 14, { w: 1.8 });
+          nd.its.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + 142 + q * ITH, it, 24));
+          if (nd.its.length > MAXIT) txt(g, cx + 38, busY + 142 + MAXIT * ITH, '+ ' + (nd.its.length - MAXIT) + ' tipos más (ver matriz)', { size: 8, fill: GRIS });
         } else {
           numG++;
           txt(g, cx, busY - 8, 'GW-' + nd.n, { size: 11, bold: true, anchor: 'middle' });
@@ -191,16 +190,15 @@
           txt(g, cx, busY + 66, nd.gw, { size: 9, anchor: 'middle', bold: true });
           const host = nd.host ? E.controladores.find((c) => c.id === nd.host) : null;
           if (host) txt(g, cx, busY + 77, 'Cerca de ' + C.nombreCtrl(host), { size: 7.5, anchor: 'middle', fill: GRIS });
-          line(g, cx, busY + 82, cx, busY + 100); clave(g, cx, busY + 100, nd.clave);
-          line(g, cx, busY + 108, cx, busY + 122);
-          const bh = 38 + nd.items.length * 30;
-          rect(g, cx - 100, busY + 122, 200, bh, { dash: '5 4', w: 0.8 });
-          para(g, cx, busY + 134, 'Contratista de BMS debe integrar estos equipos (suministrados e instalados por otros)', 40, { size: 6.5, anchor: 'middle', fill: GRIS, lh: 8 });
+          line(g, cx, busY + 82, cx, busY + 100, { w: 1.8 }); clave(g, cx, busY + 100, nd.clave);
+          g.append(s('path', { d: `M${cx} ${busY + 108} V${busY + 114} H${cx - 108} V${busY + 190} H${cx - 100}`, fill: 'none', stroke: INK, 'stroke-width': 1.8, 'stroke-linejoin': 'round' }));
+          para(g, cx, busY + 124, 'Contratista de BMS debe integrar estos equipos y velar porque sean compatibles con su solución (suministrados e instalados por otros)', 40, { size: 7.5, anchor: 'middle', lh: 9 });
+          rect(g, cx - 100, busY + 178, 200, 14 + nd.items.length * 36, { dash: '5 4', w: 0.8 });
           nd.items.forEach((it, q) => {
-            const yy = busY + 158 + q * 30;
-            rect(g, cx - 90, yy, 180, 24, { r: 5 });
-            txt(g, cx - 84, yy + 10, cut(etiqueta(it) + (it.qty > 1 ? ' ×' + it.qty : ''), 40), { size: 8 });
-            txt(g, cx - 84, yy + 20, `INT ${it.ints}` + (it.niv.size ? ' · ' + [...it.niv].join(', ') : ''), { size: 7, fill: GRIS });
+            const yy = busY + 188 + q * 36;
+            simOtros(g, cx - 92, yy, 56);
+            txt(g, cx - 30, yy + 9, cut(etiqueta(it) + (it.qty > 1 ? ' ×' + it.qty : ''), 25), { size: 8 });
+            txt(g, cx - 30, yy + 20, `INT ${it.ints}` + (it.niv.size ? ' · ' + [...it.niv].join(', ') : ''), { size: 7, fill: GRIS });
           });
         }
       });
