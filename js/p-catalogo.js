@@ -15,11 +15,21 @@
       h('p', { class: 'hint' }, 'Cada tipo de equipo aparece una sola vez. Aquí se actualizan las variables (puntos) que se cargan al escoger el equipo en la pestaña 3. Los cambios aplican a todos los equipos de ese tipo ya cargados.'));
 
     const lista = h('div', { class: 'lista' });
-    CAT.categorias.forEach((cat) => {
-      lista.append(h('div', { class: 'grp' }, cat.nombre));
-      CAT.tipos.filter((t) => t.cat === cat.id).forEach((t) => lista.append(h('div', { class: 'it' + (t.id === BMS.ui.tipoSel ? ' on' : ''), onclick: () => { BMS.ui.tipoSel = t.id; BMS.rerender(); } },
-        h('span', null, t.nombre), h('span', { class: 'badge' }, t.pts.length))));
-    });
+    const pintaLista = (q) => {
+      lista.replaceChildren();
+      const ids = q && q.trim() ? new Set(BMS.buscarTipos(q, 300).map((t) => t.id)) : null;
+      let n = 0;
+      CAT.categorias.forEach((cat) => {
+        const ts = CAT.tipos.filter((t) => t.cat === cat.id && (!ids || ids.has(t.id)));
+        if (!ts.length) return;
+        lista.append(h('div', { class: 'grp' }, cat.nombre));
+        ts.forEach((t) => { n++; lista.append(h('div', { class: 'it' + (t.id === BMS.ui.tipoSel ? ' on' : ''), onclick: () => { BMS.ui.tipoSel = t.id; BMS.rerender(); } }, h('span', null, t.nombre), h('span', { class: 'badge' }, t.pts.length))); });
+      });
+      if (!n) lista.append(h('div', { class: 'it mute' }, 'Sin coincidencias'));
+    };
+    pintaLista(BMS.ui.busCat || '');
+    const buscaCat = h('input', { class: 'in', style: { width: '100%', marginBottom: '6px' }, placeholder: 'Buscar equipo (ej. generador, VFD, UPS…)', autocomplete: 'off', value: BMS.ui.busCat || '', oninput: (e) => { BMS.ui.busCat = e.target.value; pintaLista(e.target.value); } });
+    const izq = h('div', null, buscaCat, lista);
 
     let editor;
     if (!tipo) editor = h('div', { class: 'warnbox' }, 'El catálogo está vacío.');
@@ -65,6 +75,6 @@
       h('button', { class: 'b', onclick: () => BMS.descargar('catalogo-equipos.json', JSON.stringify(CAT, null, 1), 'application/json') }, 'Exportar catálogo'),
       h('button', { class: 'b', onclick: () => BMS.leerArchivo('.json', (t) => { try { const d = JSON.parse(t); if (!d.tipos || !d.categorias) throw new Error('Formato no válido'); if (!confirm('Reemplazar el catálogo actual?')) return; BMS.catEq = d; BMS.guardarCatEq(); BMS.rerender(); } catch (e) { alert('No se pudo importar: ' + e.message); } }) }, 'Importar catálogo'),
       h('button', { class: 'b', onclick: () => { if (confirm('Restaurar el catálogo base del Excel? Se pierden los cambios hechos al catálogo.')) { BMS.catEq = BMS.clone(window.BMS_CATALOGO_EQUIPOS); BMS.ui.tipoSel = null; BMS.guardarCatEq(); BMS.rerender(); } } }, 'Restaurar catálogo base')));
-    root.append(h('div', { class: 'split' }, lista, editor));
+    root.append(h('div', { class: 'split' }, izq, editor));
   };
 })();

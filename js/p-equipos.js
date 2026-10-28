@@ -100,12 +100,35 @@
       pintaLista(res);
     };
 
+    /* Buscador predictivo: escribe y sugiere los equipos del catálogo que se parezcan */
+    const buscador = (() => {
+      const inp = h('input', { class: 'in', style: { width: '100%' }, placeholder: 'Escriba para buscar y agregar un equipo (ej. generador, VFD, UPS, chiller, inyector…)', autocomplete: 'off', 'aria-label': 'Buscar equipo' });
+      const sug = h('div', { class: 'sug' }); let items = [], idx = 0;
+      const catNom = (id) => { const c = BMS.catEq.categorias.find((x) => x.id === id); return c ? c.nombre : ''; };
+      const agregar = (t) => { E.equipos.push({ id: uid(), nivel: nivel.id, tipoId: t.id, qty: 1, tag: etiquetaTag(t), ctrl: 'auto', obs: '', excl: [] }); BMS.touch(); BMS.rerender(); };
+      const marca = () => [...sug.children].forEach((d, i) => d.classList.toggle('on', i === idx));
+      const pinta = () => {
+        items = BMS.buscarTipos(inp.value, 10); idx = 0;
+        sug.replaceChildren(...(items.length ? items.map((t) => h('div', { class: 'it', onmousedown: (ev) => { ev.preventDefault(); agregar(t); } }, h('b', null, t.nombre), h('span', { class: 'mute' }, ' · ' + catNom(t.cat) + (t.tag ? ' · ' + t.tag.replace(/-$/, '') : '')))) : [h('div', { class: 'it mute' }, 'Sin coincidencias; revise la ortografía o agréguelo en el catálogo de variables')]));
+        sug.style.display = 'block'; marca();
+      };
+      inp.addEventListener('input', pinta); inp.addEventListener('focus', pinta);
+      inp.addEventListener('blur', () => setTimeout(() => (sug.style.display = 'none'), 120));
+      inp.addEventListener('keydown', (ev) => {
+        if (ev.key === 'ArrowDown') { idx = Math.min(items.length - 1, idx + 1); marca(); ev.preventDefault(); }
+        else if (ev.key === 'ArrowUp') { idx = Math.max(0, idx - 1); marca(); ev.preventDefault(); }
+        else if (ev.key === 'Enter' && items[idx]) { ev.preventDefault(); agregar(items[idx]); }
+        else if (ev.key === 'Escape') inp.blur();
+      });
+      return h('div', { class: 'combo' }, inp, sug);
+    })();
+
     /* Barra de acciones */
     const selAgregar = h('select', { class: 'in', style: { maxWidth: '380px' }, onchange: (e) => {
       const t = C.tipoDe(e.target.value); if (!t) return;
       E.equipos.push({ id: uid(), nivel: nivel.id, tipoId: t.id, qty: 1, tag: etiquetaTag(t), ctrl: 'auto', obs: '', excl: [] });
       BMS.touch(); BMS.rerender();
-    } }, h('option', { value: '' }, '＋ Agregar equipo del catálogo…'),
+    } }, h('option', { value: '' }, '…o elija de la lista del catálogo'),
       BMS.catEq.categorias.map((cat) => h('optgroup', { label: cat.nombre }, BMS.catEq.tipos.filter((t) => t.cat === cat.id).map((t) => h('option', { value: t.id }, t.nombre)))));
     const otros = E.niveles.filter((n) => n.id !== nivel.id && E.equipos.some((q) => q.nivel === n.id));
     const selCopiar = h('select', { class: 'in' }, h('option', { value: '' }, 'Copiar equipos de…'), otros.map((n) => h('option', { value: n.id }, n.codigo + ' · ' + n.nombre)));
@@ -119,6 +142,7 @@
     root.append(h('div', { class: 'split' }, lista, h('div', null,
       h('h3', { style: { marginTop: 0 } }, 'Nivel ' + nivel.codigo + ' — ' + nivel.nombre),
       resumenEl,
+      h('div', { class: 'fila noprint' }, buscador),
       h('div', { class: 'fila noprint' }, selAgregar, selCopiar, h('button', { class: 'b', onclick: copiar }, 'Copiar')),
       h('div', { class: 'scroll' }, h('table', { class: 't' },
         h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Cant.', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),

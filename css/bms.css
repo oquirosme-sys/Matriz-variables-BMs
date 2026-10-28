@@ -98,3 +98,9 @@ table.t td.nm { max-width: 460px; }
 .celda .asa { position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; background: var(--accent); border: 1px solid var(--panel); cursor: crosshair; display: none; touch-action: none; z-index: 2; }
 .celda:hover .asa, .celda:focus-within .asa { display: block; }
 table.t tr.rel td { background: var(--accent-soft); }
+
+.combo { position: relative; flex: 1; min-width: 320px; max-width: 640px; }
+.sug { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; max-height: 340px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,.3); display: none; }
+.sug .it { padding: 7px 10px; cursor: pointer; border-bottom: 1px solid var(--line); }
+.sug .it:last-child { border-bottom: 0; }
+.sug .it.on, .sug .it:hover { background: var(--accent-soft); }
