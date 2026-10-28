@@ -102,6 +102,7 @@
 
     /* Controladores */
     const cuerpoC = h('tbody');
+    E.gabDim = E.gabDim || {};
     const pintaCtrl = () => {
       cuerpoC.replaceChildren();
       const ord = E.controladores.map((c, i) => ({ c, i })).sort((a, b) => E.niveles.findIndex((n) => n.id === a.c.nivel) - E.niveles.findIndex((n) => n.id === b.c.nivel) || (a.c.tipo === 'CP' ? -1 : 1) - (b.c.tipo === 'CP' ? -1 : 1));
@@ -115,6 +116,8 @@
           h('td', null, h('input', { class: 'in n', type: 'number', min: 1, value: c.consec, onchange: (e) => { const ant = c.consec; c.consec = Math.max(1, Math.round(num(e.target.value, 1))); if (dup()) { alert('Ya existe un controlador con ese nombre.'); c.consec = ant; e.target.value = ant; } act(); } })),
           nm,
           h('td', null, h('input', { class: 'in', style: { width: '100%' }, value: c.ubicacion || '', onchange: (e) => { c.ubicacion = e.target.value; BMS.touch(); } })),
+          h('td', null, h('input', { class: 'in', style: { width: '110px' }, list: 'gabs', placeholder: 'Sin gabinete', value: c.gab || '', onchange: (e) => { c.gab = e.target.value.trim(); BMS.touch(); BMS.rerender(); } })),
+          h('td', null, h('input', { class: 'in', style: { width: '110px' }, placeholder: '70x50 cm', value: E.gabDim[c.gab || c.id] || '', onchange: (e) => { E.gabDim[c.gab || c.id] = e.target.value.trim(); BMS.touch(); } })),
           h('td', null, h('input', { class: 'in', style: { width: '100%' }, value: c.obs || '', onchange: (e) => { c.obs = e.target.value; BMS.touch(); } })),
           h('td', { class: 'c' }, h('button', { class: 'b x', onclick: () => {
             const nq = E.equipos.filter((q) => q.ctrl === c.id).length;
@@ -132,8 +135,9 @@
       BMS.touch(); BMS.rerender();
     };
     root.append(h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Controladores'),
-      h('p', { class: 'hint' }, 'El consecutivo se cuenta por nivel y por tipo (CS-N2-01, CS-N2-02…). El modelo de cada controlador se escoge en la pestaña 5.'),
-      h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tipo', 'Nivel', 'Consec.', 'Nombre', 'Cuarto / ubicación', 'Observación', ''].map((x) => h('th', null, x)))), cuerpoC)),
+      h('p', { class: 'hint' }, 'El consecutivo se cuenta por nivel y por tipo (CS-N2-01, CS-N2-02…). El modelo de cada controlador se escoge en la pestaña 5. Gabinete: los controladores que estén en el mismo cuarto y compartan nombre de gabinete se dibujan dentro de un mismo panel (recuadro punteado); la dimensión del panel se escribe una vez por gabinete.'),
+      h('datalist', { id: 'gabs' }, [...new Set(E.controladores.map((c) => c.gab).filter(Boolean))].map((g) => h('option', { value: g }))),
+      h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tipo', 'Nivel', 'Consec.', 'Nombre', 'Cuarto / ubicación', 'Gabinete', 'Dim. panel', 'Observación', ''].map((x) => h('th', null, x)))), cuerpoC)),
       h('div', { class: 'fila' },
         h('button', { class: 'b p', onclick: () => agregar('CS') }, '+ Controlador secundario (CS)'),
         h('button', { class: 'b', onclick: () => agregar('CP') }, '+ Controlador principal (CP)'),
@@ -141,7 +145,13 @@
           let n = 0;
           E.niveles.forEach((nv) => { if (!E.controladores.some((c) => c.nivel === nv.id)) { E.controladores.push({ id: uid(), tipo: 'CS', nivel: nv.id, consec: 1, ubicacion: '', obs: '', modo: 'auto' }); n++; } });
           if (!n) alert('Todos los niveles ya tienen controlador.'); else { BMS.touch(); BMS.rerender(); }
-        } }, 'Crear 1 CS en cada nivel sin controlador'))));
+        } }, 'Crear 1 CS en cada nivel sin controlador'),
+        h('button', { class: 'b', title: 'Asigna un mismo gabinete a los controladores del mismo nivel que tengan el mismo cuarto', onclick: () => {
+          const grupos = {}; E.controladores.forEach((c) => { const k = c.nivel + '|' + String(c.ubicacion || '').trim().toLowerCase(); if (String(c.ubicacion || '').trim()) (grupos[k] = grupos[k] || []).push(c); });
+          let n = 0;
+          Object.values(grupos).filter((l) => l.length > 1).forEach((l) => { const niv = BMS.calc.nivelDe(l[0].nivel); let q = 1; while (E.controladores.some((c) => c.gab === 'GAB-' + (niv ? niv.codigo : '') + '-' + String(q).padStart(2, '0'))) q++; const nombre = 'GAB-' + (niv ? niv.codigo : '') + '-' + String(q).padStart(2, '0'); l.forEach((c) => (c.gab = nombre)); n++; });
+          if (!n) alert('No hay controladores del mismo nivel con el mismo "Cuarto / ubicación". Escriba el cuarto en cada controlador y vuelva a intentar.'); else { BMS.touch(); BMS.rerender(); }
+        } }, 'Agrupar en gabinete los del mismo cuarto'))));
 
     root.append(h('div', { class: 'fila noprint' },
       h('button', { class: 'b', onclick: () => { if (confirm('¿Cargar el ejemplo Fairfield Guayabos? Reemplaza el proyecto actual.')) { BMS.estado = BMS.proyectoEjemplo(); BMS.ui.nivelSel = null; BMS.touch(); BMS.rerender(); } } }, 'Cargar ejemplo Fairfield Guayabos'),

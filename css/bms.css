@@ -78,10 +78,13 @@ table.t td.nm { max-width: 460px; }
 .mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 10px; margin-top: 6px; }
 .mods label { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; }
 .warnbox { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 8px 12px; margin: 8px 0; }
-.diag { background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: auto; }
-.diag { max-height: 78vh; }
-.diag svg { display: block; height: auto; }
+.diag { background: #8a9099; border: 1px solid var(--line); border-radius: 8px; overflow: auto; padding: 0; }
+.diag { height: 76vh; min-height: 420px; }
+.diag svg { display: block; height: auto; margin: 0 auto; box-shadow: 0 0 0 1px #555, 0 4px 18px rgba(0,0,0,.35); }
 .diag.mano { cursor: grab; user-select: none; touch-action: none; }
+.diag.texto { user-select: none; touch-action: none; }
+.diag.texto [data-mv] { cursor: move; }
+.diag.texto [data-mv]:hover text { fill: #0b6bcb; }
 .diag.mano.arr { cursor: grabbing; }
 .det td { background: var(--bg); }
 .det table.t th { position: static; background: #4a5260; }
@@ -89,7 +92,7 @@ table.t td.nm { max-width: 460px; }
 @media (max-width: 800px) { .split { grid-template-columns: 1fr; } .lista { max-height: 220px; } }
 @media print {
   header.top, nav.tabs, .noprint { display: none !important; }
-  body { background: #fff; } .diag { border: 0; max-height: none; overflow: visible; } .diag svg { width: 100% !important; min-width: 0 !important; } main { padding: 0; max-width: none; }
+  body { background: #fff; } .diag { border: 0; height: auto; overflow: visible; } .diag svg { width: 100% !important; height: auto !important; min-width: 0 !important; } main { padding: 0; max-width: none; }
 }
 .celda { position: relative; display: block; }
 .celda .asa { position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; background: var(--accent); border: 1px solid var(--panel); cursor: crosshair; display: none; touch-action: none; z-index: 2; }

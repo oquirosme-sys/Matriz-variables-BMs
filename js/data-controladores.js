@@ -3,7 +3,7 @@
    JCI: tomado de la hoja JCI_Catalogo del Excel (LIT-1900346 / LIT-1900349 y Guía de configuración Metasys 12.0).
    Honeywell: Optimizer en Español (Honeywell LATAM 2023). Se corrigen en la pestaña "Catálogo de controladores". */
 window.BMS_CATALOGO_CONTROLADORES = {
-  version: 4, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador
+  version: 5, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador
   marcas: {
     JCI: {
       nombre: 'Johnson Controls (Metasys)',
@@ -33,12 +33,12 @@ window.BMS_CATALOGO_CONTROLADORES = {
     Honeywell: {
       nombre: 'Honeywell Optimizer',
       maxModulosPorBase: 3,
-      bus: 'A', // Unitary BACnet IP (versión MS/TP: clave B)
+      bus: 'B', // troncal BACnet MS/TP entre controladores (Unitary versión MS/TP); la LAN IP llega solo al controlador principal
       confirmar: false,
       nota: 'Fuente: presentación "Optimizer en Español" (Honeywell LATAM, 2023). UIO = entrada/salida universal (sirve como AI, DI, AO o DO). Los módulos IO se conectan al Unitary por Modbus RTU (roadmap, lámina 14); el límite de 3 módulos por Unitary sale de la lámina de integración Modbus RTU (cadena de 3 dispositivos) y es conservador: confirmar con Honeywell. Cuando un panel necesitaría más de 2 Unitary, la selección automática usa un Optimizer Advanced con módulos IO (hasta 64 módulos por canal RS485).',
       bases: [
-        { cod: 'UN-RS0844ES24NMC', desc: 'Optimizer Unitary Small, BACnet IP: 16 puntos (8 UIO, 4 SSR, 4 relés); 1 puerto Modbus RS485. Variantes de comunicación: MS24 (MS/TP), TS24 (T1L), WAS24 (WiFi)', uio: 8, bo: 8, maxMod: 3, maxBases: 2, fuente: 'Optimizer Unitary, rev. 1.05 (jul-2023)' },
-        { cod: 'UN-RL1644ES24NMC', desc: 'Optimizer Unitary Large, BACnet IP: 24 puntos (16 UIO, 4 SSR, 4 relés); 1 puerto Modbus RS485. Variantes de comunicación: MS24 (MS/TP), TS24 (T1L), WAS24 (WiFi)', uio: 16, bo: 8, maxMod: 3, maxBases: 2, fuente: 'Optimizer Unitary, rev. 1.05 (jul-2023)' },
+        { cod: 'UN-RS0844MS24NMC', desc: 'Optimizer Unitary Small, BACnet MS/TP: 16 puntos (8 UIO, 4 SSR, 4 relés); 1 puerto Modbus RS485. Otras versiones de comunicación: ES24 (IP), TS24 (T1L), WAS24 (WiFi)', uio: 8, bo: 8, maxMod: 3, maxBases: 2, fuente: 'Optimizer Unitary, rev. 1.05 (jul-2023)' },
+        { cod: 'UN-RL1644MS24NMC', desc: 'Optimizer Unitary Large, BACnet MS/TP: 24 puntos (16 UIO, 4 SSR, 4 relés); 1 puerto Modbus RS485. Otras versiones de comunicación: ES24 (IP), TS24 (T1L), WAS24 (WiFi)', uio: 16, bo: 8, maxMod: 3, maxBases: 2, fuente: 'Optimizer Unitary, rev. 1.05 (jul-2023)' },
         { cod: 'N-ADV-112-H-C', desc: 'Optimizer Advanced con módulos IO (sin entradas/salidas propias): 2 puertos RS485, hasta 64 módulos por canal', maxMod: 128, fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo: 64 × 2 canales)' },
         { cod: 'N-ADV-133-H-C', desc: 'Optimizer Advanced con módulos IO (sin entradas/salidas propias): 3 puertos RS485, hasta 64 módulos por canal', maxMod: 192, fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo: 64 × 3 canales)' }
       ],
