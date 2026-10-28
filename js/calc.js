@@ -20,6 +20,16 @@
     return r;
   };
 
+  /* Paneles (gabinetes) estándar y unidades equivalentes que admiten:
+     controlador base = 2, módulo IO = 1, más 2 de fuente y protecciones (y 2 del motor de red en el principal). Valores de referencia editables por controlador. */
+  const PANELES = [['24 x 18 cm', 4], ['40 x 30 cm', 8], ['50 x 40 cm', 12], ['70 x 50 cm', 20], ['100 x 80 cm', 40], ['120 x 100 cm', 70]];
+  const panelSugerido = (u) => (PANELES.find((p) => p[1] >= u) || PANELES[PANELES.length - 1])[0];
+  const unidadesPanel = (c, detMap) => {
+    const E = BMS.estado, uno = (x) => { const d = detMap[x.id]; return d && d.cfg ? 2 * (d.cfg.baseQty || 0) + Object.values(d.cfg.modulos || {}).reduce((a, y) => a + y, 0) : 0; };
+    const miembros = c.gab ? E.controladores.filter((x) => x.gab === c.gab) : [c];
+    return miembros.reduce((a, x) => a + uno(x), 0) + 2 + (c.tipo === 'CP' ? 2 : 0);
+  };
+
   /* Panel o equipo con BACnet/IP: sus señales son internas del panel y llegan al BMS por la red (INT), no por cable. */
   const esIP = (eq, tipo) => !!tipo && (eq.ip != null ? !!eq.ip : !!tipo.ip);
 
@@ -185,5 +195,5 @@
     return lista;
   }
 
-  Object.assign(BMS, { calc: { esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
+  Object.assign(BMS, { calc: { PANELES, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
 })();

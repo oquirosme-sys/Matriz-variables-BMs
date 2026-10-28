@@ -149,7 +149,7 @@
       ['cs', 'Controlador secundario de campo con accesorios compatibles con BACnet. Ver requerimientos en notas y en especificaciones técnicas. Entradas y salidas según aplicación; ver matriz I/O.', 'Igual o superior a ' + usados(sb.bases)],
       ['iom', 'Módulos de expansión de entradas y salidas del controlador. Ver requerimientos en notas y en especificaciones técnicas.', 'Igual o superior a ' + usados(sb.modulos)],
       ['gw', 'Gateway. Pasarela para interconectar protocolos y arquitecturas; debe ser ubicado dentro del gabinete del controlador más próximo.', gwsUsados ? 'Según equipo a integrar (' + gwsUsados + ')' : 'Según equipo a integrar'],
-      ['pan', 'Gabinete (panel) para la instalación de los controladores y gateways. Controladores del mismo cuarto comparten gabinete (recuadro punteado). Dimensión indicada sobre cada panel.', 'NEMA 1 en interiores; NEMA 3R en zonas expuestas a la intemperie o cuartos mecánicos.'],
+      ['pan', 'Gabinete (panel) para la instalación de los controladores y gateways. Cada controlador va dentro de un panel (recuadro punteado) con su dimensión; los del mismo cuarto comparten gabinete. Medida sugerida según el hardware, editable en la pestaña 1.', 'NEMA 1 en interiores; NEMA 3R en zonas expuestas a la intemperie o cuartos mecánicos.'],
       ['panip', 'Panel o equipo con tarjeta BACnet/IP (bombas de agua potable, contra incendio, etc.): se conecta a la red IP; sus señales internas quedan dentro del panel y no se cablean al BMS.', 'Según fabricante del panel. Dirección IP fija por coordinar con TI.'],
       ['spd', 'Módulo supresor de sobretensiones compatible con la aplicación; debe incluir adecuada conexión a tierra para descarga en conduit separado.', 'Igual o superior a PROT485. Modelo según aplicación.'],
       ['otros', 'Equipos suministrados e instalados por otros, con tarjetas de fábrica compatibles. Contratista de BMS debe incluir cableado, tubería, accesorios y programación necesarios para integrarlos. Ver notas y especificaciones.', ''],
@@ -188,14 +188,15 @@
 
     /* ---- controlador principal ---- */
     const busIni = principal ? 192 : 60;
-    const dimDe = (c) => E.gabDim[c.gab || c.id] || '';
+    const dimDe = (c) => E.gabDim[c.gab || c.id] || C.panelSugerido(C.unidadesPanel(c, det));
     if (principal) {
       const d = det[principal.id], pBus = pos[0].busY;
       line(g, 108, 270, 108, pBus - 40, { w: 2.4, color: col('A') }); rect(g, 103, 330, 10, 10); clave(g, 128, 352, 'A');
       mv(g, 'to', (sg) => txt(sg, 140, 336, 'Salida de TO, ver láminas T-2XX (por otros)', { size: 9 }));
       line(g, 108, pBus - 40, 108, pBus + 10, { w: 2.4, color: col('A') });
       simCP(g, 44, pBus + 10);
-      mv(g, 'cp:label', (sg) => { txt(sg, 120, pBus - 36, C.nombreCtrl(principal), { size: 12, bold: true }); txt(sg, 120, pBus - 24, 'Controlador', { size: 9 }); txt(sg, 120, pBus - 13, 'principal', { size: 9 }); if (dimDe(principal)) txt(sg, 44, pBus + 3, 'Panel ' + dimDe(principal), { size: 9, bold: true }); });
+      if (cfg.paneles !== false) { rect(g, 30, pBus + 2, 156, 122, { dash: '6 4', w: 0.9, fill: 'none' }); mv(g, 'cp:panel', (sg) => txt(sg, 116, pBus - 2, 'Panel ' + dimDe(principal), { size: 9, bold: true })); }
+      mv(g, 'cp:label', (sg) => { txt(sg, 120, pBus - 36, C.nombreCtrl(principal), { size: 12, bold: true }); txt(sg, 120, pBus - 24, 'Controlador', { size: 9 }); txt(sg, 120, pBus - 13, 'principal', { size: 9 }); });
       plug(g, 20, pBus + 40); txt(g, 8, pBus + 66, '120 V,', { size: 7.5 }); txt(g, 8, pBus + 75, 'UPS', { size: 7.5 });
       mv(g, 'cp:info', (sg) => { txt(sg, 46, pBus + 92, mot.motor ? 'Motor de red ' + mot.motor.cod : 'Motor de red por definir', { size: 8.5 }); if (d && d.cfg.base) txt(sg, 46, pBus + 103, d.cfg.baseQty + '×' + d.cfg.base, { size: 8.5 }); });
       line(g, 172, pBus + 40, busIni + 20, pBus + 40, { w: 2.4, color: col(trunk) }); line(g, busIni + 20, pBus + 40, busIni + 48, pBus, { w: 2.4, color: col(trunk) });
@@ -214,16 +215,16 @@
       g.append(s('path', { d: `M${xIni} ${busY} ` + nodes.map((_, i) => { const c0 = X0 + i * COLW + 50; return `H${c0 - 16} L${c0} ${busY + 22} L${c0 + 16} ${busY}`; }).join(' ') + ` H${xFin}`, fill: 'none', stroke: col(kk), 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
       if (fila.ip) { mv(g, 'iplab' + ri, (sg) => txt(sg, 40, busY - 14, 'Red IP (LAN por otros) — ' + (fila.ip === 'E' ? 'Modbus TCP' : 'BACnet/IP'), { size: 9 })); clave(g, 300, busY, fila.ip); }
       else if (ri > 0) { mv(g, 'trlab' + ri, (sg) => txt(sg, 40, busY - 14, 'Continúa troncal (fila ' + (ri + 1) + ')', { size: 9 })); clave(g, 280, busY, kk); }
-      /* gabinetes con 2 o más controladores */
-      if (!fila.ip) {
+      /* paneles (gabinetes): cada controlador, o el grupo que comparte gabinete, va dentro de un recuadro punteado con su dimensión */
+      if (!fila.ip && cfg.paneles !== false) {
         let i = 0;
         while (i < n) {
           const nd = nodes[i]; let j = i;
-          if (nd.k === 'ctrl' && nd.gab) { while (j + 1 < n && nodes[j + 1].k === 'ctrl' && nodes[j + 1].gab === nd.gab) j++; }
-          if (j > i) {
-            const x1 = X0 + i * COLW - 16, x2 = X0 + j * COLW + COLW - 34, hh = Math.max(...nodes.slice(i, j + 1).map(altNodo));
-            rect(g, x1, busY - 58, x2 - x1, hh + 52, { dash: '6 4', w: 0.9, fill: 'none' });
-            mv(g, 'gab:' + nd.gab, (sg) => { txt(sg, (x1 + x2) / 2, busY - 64, 'Gabinete ' + nd.gab + (dimDe(nd.c) ? ' — Panel ' + dimDe(nd.c) : ''), { size: 9, bold: true, anchor: 'middle' }); });
+          if (nd.k === 'ctrl') {
+            if (nd.gab) while (j + 1 < n && nodes[j + 1].k === 'ctrl' && nodes[j + 1].gab === nd.gab) j++;
+            const x1 = X0 + i * COLW - 14, x2 = X0 + j * COLW + COLW - 34;
+            rect(g, x1, busY - 30, x2 - x1, 156, { dash: '6 4', w: 0.9, fill: 'none' });
+            mv(g, 'gab:' + (nd.gab || nd.c.id), (sg) => txt(sg, (x1 + x2) / 2, busY - 36, (nd.gab && j > i ? nd.gab + ' — ' : '') + 'Panel ' + dimDe(nd.c), { size: 9, bold: true, anchor: 'middle' }));
           }
           i = j + 1;
         }
@@ -235,7 +236,6 @@
           const c = nd.c, d = det[c.id], t = d.t, esCP = c.tipo === 'CP', n1 = C.nivelDe(c.nivel);
           mv(g, 'n:' + c.id + ':tag', (sg) => {
             txt(sg, cx, busY - 8, C.nombreCtrl(c), { size: 11, bold: true, anchor: 'middle' });
-            if (!nd.gab && dimDe(c)) txt(sg, cx, busY - 22, 'Panel ' + dimDe(c), { size: 8.5, bold: true, anchor: 'middle' });
           });
           simCS(g, xs, busY + 28);
           if (esCP) rect(g, xs + 22, busY + 42, 12, 8, { fill: '#000' });
@@ -372,10 +372,10 @@
 
   BMS.pDiagrama = (root) => {
     const E = BMS.estado;
-    E.diagrama = Object.assign({ lamina: 'BMS-01', awg: '16', licencias: true, colores: true, troncal: 'auto', notas: '', mv: {} }, E.diagrama || {});
+    E.diagrama = Object.assign({ lamina: 'BMS-01', awg: '16', licencias: true, colores: true, paneles: true, troncal: 'auto', notas: '', mv: {} }, E.diagrama || {});
     const D = E.diagrama;
     const campo = (rot, k, w) => h('label', { class: 'f' }, rot, h('input', { class: 'in', style: { width: w || '110px' }, value: D[k] || '', onchange: (e) => { D[k] = e.target.value; BMS.touch(); BMS.rerender(); } }));
-    const sel = (rot, k, opts, val) => h('label', { class: 'f' }, rot, h('select', { class: 'in', value: val, onchange: (e) => { D[k] = k === 'licencias' || k === 'colores' ? e.target.value === '1' : e.target.value; BMS.touch(); BMS.rerender(); } }, opts.map(([v, t]) => h('option', { value: v }, t))));
+    const sel = (rot, k, opts, val) => h('label', { class: 'f' }, rot, h('select', { class: 'in', value: val, onchange: (e) => { D[k] = k === 'licencias' || k === 'colores' || k === 'paneles' ? e.target.value === '1' : e.target.value; BMS.touch(); BMS.rerender(); } }, opts.map(([v, t]) => h('option', { value: v }, t))));
     /* Visor con zoom (botones y Ctrl + rueda), mano para desplazar y mover textos. */
     const svg = construir(), VB = svg.viewBox.baseVal, HOJA = VB.width;
     BMS.ui.modo = BMS.ui.modo || 'mano';
@@ -425,6 +425,7 @@
       h('div', { class: 'fila noprint' }, campo('Lámina', 'lamina'), campo('Calibre señales (AWG)', 'awg', '80px'),
         sel('Troncal entre controladores', 'troncal', [['auto', 'Según la marca'], ['B', 'BACnet MS/TP (B)'], ['A', 'BACnet IP (A)']], D.troncal || 'auto'),
         sel('Licencias y servidor', 'licencias', [['1', 'Mostrar'], ['0', 'Ocultar']], D.licencias ? '1' : '0'),
+        sel('Paneles de controladores', 'paneles', [['1', 'Mostrar'], ['0', 'Ocultar']], D.paneles !== false ? '1' : '0'),
         sel('Colores de cableado', 'colores', [['1', 'Por clave (como el plano)'], ['0', 'Blanco y negro']], D.colores !== false ? '1' : '0'),
         h('label', { class: 'f', style: { flex: '1', minWidth: '260px' } }, 'Nota 1 (vacía = nota estándar de IP fijas)', h('input', { class: 'in', value: D.notas || '', onchange: (e) => { D.notas = e.target.value; BMS.touch(); BMS.rerender(); } }))),
       h('div', { class: 'fila noprint' },

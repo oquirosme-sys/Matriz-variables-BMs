@@ -103,6 +103,7 @@
     /* Controladores */
     const cuerpoC = h('tbody');
     E.gabDim = E.gabDim || {};
+    const detMap = {}; BMS.calc.motor(BMS.calc.todo(), P.marca).detalle.forEach((d) => (detMap[d.c.id] = d));
     const pintaCtrl = () => {
       cuerpoC.replaceChildren();
       const ord = E.controladores.map((c, i) => ({ c, i })).sort((a, b) => E.niveles.findIndex((n) => n.id === a.c.nivel) - E.niveles.findIndex((n) => n.id === b.c.nivel) || (a.c.tipo === 'CP' ? -1 : 1) - (b.c.tipo === 'CP' ? -1 : 1));
@@ -117,7 +118,7 @@
           nm,
           h('td', null, h('input', { class: 'in', style: { width: '100%' }, value: c.ubicacion || '', onchange: (e) => { c.ubicacion = e.target.value; BMS.touch(); } })),
           h('td', null, h('input', { class: 'in', style: { width: '110px' }, list: 'gabs', placeholder: 'Sin gabinete', value: c.gab || '', onchange: (e) => { c.gab = e.target.value.trim(); BMS.touch(); BMS.rerender(); } })),
-          h('td', null, h('input', { class: 'in', style: { width: '110px' }, placeholder: '70x50 cm', value: E.gabDim[c.gab || c.id] || '', onchange: (e) => { E.gabDim[c.gab || c.id] = e.target.value.trim(); BMS.touch(); } })),
+          h('td', null, h('input', { class: 'in', style: { width: '110px' }, list: 'dims', placeholder: 'Sugerido ' + BMS.calc.panelSugerido(BMS.calc.unidadesPanel(c, detMap)), title: 'Dimensión del panel (gabinete). Si se deja vacía, el diagrama usa la sugerida según el hardware elegido.', value: E.gabDim[c.gab || c.id] || '', onchange: (e) => { E.gabDim[c.gab || c.id] = e.target.value.trim(); BMS.touch(); } })),
           h('td', null, h('input', { class: 'in', style: { width: '100%' }, value: c.obs || '', onchange: (e) => { c.obs = e.target.value; BMS.touch(); } })),
           h('td', { class: 'c' }, h('button', { class: 'b x', onclick: () => {
             const nq = E.equipos.filter((q) => q.ctrl === c.id).length;
@@ -136,8 +137,9 @@
     };
     root.append(h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Controladores'),
       h('p', { class: 'hint' }, 'El consecutivo se cuenta por nivel y por tipo (CS-N2-01, CS-N2-02…). El modelo de cada controlador se escoge en la pestaña 5. Gabinete: los controladores que estén en el mismo cuarto y compartan nombre de gabinete se dibujan dentro de un mismo panel (recuadro punteado); la dimensión del panel se escribe una vez por gabinete.'),
+      h('datalist', { id: 'dims' }, BMS.calc.PANELES.map((x) => h('option', { value: x[0] }))),
       h('datalist', { id: 'gabs' }, [...new Set(E.controladores.map((c) => c.gab).filter(Boolean))].map((g) => h('option', { value: g }))),
-      h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tipo', 'Nivel', 'Consec.', 'Nombre', 'Cuarto / ubicación', 'Gabinete', 'Dim. panel', 'Observación', ''].map((x) => h('th', null, x)))), cuerpoC)),
+      h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tipo', 'Nivel', 'Consec.', 'Nombre', 'Cuarto / ubicación', 'Gabinete', 'Panel (dimensión)', 'Observación', ''].map((x) => h('th', null, x)))), cuerpoC)),
       h('div', { class: 'fila' },
         h('button', { class: 'b p', onclick: () => agregar('CS') }, '+ Controlador secundario (CS)'),
         h('button', { class: 'b', onclick: () => agregar('CP') }, '+ Controlador principal (CP)'),
