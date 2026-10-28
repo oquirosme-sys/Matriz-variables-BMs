@@ -20,6 +20,9 @@
     return r;
   };
 
+  /* Panel o equipo con BACnet/IP: sus señales son internas del panel y llegan al BMS por la red (INT), no por cable. */
+  const esIP = (eq, tipo) => !!tipo && (eq.ip != null ? !!eq.ip : !!tipo.ip);
+
   /* Calcula todo el proyecto: filas de equipos con asignación de controlador y totales agrupados. */
   function todo() {
     const E = BMS.estado;
@@ -35,9 +38,12 @@
       const qty = num(eq.qty);
       const f = { eq, tipo, ctrlId: null, auto: false, t: vacio(), puntos: [] };
       if (tipo) {
+        const ip = esIP(eq, tipo);
+        f.ip = ip;
         for (const p of tipo.pts) {
           const incl = !(eq.excl || []).includes(p.id);
           const pt = { p, incl, ai: p.ai * qty, ao: p.ao * qty, di: p.di * qty, do: p.do * qty, int: p.int * qty };
+          if (ip) { pt.int = pt.ai + pt.ao + pt.di + pt.do + pt.int; pt.ai = pt.ao = pt.di = pt.do = 0; }
           f.puntos.push(pt);
           if (incl) for (const k of [...CLASES, 'int']) f.t[k] += pt[k];
         }
@@ -179,5 +185,5 @@
     return lista;
   }
 
-  Object.assign(BMS, { calc: { todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
+  Object.assign(BMS, { calc: { esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
 })();

@@ -77,6 +77,7 @@
         const i = BMS.catEq.tipos.findIndex((x) => x.id === t.id);
         if (i < 0) BMS.catEq.tipos.push(clone(t));
         else if ((base.corregidos || []).includes(t.id)) BMS.catEq.tipos[i] = clone(t);
+        else if (t.ip !== undefined && BMS.catEq.tipos[i].ip === undefined) BMS.catEq.tipos[i].ip = t.ip;
       });
       BMS.catEq.version = base.version; BMS.catEq.corregidos = base.corregidos;
       BMS.guardarCatEq();

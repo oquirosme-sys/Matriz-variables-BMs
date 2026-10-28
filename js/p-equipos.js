@@ -78,6 +78,7 @@
         const selTipo = combo(tipo ? tipo.nombre : '(tipo eliminado del catálogo)', 'Escriba para cambiar el equipo…', (t) => {
           eq.tipoId = t.id; eq.excl = []; eq.tag = etiquetaTag(t); BMS.touch(); BMS.rerender();
         }, '300px');
+        const ipCell = h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: C.esIP(eq, tipo), disabled: !tipo, title: 'Panel con BACnet/IP: todas sus señales son internas del panel y llegan al BMS por la red (INT), no por cable al controlador. En el diagrama se dibuja pegado a la red IP.', onchange: (ev) => { eq.ip = ev.target.checked; BMS.touch(); BMS.rerender(); } }));
         const ctlCell = h('td', null);
         const ctlName = h('span', { class: 'mute', style: { marginLeft: '6px', fontSize: '12px' } });
         (celdas[eq.id] = celdas[eq.id] || {}).ctl = ctlName;
@@ -87,12 +88,12 @@
           h('td', null, selTipo),
           h('td', null, h('input', { class: 'in', style: { width: '120px' }, value: eq.tag || '', placeholder: 'Tag(s)', onchange: (e) => { eq.tag = e.target.value; BMS.touch(); } })),
           h('td', null, h('input', { class: 'in n', type: 'number', min: 0, step: 1, value: eq.qty, onchange: (e) => { eq.qty = Math.max(0, Math.round(num(e.target.value))); e.target.value = eq.qty; BMS.touch(); actualizar(); } })),
-          ctlCell, c('ai'), c('ao'), c('di'), c('do'), c('int'), c('tot'),
+          ipCell, ctlCell, c('ai'), c('ao'), c('di'), c('do'), c('int'), c('tot'),
           h('td', null, h('input', { class: 'in', style: { width: '160px' }, value: eq.obs || '', placeholder: 'Observación', onchange: (e) => { eq.obs = e.target.value; BMS.touch(); } })),
           h('td', { class: 'c' }, h('button', { class: 'b x', title: 'Quitar', onclick: () => { E.equipos.splice(E.equipos.indexOf(eq), 1); BMS.ui.abiertos.delete(eq.id); BMS.touch(); BMS.rerender(); } }, '✕'))));
         if (abierto && tipo) {
           const pc = (pt, k) => { const e = h('td', { class: 'r calc' }); pcel[eq.id + ':' + pt.p.id + ':' + k] = e; return e; };
-          cuerpo.append(h('tr', { class: 'det' }, h('td', { colspan: 13 },
+          cuerpo.append(h('tr', { class: 'det' }, h('td', { colspan: 14 },
             tipo.nota ? h('div', { class: 'mute', style: { padding: '4px 2px', fontSize: '12px' } }, 'Origen: ' + tipo.nota) : null,
             h('table', { class: 't' }, h('thead', null, h('tr', null, ['Incl.', 'Descripción / punto', 'Qty', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total AI', 'Total AO', 'Total DI', 'Total DO', 'Total INT', 'Total puntos', 'Alarma', 'Tendencia', 'Interfaz'].map((x) => h('th', null, x)))),
               h('tbody', null, f.puntos.map((pt) => h('tr', null,
@@ -103,7 +104,7 @@
                 h('td', { class: 'c' }, pt.p.alm || '—'), h('td', { class: 'c' }, pt.p.tend || '—'), h('td', null, pt.p.ifc))))))));
         }
       });
-      if (!filasNivel().length) cuerpo.append(h('tr', null, h('td', { colspan: 13, class: 'mute', style: { padding: '14px' } }, 'Sin equipos en este nivel. Use "Agregar equipo" o copie los de otro nivel.')));
+      if (!filasNivel().length) cuerpo.append(h('tr', null, h('td', { colspan: 14, class: 'mute', style: { padding: '14px' } }, 'Sin equipos en este nivel. Use "Agregar equipo" o copie los de otro nivel.')));
     };
 
     /* Actualiza solo los números (no reconstruye los campos para no perder el foco). */
@@ -154,7 +155,7 @@
       h('div', { class: 'fila noprint' }, buscador),
       h('div', { class: 'fila noprint' }, selAgregar, selCopiar, h('button', { class: 'b', onclick: copiar }, 'Copiar')),
       h('div', { class: 'scroll' }, h('table', { class: 't' },
-        h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Cant.', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),
+        h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Cant.', 'BACnet/IP', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),
       h('div', { class: 'fila noprint' }, h('button', { class: 'b p', onclick: () => BMS.ir('resumen') }, 'Siguiente: resumen →')))));
     pintaFilas(); actualizar();
   };
