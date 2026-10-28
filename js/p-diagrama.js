@@ -4,6 +4,9 @@
   const { h, cut } = BMS;
   const NS = 'http://www.w3.org/2000/svg';
   const INK = '#111', GRIS = '#555';
+  const COLOR = { A: '#ff9e7f', B: '#ff0000', C: '#00ffff', D: '#ff00ff' };
+  let coloresOn = true;
+  const col = (k) => (coloresOn && COLOR[k]) || INK;
 
   /* ---- primitivas SVG (trazo fino tipo plano) ---- */
   const s = (tag, a, txt) => {
@@ -12,7 +15,7 @@
     if (txt != null) e.textContent = txt;
     return e;
   };
-  const line = (g, x1, y1, x2, y2, o = {}) => g.append(s('line', { x1, y1, x2, y2, stroke: INK, 'stroke-width': o.w || 1, 'stroke-dasharray': o.dash || null }));
+  const line = (g, x1, y1, x2, y2, o = {}) => g.append(s('line', { x1, y1, x2, y2, stroke: o.color || INK, 'stroke-width': o.w || 1, 'stroke-dasharray': o.dash || null }));
   const rect = (g, x, y, w, hh, o = {}) => g.append(s('rect', { x, y, width: w, height: hh, rx: o.r || 0, fill: o.fill || '#fff', stroke: o.stroke || INK, 'stroke-width': o.w || 1, 'stroke-dasharray': o.dash || null }));
   const txt = (g, x, y, t, o = {}) => g.append(s('text', { x, y, 'font-size': o.size || 9, 'font-weight': o.bold ? 700 : 400, 'text-anchor': o.anchor || 'start', fill: o.fill || INK }, String(t).toUpperCase()));
   const wrap = (t, n) => { const out = []; let cur = ''; String(t).split(' ').forEach((w) => { if ((cur + ' ' + w).trim().length > n) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }); if (cur) out.push(cur); return out; };
@@ -81,7 +84,7 @@
   const dibujaItem = (g, x, yy, it, n) => {
     const directo = it.t.ai + it.t.ao + it.t.di + it.t.do === 0 && it.t.int > 0;
     clave(g, x + 18, yy - 22, directo ? 'A' : 'D');
-    line(g, x, yy - 14, x + 14, yy, { w: 1.8 }); equipoX(g, x + 14, yy - 9, 18);
+    line(g, x, yy - 14, x + 14, yy, { w: 1.8, color: col(directo ? 'A' : 'D') }); equipoX(g, x + 14, yy - 9, 18);
     const nom = etiqueta(it) + (it.tags[0] && !etiqueta(it).toUpperCase().includes(it.tags[0].toUpperCase().replace(/-$/, '')) ? ' ' + it.tags[0] : '') + (it.qty > 1 ? ' ×' + it.qty : '');
     const ls = wrap(nom, n).slice(0, 2);
     ls.forEach((l, i) => txt(g, x + 38, yy - 3 + i * 9.5, i === 1 && wrap(nom, n).length > 2 ? cut(l, n) : l, { size: 8.5 }));
@@ -92,6 +95,7 @@
   function construir() {
     const { E, P, C, res, mot, M, det } = datos();
     const cfgD = E.diagrama;
+    coloresOn = cfgD.colores !== false;
     const W = 2592, COLW = 218, X0 = 330, PORFILA = 10, MAXIT = 8;
     const cps = E.controladores.filter((c) => c.tipo === 'CP');
     const principal = cps[0] || null;
@@ -133,18 +137,19 @@
     const busIni = principal ? 192 : 60;
     if (principal) {
       const d = det[principal.id], pBus = pos[0].busY;
-      line(g, 108, 270, 108, pBus - 40, { w: 2 }); rect(g, 103, 330, 10, 10); clave(g, 128, 352, 'A');
+      line(g, 108, 270, 108, pBus - 40, { w: 2.4, color: col('A') }); rect(g, 103, 330, 10, 10); clave(g, 128, 352, 'A');
       txt(g, 140, 336, 'Salida de TO, ver láminas T-2XX (por otros)', { size: 8.5 });
-      line(g, 108, pBus - 40, 108, pBus + 10, { w: 2 });
+      line(g, 108, pBus - 40, 108, pBus + 10, { w: 2.4, color: col('A') });
       simCP(g, 44, pBus + 10);
       txt(g, 120, pBus - 36, C.nombreCtrl(principal), { size: 12, bold: true });
       txt(g, 120, pBus - 24, 'Controlador', { size: 9 }); txt(g, 120, pBus - 13, 'principal', { size: 9 });
       plug(g, 20, pBus + 40); txt(g, 8, pBus + 66, '120 V,', { size: 7.5 }); txt(g, 8, pBus + 75, 'UPS', { size: 7.5 });
       txt(g, 46, pBus + 100, mot.motor ? 'Motor de red ' + mot.motor.cod : 'Motor de red por definir', { size: 8.5 });
       txt(g, 46, pBus + 111, d && d.cfg.base ? d.cfg.baseQty + '×' + d.cfg.base : '', { size: 8.5 });
-      line(g, 172, pBus + 40, busIni + 20, pBus + 40, { w: 2.4 }); line(g, busIni + 20, pBus + 40, busIni + 48, pBus, { w: 2.4 });
+      const cB = (M && M.bus) || 'B';
+      line(g, 172, pBus + 40, busIni + 20, pBus + 40, { w: 2.4, color: col(cB) }); line(g, busIni + 20, pBus + 40, busIni + 48, pBus, { w: 2.4, color: col(cB) });
       const kP = Math.min(itsP.length, MAXIT);
-      if (kP) line(g, 62, pBus + 74, 62, pBus + 138 + (kP - 1) * ITH - 14, { w: 1.8 });
+      if (kP) line(g, 62, pBus + 74, 62, pBus + 138 + (kP - 1) * ITH - 14, { w: 1.8, color: col('D') });
       itsP.slice(0, MAXIT).forEach((it, i) => dibujaItem(g, 62, pBus + 138 + i * ITH, it, 34));
       if (itsP.length > MAXIT) txt(g, 80, pBus + 138 + MAXIT * ITH, '+ ' + (itsP.length - MAXIT) + ' tipos de equipo más (ver matriz)', { size: 8, fill: GRIS });
     } else {
@@ -158,7 +163,7 @@
       const { busY } = pos[ri], n = fila.length;
       const xIni = ri === 0 ? busIni + 30 : 40, xFin = n ? X0 + (n - 1) * COLW + 50 + 60 : xIni + 40;
       const xs0 = ri === 0 && principal ? busIni + 48 : xIni;
-      g.append(s('path', { d: `M${xs0} ${busY} ` + fila.map((_, i) => { const c0 = X0 + i * COLW + 50; return `H${c0 - 16} L${c0} ${busY + 22} L${c0 + 16} ${busY}`; }).join(' ') + ` H${xFin}`, fill: 'none', stroke: INK, 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
+      g.append(s('path', { d: `M${xs0} ${busY} ` + fila.map((_, i) => { const c0 = X0 + i * COLW + 50; return `H${c0 - 16} L${c0} ${busY + 22} L${c0 + 16} ${busY}`; }).join(' ') + ` H${xFin}`, fill: 'none', stroke: col(busK), 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
       if (ri > 0) { txt(g, 40, busY - 10, 'Continúa troncal (fila ' + (ri + 1) + ')', { size: 8.5 }); clave(g, 150, busY, busK); }
       fila.forEach((nd, i) => {
         const x = X0 + i * COLW, xs = x + 22, cx = xs + 28;
@@ -180,7 +185,7 @@
           if (mods) { const ls = wrap(mods, 24); ls.slice(0, 3).forEach((l, q) => txt(g, xs + 68, busY + 86 + q * 10, l, { size: 7.5, fill: GRIS })); }
           if (d.ev.falta) { g.append(s('circle', { cx: xs + 62, cy: busY + 34, r: 5, fill: '#c00' })); }
           const kC = Math.min(nd.its.length, MAXIT);
-          if (kC) line(g, cx, busY + 114, cx, busY + 142 + (kC - 1) * ITH - 14, { w: 1.8 });
+          if (kC) line(g, cx, busY + 114, cx, busY + 142 + (kC - 1) * ITH - 14, { w: 1.8, color: col('D') });
           nd.its.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + 142 + q * ITH, it, 24));
           if (nd.its.length > MAXIT) txt(g, cx + 38, busY + 142 + MAXIT * ITH, '+ ' + (nd.its.length - MAXIT) + ' tipos más (ver matriz)', { size: 8, fill: GRIS });
         } else {
@@ -190,8 +195,8 @@
           txt(g, cx, busY + 66, nd.gw, { size: 9, anchor: 'middle', bold: true });
           const host = nd.host ? E.controladores.find((c) => c.id === nd.host) : null;
           if (host) txt(g, cx, busY + 77, 'Cerca de ' + C.nombreCtrl(host), { size: 7.5, anchor: 'middle', fill: GRIS });
-          line(g, cx, busY + 82, cx, busY + 100, { w: 1.8 }); clave(g, cx, busY + 100, nd.clave);
-          g.append(s('path', { d: `M${cx} ${busY + 108} V${busY + 114} H${cx - 108} V${busY + 190} H${cx - 100}`, fill: 'none', stroke: INK, 'stroke-width': 1.8, 'stroke-linejoin': 'round' }));
+          line(g, cx, busY + 82, cx, busY + 100, { w: 1.8, color: col(nd.clave) }); clave(g, cx, busY + 100, nd.clave);
+          g.append(s('path', { d: `M${cx} ${busY + 108} V${busY + 114} H${cx - 108} V${busY + 190} H${cx - 100}`, fill: 'none', stroke: col(nd.clave), 'stroke-width': 1.8, 'stroke-linejoin': 'round' }));
           para(g, cx, busY + 124, 'Contratista de BMS debe integrar estos equipos y velar porque sean compatibles con su solución (suministrados e instalados por otros)', 40, { size: 7.5, anchor: 'middle', lh: 9 });
           rect(g, cx - 100, busY + 178, 200, 14 + nd.items.length * 36, { dash: '5 4', w: 0.8 });
           nd.items.forEach((it, q) => {
@@ -214,7 +219,7 @@
       ['B', 'BACnet MS/TP.', 'Cableado igual o superior a Belden 9841 en tubería EMT. En exteriores usar Belden 5502G1.'],
       ['C', 'Modbus RTU.', 'Cableado igual o superior a Belden 9841 en tubería EMT. En exteriores usar Belden 5502G1.'],
       ['D', 'Señales analógicas y digitales.', 'Cableado TFFN #' + awg + ' AWG en tubería EMT o multiconductor equivalente en tubería EMT. Cantidad según matriz I/O.']];
-    claves.forEach((c, i) => { const yy = L + 52 + i * 34; if (i) line(g, 60, yy, 620, yy); clave(g, 90, yy + 17, c[0]); txt(g, 128, yy + 12, c[1], { size: 8.5, bold: true }); para(g, 128, yy + 22, c[2], 92, { size: 7.5, lh: 8 }); });
+    claves.forEach((c, i) => { const yy = L + 52 + i * 34; if (i) line(g, 60, yy, 620, yy); clave(g, 90, yy + 12, c[0]); line(g, 68, yy + 27, 112, yy + 27, { w: 2.6, color: col(c[0]) }); txt(g, 128, yy + 12, c[1], { size: 8.5, bold: true }); para(g, 128, yy + 22, c[2], 92, { size: 7.5, lh: 8 }); });
 
     /* ---- simbología ---- */
     const sb = SIMB[P.marca] || SIMB.JCI, SX = 700, SW = 1000;
@@ -258,7 +263,7 @@
 
   BMS.pDiagrama = (root) => {
     const E = BMS.estado;
-    E.diagrama = Object.assign({ lamina: 'BMS-01', awg: '16', licencias: true, notas: '' }, E.diagrama || {});
+    E.diagrama = Object.assign({ lamina: 'BMS-01', awg: '16', licencias: true, colores: true, notas: '' }, E.diagrama || {});
     const D = E.diagrama;
     const campo = (rot, k, w) => h('label', { class: 'f' }, rot, h('input', { class: 'in', style: { width: w || '110px' }, value: D[k] || '', onchange: (e) => { D[k] = e.target.value; BMS.touch(); BMS.rerender(); } }));
     /* Visor con zoom (botones y Ctrl + rueda) y herramienta de mano para arrastrar la lámina. */
@@ -295,6 +300,7 @@
       h('p', { class: 'hint' }, 'Lámina estándar Sinergia: servidor y LAN arriba, controlador principal a la izquierda, troncal con controladores secundarios y los equipos que cuelgan de cada uno, gateways con los equipos integrados, y abajo claves de cableado, simbología, notas y cajetín. Se dibuja solo con los datos del proyecto. Un punto rojo marca un controlador cuya selección no cubre los puntos.'),
       h('div', { class: 'fila noprint' }, campo('Lámina', 'lamina'), campo('Calibre señales (AWG)', 'awg', '80px'),
         h('label', { class: 'f' }, 'Licencias y servidor', h('select', { class: 'in', value: D.licencias ? '1' : '0', onchange: (e) => { D.licencias = e.target.value === '1'; BMS.touch(); BMS.rerender(); } }, h('option', { value: '1' }, 'Mostrar'), h('option', { value: '0' }, 'Ocultar'))),
+        h('label', { class: 'f' }, 'Colores de cableado', h('select', { class: 'in', value: D.colores !== false ? '1' : '0', onchange: (e) => { D.colores = e.target.value === '1'; BMS.touch(); BMS.rerender(); } }, h('option', { value: '1' }, 'Por clave (como el plano)'), h('option', { value: '0' }, 'Blanco y negro'))),
         h('label', { class: 'f', style: { flex: '1', minWidth: '260px' } }, 'Nota 1 (si se deja vacía se usa la nota estándar de IP fijas)', h('input', { class: 'in', value: D.notas || '', onchange: (e) => { D.notas = e.target.value; BMS.touch(); BMS.rerender(); } }))),
       h('div', { class: 'fila noprint' },
         h('button', { class: 'b', onclick: () => { const c = svg.cloneNode(true); c.removeAttribute('style'); const x = new XMLSerializer().serializeToString(c); BMS.descargar('diagrama-unifilar-bms.svg', x, 'image/svg+xml'); } }, 'Descargar SVG'),
