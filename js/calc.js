@@ -49,7 +49,9 @@
         f.auto = true;
         const cand = E.controladores.filter((c) => c.nivel === eq.nivel);
         const cs = cand.filter((c) => c.tipo === 'CS');
-        const lista = cs.length ? cs : cand;
+        let lista = cs.length ? cs : cand;
+        /* Equipos que solo entran por gateway (INT) no necesitan controlador en su nivel: si no hay, van al principal. */
+        if (!lista.length && cable(f.t) === 0 && f.t.int > 0) lista = E.controladores.filter((x) => x.tipo === 'CP');
         if (lista.length) f.ctrlId = lista.reduce((a, b) => (cable(ctrlTotales[b.id]) < cable(ctrlTotales[a.id]) ? b : a)).id;
       }
       const destino = f.ctrlId ? ctrlTotales[f.ctrlId] : sin;
