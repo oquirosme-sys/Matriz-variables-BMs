@@ -50,7 +50,13 @@
     const det = {}; mot.detalle.forEach((d) => (det[d.c.id] = d));
     return { E, P, C, res, mot, M, det };
   }
-  const etiqueta = (it) => it.tipo.nombre.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+  const etiqueta = (it) => {
+    let n = it.tipo.nombre.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+    if (n.length > 34 && n.includes(' / ')) n = n.split(' / ')[0];
+    return n;
+  };
+  /* El tag solo se muestra si aporta: no si es un prefijo de numeración (ACH-C-) ni si repite el nombre (UPS / UPS-01). */
+  const tagUtil = (it, nom) => { const t = (it.tags[0] || '').trim(); if (!t || /-$/.test(t)) return ''; const w = nom.toUpperCase().split(' ')[0]; return t.toUpperCase().startsWith(w) || nom.toUpperCase().includes(t.toUpperCase()) ? '' : t; };
 
   /* Equipos cableados de un controlador agrupados por tipo. */
   function itemsCtrl(res, cid) {
@@ -326,7 +332,7 @@
     const directo = it.t.ai + it.t.ao + it.t.di + it.t.do === 0 && it.t.int > 0;
     clave(g, x + 18, yy - 22, directo ? 'A' : 'D');
     line(g, x, yy - 14, x + 14, yy, { w: 1.8, color: col(directo ? 'A' : 'D') }); equipoX(g, x + 14, yy - 9, 18);
-    const nom = etiqueta(it) + (it.tags[0] && !etiqueta(it).toUpperCase().includes(it.tags[0].toUpperCase().replace(/-$/, '')) ? ' ' + it.tags[0] : '') + (it.qty > 1 ? ' ×' + it.qty : '');
+    const nom = etiqueta(it) + (tagUtil(it, etiqueta(it)) ? ' ' + tagUtil(it, etiqueta(it)) : '') + (it.qty > 1 ? ' ×' + it.qty : '');
     const all = wrap(nom, n), ls = all.slice(0, 2);
     mv(g, key, (sg) => {
       ls.forEach((l, i) => txt(sg, x + 38, yy - 3 + i * 9.5, i === 1 && all.length > 2 ? cut(l, n) : l, { size: 8.5 }));
@@ -393,7 +399,7 @@
         h('label', { class: 'f', style: { flex: '1', minWidth: '260px' } }, 'Nota 1 (vacía = nota estándar de IP fijas)', h('input', { class: 'in', value: D.notas || '', onchange: (e) => { D.notas = e.target.value; BMS.touch(); BMS.rerender(); } }))),
       h('div', { class: 'fila noprint' },
         h('button', { class: 'b', onclick: () => { const c = svg.cloneNode(true); c.removeAttribute('style'); BMS.descargar('diagrama-unifilar-bms.svg', new XMLSerializer().serializeToString(c), 'image/svg+xml'); } }, 'Descargar SVG'),
-        h('button', { class: 'b', onclick: () => { const st = h('style', { id: 'pgprint' }, '@page { size: 36in 24in landscape; margin: 0 }'); document.head.append(st); window.print(); setTimeout(() => st.remove(), 1500); } }, 'Imprimir / PDF (36×24 in)'),
+        h('button', { class: 'b', onclick: () => { const st = h('style', { id: 'pgprint' }, '@page { size: 36in ' + Math.round(36 * VB.height / VB.width * 10) / 10 + 'in; margin: 0 }'); document.head.append(st); window.print(); setTimeout(() => st.remove(), 1500); } }, 'Imprimir / PDF (36 in de ancho)'),
         h('button', { class: 'b p', onclick: () => BMS.ir('equipos') }, 'Siguiente: equipos por nivel →')),
       barra, visor);
     if (BMS.ui.zoomPx) aplicarZoom(BMS.ui.zoomPx, 0, 0); else setTimeout(ajustar, 0);

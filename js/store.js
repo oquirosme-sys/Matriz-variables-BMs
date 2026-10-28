@@ -39,7 +39,25 @@
     p.niveles = defs.map(([codigo, nombre]) => ({ id: uid(), codigo, nombre }));
     const n1 = p.niveles.find((n) => n.codigo === 'N1');
     p.controladores.push({ id: uid(), tipo: 'CP', nivel: n1.id, consec: 1, ubicacion: 'Cuarto de TI [por confirmar]', obs: 'Motor de red; servidor y switch BMS', modo: 'auto' });
-    p.niveles.forEach((n) => p.controladores.push({ id: uid(), tipo: 'CS', nivel: n.id, consec: 1, ubicacion: '', obs: '', modo: 'auto' }));
+    /* Controladores según el plano EB-6200 (niveles S2, S1, N1 y N2) y la matriz (resto de niveles). */
+    const nv = (c) => p.niveles.find((n) => n.codigo === c).id;
+    const cs = (c, consec, ubicacion, gab, obs) => p.controladores.push({ id: uid(), tipo: 'CS', nivel: nv(c), consec, ubicacion: ubicacion || '', gab: gab || '', obs: obs || '', modo: 'auto' });
+    cs('S2', 1, 'Cuarto de bombas S2', 'GAB-S2-01'); cs('S2', 2, 'Cuarto de bombas S2', 'GAB-S2-01');
+    cs('S1', 1, 'Cuarto eléctrico S1', 'GAB-S1-01'); cs('S1', 2, 'Cuarto eléctrico S1', 'GAB-S1-01'); cs('S1', 7, 'Cuarto de ventilación S1');
+    cs('N1', 1, 'Cuarto de TI [por confirmar]');
+    cs('N2', 1, 'Cocina N2'); cs('N2', 2, 'Cuarto técnico N2'); cs('N2', 3, 'Cuarto técnico N2');
+    ['N3', 'N4', 'N5', 'N6', 'N7', 'AZ'].forEach((c) => cs(c, 1));
+    p.gabDim = { 'GAB-S2-01': '70x50 cm', 'GAB-S1-01': '70x50 cm' };
+    /* Equipos: plano EB-6200 donde está rotulado; matriz Fairfield para el resto (distribución por nivel propuesta, por confirmar). */
+    const q = (c, tipoId, qty, tag) => p.equipos.push({ id: uid(), nivel: nv(c), tipoId, qty, tag, ctrl: 'auto', obs: '', excl: [] });
+    q('S2', 'acs_cal', 3, 'ACH-C'); q('S2', 'iny', 1, 'INY-S201'); q('S2', 'ef_simple', 3, 'EX-S2'); q('S2', 'il_panel', 2, 'TIL-S2'); q('S2', 'bp', 1, 'BP-1'); q('S2', 'bn', 1, 'BN-1'); q('S2', 'bomba_cte', 1, 'BCE-'); q('S2', 'cis', 2, 'CIS-1/2'); q('S2', 'bpl', 2, 'BPL-'); q('S2', 'tci', 1, 'TCI-1');
+    q('S1', 'cargador_ev', 4, 'EV-'); q('S1', 'sensor_co', 1, 'CO-1'); q('S1', 'il_panel', 2, 'TIL-S1'); q('S1', 'iny', 3, 'INY-S1'); q('S1', 'ef_simple', 4, 'EX-S1');
+    q('S1', 'sub', 1, 'SUB-1'); q('S1', 'tr', 1, 'TX-01'); q('S1', 'ge', 1, 'GEN-01'); q('S1', 'ats', 1, 'ATS-1'); q('S1', 'mm_full', 1, 'ION 8650'); q('S1', 'mm', 8, 'MM-1…8'); q('S1', 'itp', 10, 'ITP1…10');
+    q('N1', 'bci', 1, 'BCI-1'); q('N1', 'bj', 1, 'BJ-1'); q('N1', 'ups_gen', 1, 'UPS-01'); q('N1', 'il_panel', 2, 'TIL-N1'); q('N1', 'ef_simple', 6, 'EX-N1'); q('N1', 'asc', 2, 'ASC-'); q('N1', 'vrf_evap', 5, 'UE-1…5');
+    q('N1', 'facp_gw', 1, 'FACP-GW'); q('N1', 'seg_gw', 1, 'SEG-GW'); q('N1', 'grms_gw', 1, 'GRMS-GW'); q('N1', 'pms', 1, 'PMS-IF');
+    q('N2', 'campana', 4, 'EH-'); q('N2', 'il_panel', 1, 'TIL-N2'); q('N2', 'vrf_evap', 5, 'UE-6…10');
+    ['N1', 'N2', 'N3', 'N4', 'N5', 'N6', 'N7'].forEach((c) => { q(c, 'grms_n', 1, 'GRMS-' + c); q(c, 'facp_z', 1, 'FACP-Z-' + c); });
+    q('AZ', 'doas', 1, 'DOAS-1'); q('AZ', 'afex', 2, 'AFEX-'); q('AZ', 'iny_vfd', 8, 'INY-'); q('AZ', 'iny', 2, 'INY-9/10'); q('AZ', 'ef', 5, 'EF-1…5'); q('AZ', 'pe_esc', 2, 'PE-'); q('AZ', 'sensor_amb', 4, 'TS/HS-'); q('AZ', 'estacion_ext', 1, 'TE/HE-1'); q('AZ', 'vrf_cond', 1, 'UC-1'); q('AZ', 'itouch', 1, 'iTouch'); q('AZ', 'pdt', 1, 'PDT-INY');
     return p;
   };
 
