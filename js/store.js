@@ -54,6 +54,7 @@
     q('S1', 'cargador_ev', 4, 'EV-'); q('S1', 'sensor_co', 1, 'CO-1'); q('S1', 'il_panel', 2, 'TIL-S1'); q('S1', 'iny', 3, 'INY-S1'); q('S1', 'ef_simple', 4, 'EX-S1');
     q('S1', 'sub', 1, 'SUB-1'); q('S1', 'tr', 1, 'TX-01'); q('S1', 'ge', 1, 'GEN-01'); q('S1', 'ats', 1, 'ATS-1'); q('S1', 'mm_full', 1, 'ION 8650'); q('S1', 'mm', 8, 'MM-1…8'); q('S1', 'itp', 10, 'ITP1…10');
     q('N1', 'bci', 1, 'BCI-1'); q('N1', 'bj', 1, 'BJ-1'); q('N1', 'ups_gen', 1, 'UPS-01'); q('N1', 'il_panel', 2, 'TIL-N1'); q('N1', 'ef_simple', 6, 'EX-N1'); q('N1', 'asc', 2, 'ASC-'); q('N1', 'vrf_evap', 5, 'UE-1…5');
+    q('N1', 'dx_mane', 8, 'BCU-0201…S201'); /* 8 manejadoras BCU según la tabla de especificaciones (Fitness, Food prep, Restaurante, Área de estar, Recepción, Comedor) */
     q('N1', 'facp_gw', 1, 'FACP-GW'); q('N1', 'seg_gw', 1, 'SEG-GW'); q('N1', 'grms_gw', 1, 'GRMS-GW'); q('N1', 'pms', 1, 'PMS-IF');
     q('N2', 'campana', 4, 'EH-'); q('N2', 'il_panel', 1, 'TIL-N2'); q('N2', 'vrf_evap', 5, 'UE-6…10');
     ['N1', 'N2', 'N3', 'N4', 'N5', 'N6', 'N7'].forEach((c) => { q(c, 'grms_n', 1, 'GRMS-' + c); q(c, 'facp_z', 1, 'FACP-Z-' + c); });
