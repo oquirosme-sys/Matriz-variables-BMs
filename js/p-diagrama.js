@@ -399,6 +399,7 @@
         h('label', { class: 'f', style: { flex: '1', minWidth: '260px' } }, 'Nota 1 (vacía = nota estándar de IP fijas)', h('input', { class: 'in', value: D.notas || '', onchange: (e) => { D.notas = e.target.value; BMS.touch(); BMS.rerender(); } }))),
       h('div', { class: 'fila noprint' },
         h('button', { class: 'b', onclick: () => { const c = svg.cloneNode(true); c.removeAttribute('style'); BMS.descargar('diagrama-unifilar-bms.svg', new XMLSerializer().serializeToString(c), 'image/svg+xml'); } }, 'Descargar SVG'),
+        h('button', { class: 'b', title: 'Archivo DXF para AutoCAD con capas por tipo de cableado. En AutoCAD use Guardar como… DWG.', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms.dxf', BMS.svgADxf(c), 'application/dxf'); } }, 'Descargar DXF (AutoCAD / DWG)'),
         h('button', { class: 'b', onclick: () => { const st = h('style', { id: 'pgprint' }, '@page { size: 36in ' + Math.round(36 * VB.height / VB.width * 10) / 10 + 'in; margin: 0 }'); document.head.append(st); window.print(); setTimeout(() => st.remove(), 1500); } }, 'Imprimir / PDF (36 in de ancho)'),
         h('button', { class: 'b p', onclick: () => BMS.ir('equipos') }, 'Siguiente: equipos por nivel →')),
       barra, visor);
