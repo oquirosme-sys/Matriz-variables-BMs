@@ -261,15 +261,46 @@
     E.diagrama = Object.assign({ lamina: 'BMS-01', awg: '16', licencias: true, notas: '' }, E.diagrama || {});
     const D = E.diagrama;
     const campo = (rot, k, w) => h('label', { class: 'f' }, rot, h('input', { class: 'in', style: { width: w || '110px' }, value: D[k] || '', onchange: (e) => { D[k] = e.target.value; BMS.touch(); BMS.rerender(); } }));
+    /* Visor con zoom (botones y Ctrl + rueda) y herramienta de mano para arrastrar la lámina. */
+    const svg = construir(), HOJA = 2592;
+    const visor = h('div', { class: 'diag' + (BMS.ui.mano === false ? '' : ' mano') }, svg);
+    const pct = h('span', { class: 'mute', style: { minWidth: '48px', textAlign: 'center' } });
+    function aplicarZoom(px, cx, cy) {
+      const w0 = svg.getBoundingClientRect().width || px;
+      const fx = (visor.scrollLeft + cx) / w0, fy = (visor.scrollTop + cy) / w0;
+      const w1 = Math.max(600, Math.min(9000, Math.round(px)));
+      BMS.ui.zoomPx = w1; svg.style.width = w1 + 'px'; svg.style.minWidth = '0'; svg.style.maxWidth = 'none';
+      pct.textContent = Math.round(w1 / HOJA * 100) + ' %';
+      visor.scrollLeft = fx * w1 - cx; visor.scrollTop = fy * w1 - cy;
+    }
+    const centro = () => [visor.clientWidth / 2, visor.clientHeight / 2];
+    const zoomPor = (f) => { const [cx, cy] = centro(); aplicarZoom((BMS.ui.zoomPx || 1500) * f, cx, cy); };
+    visor.addEventListener('wheel', (e) => { if (!e.ctrlKey) return; e.preventDefault(); const r = visor.getBoundingClientRect(); aplicarZoom((BMS.ui.zoomPx || 1500) * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+    visor.addEventListener('pointerdown', (e) => {
+      if (!visor.classList.contains('mano') || e.button !== 0) return;
+      const x0 = e.clientX, y0 = e.clientY, sl = visor.scrollLeft, st = visor.scrollTop;
+      visor.setPointerCapture(e.pointerId); visor.classList.add('arr');
+      const mover = (m) => { visor.scrollLeft = sl - (m.clientX - x0); visor.scrollTop = st - (m.clientY - y0); };
+      const fin = () => { visor.classList.remove('arr'); visor.removeEventListener('pointermove', mover); visor.removeEventListener('pointerup', fin); visor.removeEventListener('pointercancel', fin); };
+      visor.addEventListener('pointermove', mover); visor.addEventListener('pointerup', fin); visor.addEventListener('pointercancel', fin);
+    });
+    const btnMano = h('button', { class: 'b' + (BMS.ui.mano === false ? '' : ' p'), title: 'Mano: arrastre la lámina para moverla', onclick: () => { BMS.ui.mano = BMS.ui.mano === false; visor.classList.toggle('mano', BMS.ui.mano); btnMano.classList.toggle('p', BMS.ui.mano); } }, '✋ Mano');
+    const barra = h('div', { class: 'fila noprint' },
+      h('button', { class: 'b', title: 'Alejar', onclick: () => zoomPor(1 / 1.25) }, '− Zoom'), pct,
+      h('button', { class: 'b', title: 'Acercar', onclick: () => zoomPor(1.25) }, '+ Zoom'),
+      h('button', { class: 'b', title: 'Ajustar la lámina al ancho disponible', onclick: () => aplicarZoom((visor.clientWidth || 1500) - 2, 0, 0) }, 'Ajustar'),
+      h('button', { class: 'b', title: 'Tamaño real de la lámina (100 %)', onclick: () => aplicarZoom(HOJA, 0, 0) }, '100 %'),
+      btnMano, h('span', { class: 'mute', style: { fontSize: '12px' } }, 'Ctrl + rueda del mouse también hace zoom'));
     root.append(h('h2', null, 'Diagrama unifilar del sistema de monitoreo y control'),
       h('p', { class: 'hint' }, 'Lámina estándar Sinergia: servidor y LAN arriba, controlador principal a la izquierda, troncal con controladores secundarios y los equipos que cuelgan de cada uno, gateways con los equipos integrados, y abajo claves de cableado, simbología, notas y cajetín. Se dibuja solo con los datos del proyecto. Un punto rojo marca un controlador cuya selección no cubre los puntos.'),
       h('div', { class: 'fila noprint' }, campo('Lámina', 'lamina'), campo('Calibre señales (AWG)', 'awg', '80px'),
         h('label', { class: 'f' }, 'Licencias y servidor', h('select', { class: 'in', value: D.licencias ? '1' : '0', onchange: (e) => { D.licencias = e.target.value === '1'; BMS.touch(); BMS.rerender(); } }, h('option', { value: '1' }, 'Mostrar'), h('option', { value: '0' }, 'Ocultar'))),
         h('label', { class: 'f', style: { flex: '1', minWidth: '260px' } }, 'Nota 1 (si se deja vacía se usa la nota estándar de IP fijas)', h('input', { class: 'in', value: D.notas || '', onchange: (e) => { D.notas = e.target.value; BMS.touch(); BMS.rerender(); } }))),
       h('div', { class: 'fila noprint' },
-        h('button', { class: 'b', onclick: () => { const x = new XMLSerializer().serializeToString(document.querySelector('.diag svg')); BMS.descargar('diagrama-unifilar-bms.svg', x, 'image/svg+xml'); } }, 'Descargar SVG'),
+        h('button', { class: 'b', onclick: () => { const c = svg.cloneNode(true); c.removeAttribute('style'); const x = new XMLSerializer().serializeToString(c); BMS.descargar('diagrama-unifilar-bms.svg', x, 'image/svg+xml'); } }, 'Descargar SVG'),
         h('button', { class: 'b', onclick: () => { const st = h('style', { id: 'pgprint' }, '@page { size: 36in 24in landscape; margin: 0 }'); document.head.append(st); window.print(); setTimeout(() => st.remove(), 1500); } }, 'Imprimir / PDF (36×24 in)'),
         h('button', { class: 'b p', onclick: () => BMS.ir('equipos') }, 'Siguiente: equipos por nivel →')),
-      h('div', { class: 'diag' }, construir()));
+      barra, visor);
+    aplicarZoom(BMS.ui.zoomPx || 1500, 0, 0);
   };
 })();
