@@ -4,10 +4,10 @@
 (function () {
   const PX = 72;
   const CAPAS = {
-    'BMS-A-BACNET-IP': 31, 'BMS-B-BACNET-MSTP': 1, 'BMS-C-MODBUS': 4, 'BMS-D-SENALES': 6,
+    'BMS-A-BACNET-IP': 31, 'BMS-B-BACNET-MSTP': 1, 'BMS-C-MODBUS-RTU': 4, 'BMS-E-MODBUS-TCP': 5, 'BMS-D-SENALES': 6,
     'BMS-MARCO': 8, 'BMS-DIBUJO': 7, 'BMS-TEXTO': 7, 'BMS-TEXTO-SEC': 8, 'BMS-ALERTA': 1
   };
-  const POR_COLOR = { '#ff9e7f': 'BMS-A-BACNET-IP', '#ff0000': 'BMS-B-BACNET-MSTP', '#00ffff': 'BMS-C-MODBUS', '#ff00ff': 'BMS-D-SENALES', '#bbb': 'BMS-MARCO', '#c00': 'BMS-ALERTA' };
+  const POR_COLOR = { '#ff9e7f': 'BMS-A-BACNET-IP', '#ff0000': 'BMS-B-BACNET-MSTP', '#00ffff': 'BMS-C-MODBUS-RTU', '#0a2fa8': 'BMS-E-MODBUS-TCP', '#ff00ff': 'BMS-D-SENALES', '#bbb': 'BMS-MARCO', '#c00': 'BMS-ALERTA' };
   const capaTrazo = (e) => POR_COLOR[(e.getAttribute('stroke') || '').toLowerCase()] || 'BMS-DIBUJO';
   const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
   /* Texto: los caracteres fuera de ASCII se escriben como \U+XXXX para no depender de la página de códigos. */

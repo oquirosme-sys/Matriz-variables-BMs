@@ -5,8 +5,8 @@
   const { h, cut } = BMS;
   const NS = 'http://www.w3.org/2000/svg';
   const INK = '#111', GRIS = '#555', W = 2592;
-  /* Colores del plano EB-6200: A BACnet IP, B BACnet MS/TP, C Modbus RTU, D señales, E Modbus TCP/IP */
-  const COLOR = { A: '#ff9e7f', B: '#ff0000', C: '#00ffff', D: '#ff00ff', E: '#00ffff' };
+  /* Colores del plano EB-6200: A BACnet IP, B BACnet MS/TP, C Modbus RTU, D señales, E Modbus TCP/IP (azul oscuro) */
+  const COLOR = { A: '#ff9e7f', B: '#ff0000', C: '#00ffff', D: '#ff00ff', E: '#0a2fa8' };
   let coloresOn = true, cfg = {};
   const col = (k) => (coloresOn && COLOR[k]) || INK;
 
@@ -112,7 +112,8 @@
     const filas = []; let cur = [];
     grupos.forEach((gr) => { if (cur.length && cur.length + gr.length > PORFILA) { filas.push({ nodes: cur }); cur = []; } cur.push(...gr); });
     if (cur.length || !filas.length) filas.push({ nodes: cur });
-    for (let i = 0; i < nodosIP.length; i += PORFILA) filas.push({ nodes: nodosIP.slice(i, i + PORFILA), ip: true });
+    /* Redes IP separadas por protocolo: BACnet/IP (A) y Modbus TCP (E), cada una en su propia línea */
+    ['A', 'E'].forEach((k) => { const l = nodosIP.filter((n) => n.clave === k); for (let i = 0; i < l.length; i += PORFILA) filas.push({ nodes: l.slice(i, i + PORFILA), ip: k }); });
 
     const altP = 150 + kmax(itsP.length) * ITH;
     let y = 400;
@@ -196,10 +197,10 @@
 
     /* ---- troncales y nodos ---- */
     filas.forEach((fila, ri) => {
-      const { busY } = pos[ri], nodes = fila.nodes, n = nodes.length, kk = fila.ip ? 'A' : trunk;
+      const { busY } = pos[ri], nodes = fila.nodes, n = nodes.length, kk = fila.ip || trunk;
       const xIni = ri === 0 && principal ? busIni + 48 : 40, xFin = n ? X0 + (n - 1) * COLW + 50 + 60 : xIni + 40;
       g.append(s('path', { d: `M${xIni} ${busY} ` + nodes.map((_, i) => { const c0 = X0 + i * COLW + 50; return `H${c0 - 16} L${c0} ${busY + 22} L${c0 + 16} ${busY}`; }).join(' ') + ` H${xFin}`, fill: 'none', stroke: col(kk), 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
-      if (fila.ip) { mv(g, 'iplab' + ri, (sg) => txt(sg, 40, busY - 14, 'Red IP (LAN por otros) — BACnet/IP y Modbus TCP', { size: 9 })); clave(g, 280, busY, 'A'); }
+      if (fila.ip) { mv(g, 'iplab' + ri, (sg) => txt(sg, 40, busY - 14, 'Red IP (LAN por otros) — ' + (fila.ip === 'E' ? 'Modbus TCP' : 'BACnet/IP'), { size: 9 })); clave(g, 300, busY, fila.ip); }
       else if (ri > 0) { mv(g, 'trlab' + ri, (sg) => txt(sg, 40, busY - 14, 'Continúa troncal (fila ' + (ri + 1) + ')', { size: 9 })); clave(g, 280, busY, kk); }
       /* gabinetes con 2 o más controladores */
       if (!fila.ip) {
@@ -391,7 +392,7 @@
       h('button', { class: 'b', title: 'Devuelve todos los textos movidos a su posición original', onclick: () => { if (Object.keys(D.mv).length && !confirm('¿Devolver todos los textos movidos a su posición original?')) return; D.mv = {}; BMS.touch(); BMS.rerender(); } }, 'Restablecer textos'),
       h('span', { class: 'mute', style: { fontSize: '12px' } }, 'Ctrl + rueda del mouse también hace zoom'));
     root.append(h('h2', null, 'Diagrama unifilar del sistema de monitoreo y control'),
-      h('p', { class: 'hint' }, 'Lámina estándar Sinergia, dibujada con los datos del proyecto. Entre controladores va la troncal (clave B, BACnet MS/TP); la red IP (clave A) llega solo al controlador principal y a los gateways BACnet/IP y Modbus TCP. Los controladores del mismo cuarto se agrupan en un gabinete (pestaña 1). Un punto rojo marca un controlador cuya selección no cubre los puntos.'),
+      h('p', { class: 'hint' }, 'Lámina estándar Sinergia, dibujada con los datos del proyecto. Entre controladores va la troncal (clave B, BACnet MS/TP); la red IP llega solo al controlador principal (clave A) y a los gateways, en líneas separadas: BACnet/IP (clave A) y Modbus TCP (clave E, azul oscuro). Los controladores del mismo cuarto se agrupan en un gabinete (pestaña 1). Un punto rojo marca un controlador cuya selección no cubre los puntos.'),
       h('div', { class: 'fila noprint' }, campo('Lámina', 'lamina'), campo('Calibre señales (AWG)', 'awg', '80px'),
         sel('Troncal entre controladores', 'troncal', [['auto', 'Según la marca'], ['B', 'BACnet MS/TP (B)'], ['A', 'BACnet IP (A)']], D.troncal || 'auto'),
         sel('Licencias y servidor', 'licencias', [['1', 'Mostrar'], ['0', 'Ocultar']], D.licencias ? '1' : '0'),
