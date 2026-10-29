@@ -155,8 +155,11 @@
       ['spd', 'Módulo supresor de sobretensiones compatible con la aplicación; debe incluir adecuada conexión a tierra para descarga en conduit separado.', 'Igual o superior a PROT485. Modelo según aplicación.'],
       ['otros', 'Equipos suministrados e instalados por otros, con tarjetas de fábrica compatibles. Contratista de BMS debe incluir cableado, tubería, accesorios y programación necesarios para integrarlos. Ver notas y especificaciones.', ''],
       ['eq', 'Equipo o sensor cableado al controlador (señales analógicas y digitales, clave D).', '']];
-    const hProt = protos.map((r) => Math.max(34, wrap(r[1], 70).length * 9.5 + 16));
-    const hSimb = simbs.map((r) => Math.max(46, Math.max(wrap(r[1], 96).length, wrap(r[2], 58).length) * 9.5 + 16));
+    /* Leyenda compacta: protocolos | simbología en dos tablas lado a lado | notas, para dejar más alto al diagrama */
+    const mitad = Math.ceil(simbs.length / 2), simbIzq = simbs.slice(0, mitad), simbDer = simbs.slice(mitad);
+    const hProt = protos.map((r) => Math.max(34, Math.max(wrap(r[1], 62).length, wrap(r[2], 30).length) * 9.5 + 16));
+    const altSimb = (L) => L.map((r) => Math.max(46, Math.max(wrap(r[1], 82).length, wrap(r[2], 50).length) * 9.5 + 16));
+    const hSimbI = altSimb(simbIzq), hSimbD = altSimb(simbDer);
     const tTot = res.total, rv = C.conReserva(tTot, P.reserva);
     const notas = [(cfg.notas || NOTAS_BASE), 'UPS de 4 h para servidor y controladores; reserva de puntos del ' + P.reserva + ' % (dimensionamiento de controladores).',
       'Cantidades según matriz de puntos del proyecto. Los puntos por gateway (INT) no ocupan canales del controlador.',
@@ -164,7 +167,8 @@
       'Marca de controladores: ' + P.marca + '. Selección de modelos según pestaña 5; validar con el integrador.',
       'Se debe suministrar un gabinete para cada controlador o grupo de controladores y gateways del mismo cuarto.'];
     const hNotas = notas.reduce((a, t) => a + wrap(t, 64).length * 10.5 + 7, 24);
-    const legH = Math.max(52 + hProt.reduce((a, b) => a + b, 0), 36 + hSimb.reduce((a, b) => a + b, 0), hNotas);
+    const sum = (L) => L.reduce((a, b) => a + b, 0);
+    const legH = Math.max(52 + sum(hProt), 36 + sum(hSimbI), 36 + sum(hSimbD), hNotas);
     const yLeyenda = y + 10, H = Math.max(1100, Math.round(yLeyenda + legH + 150));
 
     const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, xmlns: NS, role: 'img', 'aria-label': 'Diagrama unifilar del sistema de monitoreo y control (BMS)', 'font-family': 'Arial Narrow, Arial, Helvetica, sans-serif' });
@@ -300,48 +304,52 @@
     if (res.sin.filas) txt(g, 44, yLeyenda - 6, '⚠ ' + res.sin.filas + ' filas de equipos sin controlador (' + C.cable(res.sin) + ' puntos): cree o asigne controladores', { size: 11, fill: '#c00', bold: true });
 
     /* ---- simbología de protocolos de comunicación (claves de cableado) ---- */
-    const L0 = yLeyenda + 20, PX = 60, PW = 700;
-    rect(g, PX, L0, PW, 52 + hProt.reduce((a, b) => a + b, 0));
-    txt(g, PX + PW / 2, L0 + 24, 'Simbología de protocolos de comunicación', { size: 17, anchor: 'middle' });
+    const L0 = yLeyenda + 20, PX = 60, PW = 560;
+    rect(g, PX, L0, PW, 52 + sum(hProt));
+    txt(g, PX + PW / 2, L0 + 24, 'Simbología de protocolos de comunicación', { size: 16, anchor: 'middle' });
     line(g, PX, L0 + 34, PX + PW, L0 + 34); line(g, PX, L0 + 52, PX + PW, L0 + 52);
-    const cx1 = PX + 70, cx2 = PX + 480;
-    txt(g, PX + 35, L0 + 47, 'Clave', { size: 9, anchor: 'middle' }); txt(g, (cx1 + cx2) / 2, L0 + 47, 'Capa física', { size: 9, anchor: 'middle' }); txt(g, (cx2 + PX + PW) / 2, L0 + 47, 'Capa de comunicación', { size: 9, anchor: 'middle' });
+    const cx1 = PX + 66, cx2 = PX + 390;
+    txt(g, PX + 33, L0 + 47, 'Clave', { size: 9, anchor: 'middle' }); txt(g, (cx1 + cx2) / 2, L0 + 47, 'Capa física', { size: 9, anchor: 'middle' }); txt(g, (cx2 + PX + PW) / 2, L0 + 47, 'Capa de comunicación', { size: 9, anchor: 'middle' });
     let py = L0 + 52;
     protos.forEach((r, i) => {
       if (i) line(g, PX, py, PX + PW, py);
-      clave(g, PX + 35, py + hProt[i] / 2 - 6, r[0]); line(g, PX + 12, py + hProt[i] / 2 + 8, PX + 58, py + hProt[i] / 2 + 8, { w: 2.6, color: col(r[0]) });
-      para(g, cx1 + 8, py + 14, r[1], 70, { size: 8.5, lh: 9.5 }); para(g, cx2 + 8, py + 14, r[2], 34, { size: 8.5, lh: 9.5 });
+      clave(g, PX + 33, py + hProt[i] / 2 - 6, r[0]); line(g, PX + 10, py + hProt[i] / 2 + 8, PX + 56, py + hProt[i] / 2 + 8, { w: 2.6, color: col(r[0]) });
+      para(g, cx1 + 8, py + 14, r[1], 62, { size: 8.5, lh: 9.5 }); para(g, cx2 + 8, py + 14, r[2], 30, { size: 8.5, lh: 9.5 });
       py += hProt[i];
     });
     line(g, cx1, L0 + 34, cx1, py); line(g, cx2, L0 + 34, cx2, py);
 
-    /* ---- simbología de sistema de monitoreo y control, con los modelos de la marca ---- */
-    const SX = 800, SW = 1180, sc1 = SX + 120, sc2 = SX + 800;
-    rect(g, SX, L0, SW, 36 + hSimb.reduce((a, b) => a + b, 0));
-    txt(g, SX + SW / 2, L0 + 24, 'Simbología de sistema de monitoreo y control — ' + (P.marca || ''), { size: 17, anchor: 'middle' });
-    line(g, SX, L0 + 34, SX + SW, L0 + 34);
-    let sy = L0 + 34;
-    simbs.forEach((r, i) => {
-      if (i) line(g, SX, sy, SX + SW, sy);
-      const mid = sy + hSimb[i] / 2, cx0 = SX + 12;
-      if (r[0] === 'srv') simPC(g, cx0 + 24, mid - 24);
-      else if (r[0] === 'cp') simCP(g, cx0 + 6, mid - 16, 88, 32);
-      else if (r[0] === 'cs') simCS(g, cx0 + 30, mid - 20, 36, 40);
-      else if (r[0] === 'iom') { g.append(s('ellipse', { cx: cx0 + 48, cy: mid, rx: 20, ry: 12, fill: '#fff', stroke: INK })); txt(g, cx0 + 48, mid + 3.5, 'IOM', { size: 9, anchor: 'middle' }); }
-      else if (r[0] === 'gw') simGW(g, cx0 + 8, mid - 15, 84);
-      else if (r[0] === 'pan') simPanel(g, cx0 + 14, mid - 20, 70, 40);
-      else if (r[0] === 'panip') { simPanel(g, cx0 + 14, mid - 20, 70, 40); txt(g, cx0 + 49, mid + 3, 'IP', { size: 9, anchor: 'middle', bold: true }); }
-      else if (r[0] === 'spd') { rect(g, cx0 + 28, mid - 11, 42, 22); txt(g, cx0 + 49, mid + 4, 'SPD', { size: 10, anchor: 'middle' }); }
-      else if (r[0] === 'otros') simOtros(g, cx0 + 22, mid - 12, 56);
-      else equipoX(g, cx0 + 36, mid - 9, 18);
-      para(g, sc1 + 8, sy + 15, r[1], 96, { size: 8, lh: 9.5 }); para(g, sc2 + 8, sy + 15, r[2], 58, { size: 8, lh: 9.5 });
-      sy += hSimb[i];
-    });
-    line(g, sc1, L0 + 34, sc1, sy); line(g, sc2, L0 + 34, sc2, sy);
+    /* ---- simbología de sistema de monitoreo y control, con los modelos de la marca (dos tablas lado a lado) ---- */
+    const tablaSimb = (SX, filasS, hs, titulo) => {
+      const SW = 700, sc1 = SX + 96, sc2 = SX + 470;
+      rect(g, SX, L0, SW, 36 + sum(hs));
+      txt(g, SX + SW / 2, L0 + 24, titulo, { size: 16, anchor: 'middle' });
+      line(g, SX, L0 + 34, SX + SW, L0 + 34);
+      let sy = L0 + 34;
+      filasS.forEach((r, i) => {
+        if (i) line(g, SX, sy, SX + SW, sy);
+        const mid = sy + hs[i] / 2, cx0 = SX + 6;
+        if (r[0] === 'srv') simPC(g, cx0 + 18, mid - 24);
+        else if (r[0] === 'cp') simCP(g, cx0 + 2, mid - 16, 80, 32);
+        else if (r[0] === 'cs') simCS(g, cx0 + 24, mid - 20, 36, 40);
+        else if (r[0] === 'iom') { g.append(s('ellipse', { cx: cx0 + 42, cy: mid, rx: 20, ry: 12, fill: '#fff', stroke: INK })); txt(g, cx0 + 42, mid + 3.5, 'IOM', { size: 9, anchor: 'middle' }); }
+        else if (r[0] === 'gw') simGW(g, cx0 + 4, mid - 15, 78);
+        else if (r[0] === 'pan') simPanel(g, cx0 + 10, mid - 20, 68, 40);
+        else if (r[0] === 'panip') { simPanel(g, cx0 + 10, mid - 20, 68, 40); txt(g, cx0 + 44, mid + 3, 'IP', { size: 9, anchor: 'middle', bold: true }); }
+        else if (r[0] === 'spd') { rect(g, cx0 + 24, mid - 11, 42, 22); txt(g, cx0 + 45, mid + 4, 'SPD', { size: 10, anchor: 'middle' }); }
+        else if (r[0] === 'otros') simOtros(g, cx0 + 18, mid - 12, 56);
+        else equipoX(g, cx0 + 32, mid - 9, 18);
+        para(g, sc1 + 8, sy + 15, r[1], 82, { size: 8, lh: 9.5 }); para(g, sc2 + 8, sy + 15, r[2], 50, { size: 8, lh: 9.5 });
+        sy += hs[i];
+      });
+      line(g, sc1, L0 + 34, sc1, sy); line(g, sc2, L0 + 34, sc2, sy);
+    };
+    tablaSimb(640, simbIzq, hSimbI, 'Simbología de sistema de monitoreo y control — ' + (P.marca || ''));
+    tablaSimb(1360, simbDer, hSimbD, 'Simbología de sistema de monitoreo y control (continuación)');
 
     /* ---- notas ---- */
     mv(g, 'notas', (sg) => {
-      const NX = 2040; txt(sg, NX, L0 + 14, 'Notas:', { size: 11, bold: true });
+      const NX = 2082; txt(sg, NX, L0 + 14, 'Notas:', { size: 11, bold: true });
       let ny = L0 + 32;
       notas.forEach((t, i) => { const nl = para(sg, NX + 12, ny, (i + 1) + '. ' + t, 64, { size: 8.5, lh: 10.5 }); ny += nl * 10.5 + 7; });
     });
