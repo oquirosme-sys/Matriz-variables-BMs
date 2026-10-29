@@ -27,8 +27,10 @@
   };
   const P = (texto, o = {}) => '<w:p><w:pPr>' + (o.estilo ? '<w:pStyle w:val="' + o.estilo + '"/>' : '') + (o.keep ? '<w:keepNext/>' : '') +
     (o.num != null ? '<w:numPr><w:ilvl w:val="' + (o.ilvl || 0) + '"/><w:numId w:val="' + o.num + '"/></w:numPr>' : '') + (o.jc ? '<w:jc w:val="' + o.jc + '"/>' : '') + '</w:pPr>' + runs(texto, o.run || {}) + '</w:p>';
-  const H1 = (t) => '<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr></w:pPr>' + runs(t) + '</w:p>';
-  const H2 = (t) => '<w:p><w:pPr><w:pStyle w:val="Heading2"/><w:numPr><w:ilvl w:val="1"/><w:numId w:val="0"/></w:numPr></w:pPr>' + runs(t) + '</w:p>';
+  let marca = 0;
+  const marcar = (xml, id) => (id ? '<w:bookmarkStart w:id="' + id + '" w:name="_Toc' + (70000 + id) + '"/>' + xml + '<w:bookmarkEnd w:id="' + id + '"/>' : xml);
+  const H1 = (t, id) => '<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr></w:pPr>' + marcar(runs(t), id) + '</w:p>';
+  const H2 = (t, id) => '<w:p><w:pPr><w:pStyle w:val="Heading2"/><w:numPr><w:ilvl w:val="1"/><w:numId w:val="0"/></w:numPr></w:pPr>' + marcar(runs(t), id) + '</w:p>';
   const LI = (t) => P(t, { estilo: 'ListParagraph', num: 4 });
   const SALTO = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
   const campoSeq = (nombre, n) => '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> SEQ ' + nombre + ' \\* ARABIC </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>' + n + '</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>';
@@ -46,9 +48,11 @@
     const esNum = (t) => /^[-+]?[\d.,\s]*\d[\d.,\s%]*$/.test(String(t).trim()) || String(t).trim() === '—';
     const align = b.align || Array.from({ length: n }, (_, c) => (filas.slice(1).filter((f) => f[c] != null && String(f[c]).trim() !== '').length && filas.slice(1).filter((f) => f[c] != null && String(f[c]).trim() !== '').every((f) => esNum(f[c])) ? 'r' : 'l'));
     let x = '';
-    ctx.tablas = (ctx.tablas || 0) + 1;
-    x += '<w:p><w:pPr><w:pStyle w:val="TablaTitulo"/></w:pPr><w:r><w:t xml:space="preserve">' + (BMS.docxLang === 'en' ? 'Table No. ' : 'Tabla No. ') + '</w:t></w:r>' + campoSeq('Tabla', ctx.tablas) + '</w:p>';
-    x += '<w:p><w:pPr><w:pStyle w:val="TablaTitulo"/><w:spacing w:before="0"/></w:pPr>' + runs(b.titulo || 'Tabla de datos') + '</w:p>';
+    if (!b.sinTitulo) {
+      ctx.tablas = (ctx.tablas || 0) + 1;
+      const idT = 20000 + ctx.tablas;
+      x += '<w:p><w:pPr><w:pStyle w:val="TablaTitulo"/></w:pPr><w:bookmarkStart w:id="' + idT + '" w:name="_Toc' + (70000 + idT) + '"/><w:r><w:t xml:space="preserve">' + (BMS.docxLang === 'en' ? 'Table No. ' : 'Tabla No. ') + '</w:t></w:r>' + campoSeq('Tabla', ctx.tablas) + '<w:r><w:br/></w:r>' + runs(b.titulo || (BMS.docxLang === 'en' ? 'Data table' : 'Tabla de datos')) + '<w:bookmarkEnd w:id="' + idT + '"/></w:p>';
+    }
     if (b.fuente) x += P(b.fuente, { estilo: 'TablaFuente' });
     x += '<w:tbl><w:tblPr><w:tblStyle w:val="TablaSinergia"/><w:tblW w:w="' + ancho + '" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblLook w:val="0420" w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid>' + w.map((v) => '<w:gridCol w:w="' + v + '"/>').join('') + '</w:tblGrid>';
     filas.forEach((f, i) => {
@@ -96,20 +100,62 @@
     return out;
   }
 
-  BMS.docxXml = (portada, bloquesIn) => {
+  const limpiar = (t) => String(t == null ? '' : t).replace(/\*\*|==|!!/g, '').trim();
+  const ETQ = {
+    es: { contenido: 'Contenido', tablas: 'Índice de tablas', control: 'Control del documento', rev: 'Control de revisiones', rev1: 'Rev.', cod: 'Código', revision: 'Revisión', fecha: 'Fecha', estado: 'Estado', elab: 'Elaboró', reviso: 'Revisó', aprobo: 'Aprobó', desc: 'Descripción', datos: 'Datos del documento', emision: 'Emisión para revisión', ref: 'Entregable', pen: 'Actualice los campos (clic derecho › Actualizar campo) para ver los números de página.' },
+    en: { contenido: 'Contents', tablas: 'List of tables', control: 'Document control', rev: 'Revision control', rev1: 'Rev.', cod: 'Code', revision: 'Revision', fecha: 'Date', estado: 'Status', elab: 'Prepared by', reviso: 'Reviewed by', aprobo: 'Approved by', desc: 'Description', datos: 'Document data', emision: 'Issued for review', ref: 'Deliverable', pen: 'Update the fields (right-click › Update field) to see page numbers.' }
+  };
+  const campoComplejo = (instr, entradas) => {
+    /* campo TOC con entradas precargadas; Word recalcula los números de página al abrir o al actualizar el campo */
+    if (!entradas.length) return '';
+    return entradas.map((e, i) => {
+      let x = '<w:p><w:pPr><w:pStyle w:val="TOC' + e.nivel + '"/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8838"/></w:tabs>' + (e.nivel === 2 ? '<w:ind w:left="284"/>' : '') + '<w:spacing w:after="60"/></w:pPr>';
+      if (i === 0) x += '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r><w:r><w:instrText xml:space="preserve"> ' + instr + ' </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>';
+      x += '<w:hyperlink w:anchor="_Toc' + (70000 + e.id) + '" w:history="1"><w:r><w:t xml:space="preserve">' + esc(e.texto) + '</w:t></w:r><w:r><w:tab/></w:r>' +
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGEREF _Toc' + (70000 + e.id) + ' \\h </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>·</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:hyperlink>';
+      if (i === entradas.length - 1) x += '<w:r><w:fldChar w:fldCharType="end"/></w:r>';
+      return x + '</w:p>';
+    }).join('');
+  };
+  const TITULO = (t, o = {}) => '<w:p><w:pPr><w:keepNext/><w:spacing w:before="' + (o.antes == null ? 240 : o.antes) + '" w:after="120"/></w:pPr>' + run(t, { b: true, color: o.color }).replace('<w:rPr>', '<w:rPr><w:sz w:val="' + (o.sz || 26) + '"/>').replace('<w:rPr><w:sz', '<w:rPr><w:sz') + '</w:p>';
+
+  BMS.docxXml = (portada, bloquesIn, opts) => {
     const ctx = {}, bloques = normalizar(bloquesIn);
     const pr = (portada || []).map((x) => String(x || '').trim());
+    const L = ETQ[BMS.docxLang === 'en' ? 'en' : 'es'];
     let v = '', h = '', apaisado = false;
-    const destino = () => (apaisado ? 'h' : 'v');
     const add = (xml) => { if (apaisado) h += xml; else v += xml; };
-    /* portada */
-    if (pr[1]) v += '<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr><w:jc w:val="center"/></w:pPr>' + runs(pr[1]) + '</w:p>';
-    [pr[0], pr[2], pr[3]].forEach((t) => { if (t) v += P(t, { jc: 'center' }); });
-    if (pr[4]) v += P(pr[4], { run: { i: true, color: '3C3F41' } });
+    /* portada: no usa estilos de título para que no entre al índice */
+    if (opts) {
+      const cab = (t, sz, o = {}) => (t ? '<w:p><w:pPr><w:spacing w:before="' + (o.antes || 0) + '" w:after="' + (o.despues == null ? 120 : o.despues) + '"/></w:pPr>' + run(t, { b: o.b, color: o.color, i: o.i }).replace('<w:rPr>', '<w:rPr><w:sz w:val="' + sz + '"/>').replace(/^<w:r><w:t/, '<w:r><w:rPr><w:sz w:val="' + sz + '"/></w:rPr><w:t') + '</w:p>' : '');
+      v += cab(pr[0], 28, { antes: 2200, color: '385623', b: true });
+      v += cab(pr[1], 52, { b: true, despues: 240 });
+      v += cab(pr[2], 24, { despues: 600 });
+      const datos = [[L.cod, opts.codigo || '—'], [L.revision, opts.revision || '—'], [L.fecha, opts.fecha || '—'], [L.estado, opts.estado || '—'], [L.elab, opts.preparado || '—']];
+      v += tabla({ sinTitulo: true, cols: [3, 9], filas: [[L.datos, limpiar(pr[1]) || '—'], ...datos], align: ['l', 'l'] }, ANCHO.v, ctx);
+      if (pr[4]) v += P(pr[4], { run: { i: true, color: '3C3F41' } });
+      v += SALTO;
+      /* control de revisiones, contenido e índice de tablas */
+      v += TITULO(L.rev, { antes: 0 });
+      v += tabla({ sinTitulo: true, cols: [1.5, 2.1, 4.6, 2.6, 1.7, 1.7], filas: [[L.rev1, L.fecha, L.desc, L.elab, L.reviso, L.aprobo], [opts.revision || 'A', opts.fecha || '—', L.emision, opts.preparado || '—', '—', '—']], align: ['l', 'l', 'l', 'l', 'l', 'l'] }, ANCHO.v, ctx);
+      const heads = []; let k = 0;
+      bloques.forEach((b) => { if (b.t === 'h1' || b.t === 'h2') heads.push({ id: ++k, nivel: b.t === 'h1' ? 1 : 2, texto: limpiar(b.texto) }); });
+      const tabs = []; let kt = 0;
+      bloques.forEach((b) => { if (b.t === 'tabla') { kt++; tabs.push({ id: 20000 + kt, nivel: 1, texto: (BMS.docxLang === 'en' ? 'Table No. ' : 'Tabla No. ') + kt + ' — ' + limpiar(b.titulo || (BMS.docxLang === 'en' ? 'Data table' : 'Tabla de datos')) }); } });
+      v += TITULO(L.contenido, { antes: 360 }) + campoComplejo('TOC \\o "1-2" \\h \\z \\u', heads);
+      if (tabs.length) v += TITULO(L.tablas, { antes: 360 }) + campoComplejo('TOC \\h \\z \\c "Tabla"', tabs);
+      v += SALTO;
+    } else {
+      if (pr[1]) v += '<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr><w:jc w:val="center"/></w:pPr>' + runs(pr[1]) + '</w:p>';
+      [pr[0], pr[2], pr[3]].forEach((t) => { if (t) v += P(t, { jc: 'center' }); });
+      if (pr[4]) v += P(pr[4], { run: { i: true, color: '3C3F41' } });
+    }
+    let hk = 0;
     bloques.forEach((b) => {
       const ancho = apaisado ? ANCHO.h : ANCHO.v;
-      if (b.t === 'h1') add(H1(b.texto));
-      else if (b.t === 'h2') add(H2(b.texto));
+      if (b.t === 'h1') add(H1(b.texto, opts ? ++hk : 0));
+      else if (b.t === 'h2') add(H2(b.texto, opts ? ++hk : 0));
+      else if (b.t === 'sub') add(TITULO(limpiar(b.texto), { sz: 22, antes: 200 }));
       else if (b.t === 'li') add(LI(b.texto));
       else if (b.t === 'p') add(P(b.texto));
       else if (b.t === 'tabla') add(tabla(b, ancho, ctx));
@@ -121,19 +167,27 @@
     return { cuerpo: v + h + cierre, ctx };
   };
 
-  BMS.exportarSecuenciasDocx = async (titulo, portada, bloques) => {
+  BMS.exportarSecuenciasDocx = async (titulo, portada, bloques, opts) => {
     if (!window.JSZip) throw new Error('No se pudo cargar la librería JSZip (se necesita internet).');
     const bin = atob(window.BMS_DOCX_BASE), u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     const zip = await JSZip.loadAsync(u8);
     const doc = await zip.file('word/document.xml').async('string');
-    const { cuerpo, ctx } = BMS.docxXml(portada, bloques);
+    const { cuerpo, ctx } = BMS.docxXml(portada, bloques, opts);
     const ini = doc.indexOf('<w:body>') + '<w:body>'.length;
     zip.file('word/document.xml', doc.slice(0, ini) + cuerpo + '</w:body></w:document>');
     /* pie: nombre del documento en una sola línea */
     let pie = await zip.file('word/footer1.xml').async('string');
     pie = pie.replace('Nombre Documento', esc(String(titulo || 'Secuencias de operación').slice(0, 34)));
     zip.file('word/footer1.xml', pie);
+    /* estilos del índice y actualización de campos al abrir */
+    let est = await zip.file('word/styles.xml').async('string');
+    const tocSt = (id, nombre, izq) => (est.indexOf('w:styleId="' + id + '"') >= 0 ? '' : '<w:style w:type="paragraph" w:styleId="' + id + '"><w:name w:val="' + nombre + '"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="39"/><w:unhideWhenUsed/><w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8838"/></w:tabs><w:spacing w:after="60"/><w:ind w:left="' + izq + '"/><w:jc w:val="left"/></w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:style>');
+    if (opts) { est = est.replace('</w:styles>', tocSt('TOC1', 'toc 1', 0) + tocSt('TOC2', 'toc 2', 284) + '</w:styles>'); zip.file('word/styles.xml', est); }
+    if (opts) {
+      let st = await zip.file('word/settings.xml').async('string');
+      if (st.indexOf('w:updateFields') < 0) { const m = /<w:(footnotePr|endnotePr|compat|rsids|themeFontLang|clrSchemeMapping|decimalSymbol|listSeparator)/.exec(st); st = m ? st.slice(0, m.index) + '<w:updateFields w:val="true"/>' + st.slice(m.index) : st.replace('</w:settings>', '<w:updateFields w:val="true"/></w:settings>'); zip.file('word/settings.xml', st); }
+    }
     /* imágenes */
     if (ctx.imgs && ctx.imgs.length) {
       let rels = await zip.file('word/_rels/document.xml.rels').async('string');

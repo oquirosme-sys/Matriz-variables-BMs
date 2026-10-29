@@ -32,7 +32,8 @@
     ['100 x 80 cm', 40, 'Schneider Thalassa PLM — caja de poliéster con tapa transparente'],
     ['120 x 100 cm', 70, 'Schneider Thalassa PLM — caja de poliéster con tapa transparente']
   ];
-  const panelModelo = (dim) => { const p = PANELES.find((x) => x[0] === dim); return p ? p[2] : 'Caja a medida (' + dim + ')'; };
+  const panelCanon = (dim) => { const q = String(dim || '').replace(/\s/g, '').toLowerCase(); const p = PANELES.find((x) => x[0].replace(/\s/g, '').toLowerCase() === q); return p ? p[0] : dim; };
+  const panelModelo = (dim) => { const p = PANELES.find((x) => x[0] === panelCanon(dim)); return p ? p[2] : 'Caja a medida (' + dim + ')'; };
   const panelSugerido = (u) => (PANELES.find((p) => p[1] >= u) || PANELES[PANELES.length - 1])[0];
   /* Gabinete: el que se escribió a mano; si no, los controladores del mismo nivel y del mismo cuarto comparten un gabinete automático. */
   const gabDe = (c) => {
@@ -224,5 +225,5 @@
     return lista;
   }
 
-  Object.assign(BMS, { calc: { comDe, PANELES, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
+  Object.assign(BMS, { calc: { comDe, PANELES, panelCanon, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
 })();

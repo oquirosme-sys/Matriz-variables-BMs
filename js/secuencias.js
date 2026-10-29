@@ -245,7 +245,7 @@
       const bom = Object.keys(mot.bom || {}).map((cod) => { const m = M && (M.bases.find((x) => x.cod === cod) || M.modulos.find((x) => x.cod === cod)); return [cod, m ? m.desc.replace(/\s*\[.*?\]/g, '') : '—', M && M.bases.some((x) => x.cod === cod) ? 'Controlador' : 'Módulo', num(mot.bom[cod])]; });
       if (mot.motor) bom.push([mot.motor.cod, mot.motor.desc || '—', 'Motor de red', '1']);
       const cajas = new Map(); const vistos = new Set();
-      mot.detalle.forEach((d) => { const k = C.gabDe(d.c) || d.c.id; if (vistos.has(k)) return; vistos.add(k); const dim = (E.gabDim && E.gabDim[k]) || C.panelSugerido(C.unidadesPanel(d.c, detMap)); cajas.set(dim, (cajas.get(dim) || 0) + 1); });
+      mot.detalle.forEach((d) => { const k = C.gabDe(d.c) || d.c.id; if (vistos.has(k)) return; vistos.add(k); const dim = C.panelCanon((E.gabDim && E.gabDim[k]) || C.panelSugerido(C.unidadesPanel(d.c, detMap))); cajas.set(dim, (cajas.get(dim) || 0) + 1); });
       [...cajas.entries()].forEach(([dim, q]) => bom.push([dim, C.panelModelo(dim), 'Caja', String(q)]));
       out.push({ t: 'tabla', titulo: 'Lista de controladores y módulos', cols: [3, 7, 2, 1], filas: [['Código', 'Descripción', 'Tipo', 'Cant.'], ...(bom.length ? bom : [['—', '—', '—', '—']])] });
     }
@@ -255,7 +255,7 @@
         const filas = res.filas.filter((f) => f.ctrlId === d.c.id && f.tipo && f.eq.qty > 0);
         if (!filas.length) return;
         const n = C.nivelDe(d.c.nivel);
-        out.push({ t: 'h2', texto: C.nombreCtrl(d.c) + ' — ' + (n ? n.codigo + ' · ' + n.nombre : '') });
+        out.push({ t: 'sub', texto: C.nombreCtrl(d.c) + ' — ' + (n ? n.codigo + ' · ' + n.nombre : '') });
         const tt = totalizar(filas.map((f) => f.t));
         out.push({ t: 'tabla', titulo: 'Equipos y puntos de ' + C.nombreCtrl(d.c), cols: [6, 2, 1, 1, 1, 1, 1, 1], filas: [['Equipo', 'Tag(s)', 'Cant.', ...cab], ...filas.map((f) => [corto(f.tipo.nombre) + (f.ip || f.tipo.gw ? ' (red)' : ''), f.eq.tag || '—', num(f.eq.qty), ...fila5(f.t)]), ['Total', '—', num(tt.eq), ...fila5(tt)]], total: true });
         if (op.detalle) {
@@ -491,7 +491,9 @@
         if (S.opciones.idioma !== 'en') bl = unificarEspanol(bl);
         BMS.docxLang = en ? 'en' : 'es';
         if (en) { portada = portada.map((x) => BMS.trad.aEn(x)); bl = BMS.trad.bloques(bl); titulo = doc === 'inc' ? 'Fire alarm sequences' : 'Sequences of operation'; if (bl.pendientes) estado.textContent = bl.pendientes + ' texto(s) sin traducir quedaron en rojo en el Word…'; }
-        const blob = await BMS.exportarSecuenciasDocx(titulo, portada, bl);
+        const P = E.proyecto;
+        const opts = { codigo: (S.portada[5] || '').trim() || 'SOO-' + (doc === 'inc' ? 'FACP' : 'BMS') + '-01', revision: (S.portada[6] || '').trim() || 'A', fecha: P.fecha || '', estado: P.estado || '', preparado: P.preparado || 'Sinergia Ingeniería' };
+        const blob = await BMS.exportarSecuenciasDocx(titulo, portada, bl, opts);
         BMS.descargar((S.opciones.idioma === 'en' ? (doc === 'inc' ? 'Fire_alarm_sequences_' : 'Sequences_of_operation_') : doc === 'inc' ? 'Secuencias_alarma_contra_incendio_' : 'Secuencias_de_operacion_BMS_') + (E.proyecto.nombre || 'proyecto').replace(/[^\w\-]+/g, '_') + '.docx', blob);
         estado.textContent = 'Documento exportado (' + Math.round(blob.size / 1024) + ' KB).';
       } catch (e) { estado.textContent = ''; alert('No se pudo exportar: ' + e.message); }
@@ -564,8 +566,10 @@
       });
       inp.click();
     }
+    const selSistema = () => h('select', { class: 'in', title: 'Sistema con el que trabaja: las secciones, la validación, «Completar la secuencia» y la exportación se limitan a este sistema', style: { width: '300px', fontWeight: 700 }, value: DOC, onchange: (e) => { BMS.ui.secDoc = e.target.value; BMS.ui.secSel = null; BMS.rerender(); } }, h('option', { value: 'bms' }, 'Sistema: BMS'), h('option', { value: 'inc' }, 'Sistema: Alarmas contra incendio'));
+    const cabSistema = () => h('div', { class: 'card', style: { display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' } }, h('b', null, 'Sistema:'), selSistema(), h('span', { class: 'mute' }, 'Las secciones, los hallazgos, «Completar la secuencia» y el Word se limitan al sistema escogido.'));
     const barra = h('div', { class: 'fila noprint' },
-      h('select', { class: 'in', title: 'Sistema con el que trabaja: las secciones, la validación, «Completar la secuencia» y la exportación se limitan a este sistema', style: { width: '300px', fontWeight: 700 }, value: DOC, onchange: (e) => { BMS.ui.secDoc = e.target.value; BMS.ui.secSel = null; BMS.rerender(); } }, h('option', { value: 'bms' }, 'Sistema: BMS'), h('option', { value: 'inc' }, 'Sistema: Alarmas contra incendio')),
+      selSistema(),
       h('button', { class: 'b p', title: 'Genera el Word de este sistema', onclick: () => exportar(DOC) }, 'Exportar Word — ' + (DOC === 'inc' ? 'Alarma contra incendio' : 'BMS')),
       h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
         try {
@@ -607,7 +611,7 @@
     if (sel === -2) {
       /* validación con el estándar del hotel */
       const conteo = (c) => h('span', null, h('span', { class: 'chip ok' }, c.ok + ' cumplen'), ' ', h('span', { class: 'chip warn' }, c.parcial + ' parciales'), ' ', h('span', { class: 'chip bad' }, c.falta + ' no cumplen'));
-      derecha = h('div', null,
+      derecha = h('div', null, cabSistema(),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Estándar del hotel'),
           h('p', { class: 'hint' }, 'Pegue los requisitos del estándar del hotel, o cárguelos desde un PDF, uno por línea (opcional: "referencia | requisito"). La herramienta revisa en vivo si las secuencias los tratan y con qué valores, y señala lo que falta. Se preasigna una base de requisitos Fairfield CALA tomada del documento de secuencias; reemplácela por el texto del estándar.'),
           h('label', { class: 'f' }, 'Nombre del estándar', h('input', { class: 'in', value: estDe(S).nombre || '', onchange: (e) => { estDe(S).nombre = e.target.value; guardar(); } })),
@@ -623,9 +627,9 @@
     } else if (sel === -1) {
       const campo = (rot, i, ph) => h('label', { class: 'f' }, rot, h('input', { class: 'in', placeholder: ph || '', value: S.portada[i] || '', onchange: (e) => { S.portada[i] = e.target.value; guardar(); } }));
       const casilla = (rot, k) => h('label', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, h('input', { type: 'checkbox', checked: !!S.opciones[k], onchange: (e) => { S.opciones[k] = e.target.checked; guardar(); } }), rot);
-      derecha = h('div', null,
+      derecha = h('div', null, cabSistema(),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Portada'), h('p', { class: 'hint' }, 'Puede usar marcadores ligados en vivo al proyecto: {{proyecto}}, {{ubicacion}}, {{marca}}, {{reserva}}, {{niveles}}, {{controladores}}, {{equipos}} y {{puntos}}; funcionan también en cualquier párrafo, viñeta o tabla.'), h('div', { class: 'grid' },
-          campo('Proyecto y ubicación', 0, '{{proyecto}} — {{ubicacion}}'), campo('Título del documento', 1), campo('Entregable / referencia', 2, 'Entregable 60 % — Comentario #…'), campo('Autor · fecha · estado', 3, 'Sinergia Ingeniería · fecha · Borrador'), campo('Nota inicial', 4, 'Aclaración sobre valores entre corchetes'))),
+          campo('Proyecto y ubicación', 0, '{{proyecto}} — {{ubicacion}}'), campo('Título del documento', 1), campo('Entregable / referencia', 2, 'Entregable 60 % — Comentario #…'), campo('Autor · fecha · estado', 3, 'Sinergia Ingeniería · fecha · Borrador'), campo('Nota inicial', 4, 'Aclaración sobre valores entre corchetes'), campo('Código del documento', 5, 'SOO-BMS-01'), campo('Revisión', 6, 'A'))),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Anexos generados al exportar (solo en el documento del BMS)'),
           h('p', { class: 'hint' }, 'Se generan con los datos actuales del proyecto (niveles, controladores, equipos, marca y reserva) y siguen la letra del último anexo del documento. Van en hojas apaisadas.'),
           h('label', { class: 'f', style: { maxWidth: '320px', marginBottom: '10px' } }, 'Idioma del documento exportado', h('select', { class: 'in', value: S.opciones.idioma || 'es', onchange: (e) => { S.opciones.idioma = e.target.value; guardar(); } }, h('option', { value: 'es' }, 'Español'), h('option', { value: 'en' }, 'English (traducción con glosario; lo no traducido sale en rojo)'))),
@@ -677,7 +681,7 @@
   function sanear(E) {
     const base = inicial(), S = E.secuencias = (E.secuencias && typeof E.secuencias === 'object') ? E.secuencias : base;
     const txt = (v) => (v == null ? '' : String(v));
-    S.portada = Array.from({ length: 5 }, (_, i) => txt((Array.isArray(S.portada) ? S.portada : [])[i]));
+    S.portada = Array.from({ length: 7 }, (_, i) => txt((Array.isArray(S.portada) ? S.portada : [])[i]));
     S.bloques = (Array.isArray(S.bloques) ? S.bloques : []).filter((b) => b && ['h1', 'h2', 'p', 'li', 'tabla', 'vivo'].includes(b.t)).map((b) => {
       if (b.t === 'tabla') return { ...b, filas: (Array.isArray(b.filas) ? b.filas : []).map((f) => (Array.isArray(f) ? f : [f]).map(txt)) };
       if (b.t === 'vivo') return b;
