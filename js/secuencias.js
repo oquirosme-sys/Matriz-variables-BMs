@@ -107,6 +107,16 @@
       return t >= 3 || (t >= 1 && VERBOS.test(l));
     });
   }
+  /* el documento se separa en dos: secuencias del BMS y secuencias del sistema de alarma contra incendio */
+  const ES_INC = /incend|facp|humo|presuriz|rociador|sprinkler|nfpa|escalera|detecci[o]n de/;
+  const docDe = (h1) => (h1.doc === 'inc' || h1.doc === 'bms' ? h1.doc : (!/^\s*Anexo\b/i.test(h1.texto || '') && ES_INC.test(BMS.norm(h1.texto || '')) ? 'inc' : 'bms'));
+  const DOCS = { bms: 'Secuencias del BMS', inc: 'Secuencias de alarma contra incendio' };
+  /* bloques de un documento: cada sección (Título 1 y su contenido) va al documento que le corresponde */
+  function bloquesDe(bl, doc) {
+    const out = []; let actual = 'bms';
+    bl.forEach((b) => { if (b.t === 'h1') actual = docDe(b); if (actual === doc) out.push(b); });
+    return out;
+  }
   const MAX_REQ = 600; /* tope de requisitos revisados, para que un estándar muy largo no deje la página lenta */
   function validarCalc() {
     const E = BMS.estado, S = E.secuencias, P = E.proyecto, C = BMS.calc, res = C.todo(), mot = C.motor(res, P.marca);
@@ -365,14 +375,16 @@
     const val = validar();
     const nObs = val.cuentaReqs.falta + val.cuentaReqs.parcial + val.pr.length;
 
-    const exportar = async () => {
+    const exportar = async (doc = 'bms') => {
       try {
-        estado.textContent = 'Generando el documento y los anexos…';
-        const letra0 = letraSiguiente(S.bloques);
-        const anexos = ['b', 'c', 'd', 'e', 'f'].some((k) => S.opciones[k]) ? await generarAnexos(S.opciones, letra0) : [];
+        estado.textContent = 'Generando el documento' + (doc === 'bms' ? ' y los anexos…' : '…');
+        const mios = bloquesDe(S.bloques, doc);
+        const letra0 = letraSiguiente(mios);
+        const anexos = doc === 'bms' && ['b', 'c', 'd', 'e', 'f'].some((k) => S.opciones[k]) ? await generarAnexos(S.opciones, letra0) : [];
         const portada = S.portada.map((x) => resolverTexto(x));
-        const blob = await BMS.exportarSecuenciasDocx('Secuencias de operación', portada, [...resolverBloques(S.bloques), ...anexos]);
-        BMS.descargar('Secuencias_de_operacion_' + (E.proyecto.nombre || 'BMS').replace(/[^\w\-]+/g, '_') + '.docx', blob);
+        if (doc === 'inc' && /^Secuencias de operación del BMS\/BAS$/i.test((portada[1] || '').trim())) portada[1] = 'Secuencias de operación del sistema de alarma contra incendio';
+        const blob = await BMS.exportarSecuenciasDocx(doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación', portada, [...resolverBloques(mios), ...anexos]);
+        BMS.descargar((doc === 'inc' ? 'Secuencias_alarma_contra_incendio_' : 'Secuencias_de_operacion_BMS_') + (E.proyecto.nombre || 'proyecto').replace(/[^\w\-]+/g, '_') + '.docx', blob);
         estado.textContent = 'Documento exportado (' + Math.round(blob.size / 1024) + ' KB).';
       } catch (e) { estado.textContent = ''; alert('No se pudo exportar: ' + e.message); }
     };
@@ -444,7 +456,8 @@
       inp.click();
     }
     const barra = h('div', { class: 'fila noprint' },
-      h('button', { class: 'b p', onclick: exportar }, 'Exportar a Word'),
+      h('button', { class: 'b p', title: 'Word con las secuencias del BMS y los anexos', onclick: () => exportar('bms') }, 'Exportar Word — BMS'),
+      h('button', { class: 'b p', title: 'Word aparte con las secuencias del sistema de alarma contra incendio', onclick: () => exportar('inc') }, 'Exportar Word — Alarma contra incendio'),
       h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
         try {
           const r = await BMS.leerSecuenciasDocx(buf);
@@ -468,10 +481,16 @@
     const lista = h('div', { class: 'lista' }, h('div', { class: 'grp' }, 'Documento'),
       h('div', { class: 'it' + (sel === -1 ? ' on' : ''), onclick: () => { BMS.ui.secSel = -1; BMS.rerender(); } }, h('span', null, 'Portada y anexos')),
       h('div', { class: 'it' + (sel === -2 ? ' on' : ''), onclick: () => { BMS.ui.secSel = -2; BMS.rerender(); } }, h('span', null, 'Validación con el estándar'), h('span', { class: 'badge', style: nObs ? { color: 'var(--bad)' } : null }, nObs)),
-      h('div', { class: 'grp' }, 'Secciones'));
-    ini.forEach((bi, k) => {
-      const fin = k + 1 < ini.length ? ini[k + 1] : S.bloques.length;
-      lista.append(h('div', { class: 'it' + (sel === k ? ' on' : ''), onclick: () => { BMS.ui.secSel = k; BMS.rerender(); } }, h('span', null, cut(S.bloques[bi].texto, 44)), h('span', { class: 'badge' }, fin - bi - 1)));
+      );
+    ['bms', 'inc'].forEach((d) => {
+      lista.append(h('div', { class: 'grp' }, DOCS[d]));
+      let hay = false;
+      ini.forEach((bi, k) => {
+        if (docDe(S.bloques[bi]) !== d) return; hay = true;
+        const fin = k + 1 < ini.length ? ini[k + 1] : S.bloques.length;
+        lista.append(h('div', { class: 'it' + (sel === k ? ' on' : ''), onclick: () => { BMS.ui.secSel = k; BMS.rerender(); } }, h('span', null, cut(S.bloques[bi].texto, 44)), h('span', { class: 'badge' }, fin - bi - 1)));
+      });
+      if (!hay) lista.append(h('div', { class: 'mute', style: { fontSize: '12px', padding: '4px 10px' } }, 'Sin secciones'));
     });
     lista.append(h('div', { class: 'it', style: { color: 'var(--accent)' }, onclick: () => { S.bloques.push({ t: 'h1', texto: 'Nueva sección' }); BMS.ui.secSel = ini.length; guardar(); BMS.rerender(); } }, h('span', null, '+ Agregar sección')));
 
@@ -511,6 +530,7 @@
           h('select', { class: 'in', style: { width: '120px' }, value: b.t, onchange: (e) => { const t = e.target.value; if (t === b.t) return; if (t === 'tabla' || t === 'vivo') S.bloques[i] = nuevoTipo(t); else if (b.t === 'tabla' || b.t === 'vivo') S.bloques[i] = { t, texto: '' }; else b.t = t; guardar(); BMS.rerender(); } }, TIPOS.map(([v, tx]) => h('option', { value: v }, tx))),
           h('button', { class: 'b s', title: 'Subir', onclick: () => mover(-1) }, '↑'), h('button', { class: 'b s', title: 'Bajar', onclick: () => mover(1) }, '↓'),
           h('button', { class: 'b s', title: 'Agregar un párrafo debajo', onclick: () => { S.bloques.splice(i + 1, 0, nuevoTipo('p')); guardar(); BMS.rerender(); } }, '＋'),
+          b.t === 'h1' ? h('select', { class: 'in', title: 'Documento al que pertenece esta sección', style: { width: '170px' }, value: docDe(b), onchange: (e) => { b.doc = e.target.value; guardar(); BMS.rerender(); } }, Object.entries(DOCS).map(([v, tx]) => h('option', { value: v }, tx))) : null,
           h('button', { class: 'b x', title: 'Eliminar', onclick: () => { if (b.t === 'h1' && !confirm('Es el título de la sección; se elimina solo el título y su contenido pasa a la sección anterior. ¿Continuar?')) return; S.bloques.splice(i, 1); guardar(); BMS.rerender(); } }, '✕'));
         let cont;
         if (b.t === 'vivo') {
