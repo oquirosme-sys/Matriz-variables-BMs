@@ -9,7 +9,7 @@
    Requiere JSZip (cdnjs). */
 (function () {
   const ANCHO = { v: 8838, h: 12438 };               // ancho útil en twips (carta, márgenes de 3 cm)
-  const ALTO_H = 6600;                                 // alto máximo de una figura en hoja apaisada (twips), dejando lugar al título y al pie
+  const ALTO_H = 8450;                                 // alto máximo de una figura en hoja apaisada (twips), dejando lugar al título y al pie
   const esc = (t) => String(t == null ? '' : t).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
   const run = (t, o = {}) => '<w:r>' + (o.b || o.i || o.color || o.hl || o.rojo ? '<w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.rojo || o.hl ? '<w:color w:val="C00000"/>' : o.color ? '<w:color w:val="' + o.color + '"/>' : '') + '' + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(t) + '</w:t></w:r>';

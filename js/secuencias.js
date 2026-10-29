@@ -200,9 +200,12 @@
     const img = new Image();
     img.onload = async () => {
       try {
-        const n = Math.max(1, Math.ceil(H / (W * 0.62))), sliceH = Math.ceil(H / n), partes = [];
-        for (let i = 0; i < n; i++) {
-          const y0 = i * sliceH, hh = Math.min(sliceH, H - y0);
+        /* a todo el ancho útil de la hoja: la primera parte comparte página con el título (0.52 del ancho), las demás ocupan la página (0.68) */
+        const h1 = Math.min(H, Math.round(W * 0.52)), resto = Math.max(0, H - h1), nr = resto ? Math.ceil(resto / (W * 0.68)) : 0, hr = nr ? Math.ceil(resto / nr) : 0;
+        const cortes = [[0, h1]]; for (let i = 0; i < nr; i++) cortes.push([h1 + i * hr, Math.min(hr, H - h1 - i * hr)]);
+        const partes = [];
+        for (let i = 0; i < cortes.length; i++) {
+          const y0 = cortes[i][0], hh = cortes[i][1];
           const c = document.createElement('canvas'); c.width = W * escala; c.height = Math.round(hh * escala);
           const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
           g.drawImage(img, 0, y0 * escala, W * escala, hh * escala, 0, 0, W * escala, hh * escala);
@@ -248,7 +251,7 @@
     if (op.d) {
       anexo('Lista de controladores y dispositivos', 'Controladores con el modelo seleccionado para la marca ' + P.marca + ', dispositivos de red e integraciones, y lista de materiales de controladores y módulos. Los modelos se validan con el integrador antes de emitir.');
       const resumenCfg = (cfg) => (cfg.base ? cfg.baseQty + '× ' + cfg.base + Object.keys(cfg.modulos || {}).filter((k) => cfg.modulos[k]).map((k) => ' + ' + cfg.modulos[k] + '× ' + k).join('') : 'Sin hardware (solo integración)');
-      out.push({ t: 'tabla', titulo: 'Controladores del sistema', cols: [2.2, 1, 1.2, 2.2, 1.6, 4.4, 1.2, 1.2], filas: [['Controlador', 'Tipo', 'Nivel', 'Cuarto / ubicación', 'Panel', 'Modelo y módulos', 'Cableados', 'Con reserva'],
+      out.push({ t: 'tabla', titulo: 'Controladores del sistema', cols: [2.1, 1.5, 1, 2.1, 1.5, 4.2, 1.6, 1.4], filas: [['Controlador', 'Tipo', 'Nivel', 'Cuarto / ubicación', 'Panel', 'Modelo y módulos', 'Cableados', 'Con reserva'],
         ...mot.detalle.map((d) => { const n = C.nivelDe(d.c.nivel); return [C.nombreCtrl(d.c), d.c.tipo === 'CP' ? 'Principal' : 'Secundario', n ? n.codigo : '—', d.c.ubicacion || '—', (E.gabDim && E.gabDim[C.gabDe(d.c) || d.c.id]) || C.panelSugerido(C.unidadesPanel(d.c, detMap)), resumenCfg(d.cfg), num(C.cable(d.t)), num(C.cable(d.req))]; })] });
       const disp = [];
       if (mot.motor) disp.push([mot.motor.cod + ' — ' + (mot.motor.desc || 'motor de red'), 'Motor de red / supervisor', '1', '—', '—']);
