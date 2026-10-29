@@ -78,7 +78,8 @@
         const selTipo = combo(tipo ? tipo.nombre : '(tipo eliminado del catálogo)', 'Escriba para cambiar el equipo…', (t) => {
           eq.tipoId = t.id; eq.excl = []; eq.tag = etiquetaTag(t); BMS.touch(); BMS.rerender();
         }, '300px');
-        const ipCell = h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: C.esIP(eq, tipo), disabled: !tipo, title: 'Panel con BACnet/IP: todas sus señales son internas del panel y llegan al BMS por la red (INT), no por cable al controlador. En el diagrama se dibuja pegado a la red IP.', onchange: (ev) => { eq.ip = ev.target.checked; BMS.touch(); BMS.rerender(); } }));
+        const OPC_COM = [['D', 'Cableado (D)'], ['A', 'BACnet/IP (A)'], ['B', 'BACnet MS/TP (B)'], ['E', 'Modbus TCP/IP (E)'], ['C', 'Modbus RTU (C)']];
+        const ipCell = h('td', null, h('select', { class: 'in', style: { minWidth: '128px' }, disabled: !tipo, value: C.comDe(eq, tipo), title: 'Cómo llega el equipo al BMS. Cableado: señales al controlador. Las demás opciones son equipos o paneles de red: sus señales son internas y cuentan como INT; en el diagrama se dibujan sobre la red o troncal correspondiente.', onchange: (ev) => { eq.com = ev.target.value; delete eq.ip; BMS.touch(); BMS.rerender(); } }, OPC_COM.map(([v, t]) => h('option', { value: v }, t))));
         const ctlCell = h('td', null);
         const ctlName = h('span', { class: 'mute', style: { marginLeft: '6px', fontSize: '12px' } });
         (celdas[eq.id] = celdas[eq.id] || {}).ctl = ctlName;
@@ -155,7 +156,7 @@
       h('div', { class: 'fila noprint' }, buscador),
       h('div', { class: 'fila noprint' }, selAgregar, selCopiar, h('button', { class: 'b', onclick: copiar }, 'Copiar')),
       h('div', { class: 'scroll' }, h('table', { class: 't' },
-        h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Cant.', 'BACnet/IP', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),
+        h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Cant.', 'Comunicación', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),
       h('div', { class: 'fila noprint' }, h('button', { class: 'b p', onclick: () => BMS.ir('resumen') }, 'Siguiente: resumen →')))));
     pintaFilas(); actualizar();
   };

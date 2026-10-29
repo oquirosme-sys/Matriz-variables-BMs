@@ -50,6 +50,7 @@
     const det = {}; mot.detalle.forEach((d) => (det[d.c.id] = d));
     return { E, P, C, res, mot, M, det };
   }
+  const NOMRED = { A: 'BACnet/IP', B: 'BACnet MS/TP', C: 'Modbus RTU', E: 'Modbus TCP' };
   const etiqueta = (it) => {
     let n = it.tipo.nombre.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
     if (n.length > 34 && n.includes(' / ')) n = n.split(' / ')[0];
@@ -71,7 +72,7 @@
   /* Gateways: BACnet IP y Modbus TCP entran por la red IP; Modbus RTU por gateway sobre la troncal. */
   function gateways(res, nivelDe) {
     const out = new Map();
-    res.filas.filter((f) => f.tipo && f.tipo.gw && f.eq.qty > 0).forEach((f) => {
+    res.filas.filter((f) => f.tipo && f.tipo.gw && f.eq.qty > 0 && !f.ip).forEach((f) => {
       let k = 'A';
       if (f.tipo.gw === 'GW-MODBUS') k = /RTU|Modbus \/ BACnet/i.test(f.tipo.pts.map((p) => p.ifc).join(' ')) ? 'C' : 'E';
       const id = f.tipo.gw + '|' + k;
@@ -91,9 +92,9 @@
   function paneles(res, nivelDe) {
     const out = new Map();
     res.filas.filter((f) => f.ip && f.tipo && f.eq.qty > 0).forEach((f) => {
-      const o = out.get(f.tipo.id) || { k: 'panel', clave: 'A', tipo: f.tipo, qty: 0, tags: [], niv: new Set(), int: 0, pts: f.puntos.filter((p) => p.incl).map((p) => p.p.n) };
+      const o = out.get(f.tipo.id + '|' + f.com) || { k: 'panel', clave: f.com, tipo: f.tipo, qty: 0, tags: [], niv: new Set(), int: 0, pts: f.puntos.filter((p) => p.incl).map((p) => p.p.n) };
       o.qty += f.eq.qty; if (f.eq.tag && !/-$/.test(f.eq.tag)) o.tags.push(f.eq.tag);
-      const n = nivelDe(f.eq.nivel); if (n) o.niv.add(n.codigo); o.int += f.t.int; out.set(f.tipo.id, o);
+      const n = nivelDe(f.eq.nivel); if (n) o.niv.add(n.codigo); o.int += f.t.int; out.set(f.tipo.id + '|' + f.com, o);
     });
     return [...out.values()];
   }
@@ -124,7 +125,7 @@
     grupos.forEach((gr) => { if (cur.length && cur.length + gr.length > PORFILA) { filas.push({ nodes: cur }); cur = []; } cur.push(...gr); });
     if (cur.length || !filas.length) filas.push({ nodes: cur });
     /* Redes IP separadas por protocolo: BACnet/IP (A) y Modbus TCP (E), cada una en su propia línea */
-    ['A', 'E'].forEach((k) => { const l = nodosIP.filter((n) => n.clave === k); for (let i = 0; i < l.length; i += PORFILA) filas.push({ nodes: l.slice(i, i + PORFILA), ip: k }); });
+    ['A', 'E', 'B', 'C'].forEach((k) => { const l = nodosIP.filter((n) => n.clave === k); for (let i = 0; i < l.length; i += PORFILA) filas.push({ nodes: l.slice(i, i + PORFILA), ip: k }); });
 
     const altP = 150 + kmax(itsP.length) * ITH;
     let y = 400;
@@ -213,7 +214,7 @@
       const { busY } = pos[ri], nodes = fila.nodes, n = nodes.length, kk = fila.ip || trunk;
       const xIni = ri === 0 && principal ? busIni + 48 : 40, xFin = n ? X0 + (n - 1) * COLW + 50 + 60 : xIni + 40;
       g.append(s('path', { d: `M${xIni} ${busY} ` + nodes.map((_, i) => { const c0 = X0 + i * COLW + 50; return `H${c0 - 16} L${c0} ${busY + 22} L${c0 + 16} ${busY}`; }).join(' ') + ` H${xFin}`, fill: 'none', stroke: col(kk), 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
-      if (fila.ip) { mv(g, 'iplab' + ri, (sg) => txt(sg, 40, busY - 14, 'Red IP (LAN por otros) — ' + (fila.ip === 'E' ? 'Modbus TCP' : 'BACnet/IP'), { size: 9 })); clave(g, 300, busY, fila.ip); }
+      if (fila.ip) { mv(g, 'iplab' + ri, (sg) => txt(sg, 40, busY - 14, (fila.ip === 'A' || fila.ip === 'E' ? 'Red IP (LAN por otros) — ' : fila.ip === 'B' ? 'Dispositivos en la troncal ' : 'Línea ') + NOMRED[fila.ip], { size: 9 })); clave(g, 300, busY, fila.ip); }
       else if (ri > 0) { mv(g, 'trlab' + ri, (sg) => txt(sg, 40, busY - 14, 'Continúa troncal (fila ' + (ri + 1) + ')', { size: 9 })); clave(g, 280, busY, kk); }
       /* paneles (gabinetes): cada controlador, o el grupo que comparte gabinete, va dentro de un recuadro punteado con su dimensión */
       if (!fila.ip && cfg.paneles !== false) {
@@ -256,10 +257,10 @@
           nd.its.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + IT0 + q * ITH, it, 24, 'n:' + c.id + ':i' + q));
           if (nd.its.length > MAXIT) txt(g, cx + 38, busY + IT0 + MAXIT * ITH, '+ ' + (nd.its.length - MAXIT) + ' tipos más (ver matriz)', { size: 8, fill: GRIS });
         } else if (nd.k === 'panel') {
-          const kid = 'p:' + nd.tipo.id, np = Math.min(nd.pts.length, 12);
+          const kid = 'p:' + nd.tipo.id + nd.clave, np = Math.min(nd.pts.length, 12);
           mv(g, kid + ':tag', (sg) => txt(sg, cx, busY - 8, (nd.tags[0] || ((nd.tipo.tag || '').replace(/-$/, '').length > 2 ? nd.tipo.tag.replace(/-$/, '') : cut(etiqueta({ tipo: nd.tipo }), 16))) + (nd.qty > 1 ? ' ×' + nd.qty : ''), { size: 11, bold: true, anchor: 'middle' }));
           simPanel(g, cx - 50, busY + 22, 100, 52);
-          txt(g, cx, busY + 52, 'BACnet/IP', { size: 9, anchor: 'middle', bold: true });
+          txt(g, cx, busY + 52, NOMRED[nd.clave], { size: 9, anchor: 'middle', bold: true });
           mv(g, kid + ':txt', (sg) => {
             let yq = busY + 90; const L = (tt, o = {}) => { txt(sg, cx, yq, tt, { anchor: 'middle', ...o }); yq += 10.5; };
             wrap(etiqueta({ tipo: nd.tipo }), 30).slice(0, 3).forEach((l) => L(l, { size: 8.5, bold: true }));
@@ -421,7 +422,7 @@
       h('button', { class: 'b', title: 'Devuelve todos los textos movidos a su posición original', onclick: () => { if (Object.keys(D.mv).length && !confirm('¿Devolver todos los textos movidos a su posición original?')) return; D.mv = {}; BMS.touch(); BMS.rerender(); } }, 'Restablecer textos'),
       h('span', { class: 'mute', style: { fontSize: '12px' } }, 'Ctrl + rueda del mouse también hace zoom'));
     root.append(h('h2', null, 'Diagrama unifilar del sistema de monitoreo y control'),
-      h('p', { class: 'hint' }, 'Lámina estándar Sinergia, dibujada con los datos del proyecto. Entre controladores va la troncal (clave B, BACnet MS/TP); la red IP llega solo al controlador principal (clave A), a los paneles con BACnet/IP (casilla en la pestaña 3) y a los gateways, en líneas separadas: BACnet/IP (clave A) y Modbus TCP (clave E, azul oscuro). Los controladores del mismo cuarto se agrupan en un gabinete (pestaña 1). Un punto rojo marca un controlador cuya selección no cubre los puntos.'),
+      h('p', { class: 'hint' }, 'Lámina estándar Sinergia, dibujada con los datos del proyecto. Entre controladores va la troncal (clave B, BACnet MS/TP); la red IP llega solo al controlador principal (clave A), a los equipos que usted marque con comunicación de red (selector en la pestaña 3) y a los gateways, cada protocolo en su propia línea: BACnet/IP (clave A) y Modbus TCP (clave E, azul oscuro). Los controladores del mismo cuarto se agrupan en un gabinete (pestaña 1). Un punto rojo marca un controlador cuya selección no cubre los puntos.'),
       h('div', { class: 'fila noprint' }, campo('Lámina', 'lamina'), campo('Calibre señales (AWG)', 'awg', '80px'),
         sel('Troncal entre controladores', 'troncal', [['auto', 'Según la marca'], ['B', 'BACnet MS/TP (B)'], ['A', 'BACnet IP (A)']], D.troncal || 'auto'),
         sel('Licencias y servidor', 'licencias', [['1', 'Mostrar'], ['0', 'Ocultar']], D.licencias ? '1' : '0'),
