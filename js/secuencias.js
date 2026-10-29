@@ -422,11 +422,12 @@
     if (tr) {
       const set = new Set();
       const ver = (x) => partesDe(x).forEach((q) => { if (BMS.trad.esIngles(sinMarcas(q))) set.add(sinMarcas(q)); });
-      bl.forEach((b) => { if (b.t === 'tabla') b.filas.forEach((f) => f.forEach((c) => { if (String(c).split(/\s+/).length >= 5) ver(c); })); else if (b.texto != null && (b.t === 'p' || b.t === 'li' || b.t === 'h2')) ver(b.texto); });
+      bl.filter((b) => !b.fijo).forEach((b) => { if (b.t === 'tabla') b.filas.forEach((f) => f.forEach((c) => { if (String(c).split(/\s+/).length >= 5) ver(c); })); else if (b.texto != null && (b.t === 'p' || b.t === 'li' || b.t === 'h2')) ver(b.texto); });
       const lista = [...set], tra = await BMS.trad.traducirLineas(tr, lista);
       mapa = new Map(lista.map((q, i) => [q, tra[i]]));
     }
     return bl.map((b) => {
+      if (b.fijo) return b;   /* lo que viene de un Word importado no se modifica */
       if (b.t === 'tabla') return { ...b, filas: b.filas.map((f) => f.map((c) => (String(c).split(/\s+/).length >= 5 ? textoEnEspanol(c, mapa) : c))) };
       if (b.texto != null && (b.t === 'p' || b.t === 'li' || b.t === 'h2')) return { ...b, texto: textoEnEspanol(b.texto, mapa) };
       return b;
@@ -441,7 +442,7 @@
     const PEND = { 'Habilitación y horario': '[por definir]', 'Control': '[por definir]', 'Alarmas': '[por definir]' };
     /* 1. secciones SOO-n con marcadores «[por definir]»: se redactan a partir de las variables del catálogo */
     S.bloques.forEach((b, i) => {
-      if (b.t !== 'li') return;
+      if (b.t !== 'li' || b.fijo) return;
       const m = /^\*\*(Habilitación y horario|Control|Alarmas):\*\*\s*\[por definir\]\.?$/.exec(b.texto || ''); if (!m) return;
       let k = i; while (k >= 0 && S.bloques[k].t !== 'h1') k--;
       if (k >= 0 && docDe(S.bloques[k]) !== doc) return;
@@ -609,7 +610,7 @@
         try {
           const r = await BMS.leerSecuenciasDocx(buf);
           if (S.bloques.length && !confirm('Se leyeron ' + r.bloques.length + ' bloques' + (r.descartados ? ' (se descartaron ' + r.descartados + ' de anexos generados, que se vuelven a generar al exportar)' : '') + '. Esto reemplaza las secuencias actuales. ¿Continuar?')) return;
-          S.portada = r.portada; S.bloques = r.bloques; BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
+          S.portada = r.portada; S.bloques = r.bloques.map((b) => ({ ...b, fijo: true })); BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
         } catch (e) { alert('No se pudo importar: ' + e.message); }
       }) }, 'Importar desde Word'),
       h('button', { class: 'b', title: 'Agrega las secciones SOO-n, subsecciones y bloques ligados en vivo que falten, sin tocar lo ya escrito', onclick: () => {
