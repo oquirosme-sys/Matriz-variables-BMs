@@ -84,8 +84,10 @@
 
   function textoDelDocumento() {
     const S = BMS.estado.secuencias;
-    const bl = resolverBloques(S.bloques);
-    const propio = S.bloques.filter((b) => b.t !== 'vivo').map((b) => (b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || '')).join(' \n ');
+    /* los párrafos agregados por «Completar la secuencia» siguen pendientes (en rojo) y no cuentan como cobertura */
+    const util = S.bloques.filter((b) => !/Redactar cómo la secuencia lo cumple/.test(b.texto || ''));
+    const bl = resolverBloques(util);
+    const propio = util.filter((b) => b.t !== 'vivo').map((b) => (b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || '')).join(' \n ');
     const todo = bl.map((b) => (b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || '')).join(' \n ');
     return { todo: BMS.norm(todo), propio: BMS.norm(propio), crudo: bl };
   }
@@ -298,7 +300,55 @@
     return cuenta;
   }
 
-  BMS.seq = { complementar, generarAnexos, resolverBloques, resolverTexto, validar, letraSiguiente, estructuraBase };
+  /* ---------- completar la secuencia: redacta lo que falta para cumplir el estándar y deja en rojo lo que se debe actualizar ---------- */
+  function completarSecuencia(S) {
+    const E = BMS.estado, res = BMS.calc.todo(), cuenta = { secciones: 0, redactados: 0, requisitos: 0 };
+    const c0 = complementar(S); cuenta.secciones = c0.secciones;
+    const lista = (a, n) => { const u = [...new Set(a)]; return u.slice(0, n).join(', ') + (u.length > n ? ' y ' + (u.length - n) + ' más' : ''); };
+    const PEND = { 'Habilitación y horario': '[por definir]', 'Control': '[por definir]', 'Alarmas': '[por definir]' };
+    /* 1. secciones SOO-n con marcadores «[por definir]»: se redactan a partir de las variables del catálogo */
+    S.bloques.forEach((b, i) => {
+      if (b.t !== 'li') return;
+      const m = /^\*\*(Habilitación y horario|Control|Alarmas):\*\*\s*\[por definir\]\.?$/.exec(b.texto || ''); if (!m) return;
+      let k = i; while (k >= 0 && S.bloques[k].t !== 'h1') k--;
+      const cat = k >= 0 && BMS.catEq.categorias.find((c) => BMS.norm(S.bloques[k].texto).includes(BMS.norm(c.nombre)));
+      if (!cat) return;
+      const tipos = new Map(); res.filas.filter((f) => f.tipo && f.tipo.cat === cat.id && f.eq.qty > 0).forEach((f) => tipos.set(f.tipo.id, f.tipo));
+      const T = [...tipos.values()], pts = (t) => t.pts || [];
+      let texto;
+      if (m[1] === 'Habilitación y horario') {
+        const con = T.filter((t) => pts(t).some((p) => p.do > 0)).map((t) => corto(t.nombre));
+        texto = '**Habilitación y horario:** ' + (con.length ? 'el BMS habilita y deshabilita ' + lista(con, 6) + ' según el horario semanal y el calendario de excepciones, editables desde la interfaz web; el selector local en el equipo tiene prioridad sobre el comando del BMS. ' : 'el BMS supervisa el sistema sin comandar equipos; los estados se registran con su hora. ') + '!!Confirmar horarios, condiciones de arranque y retardos.!!';
+      } else if (m[1] === 'Control') {
+        const ao = []; T.forEach((t) => pts(t).filter((p) => p.ao > 0 || /setpoint|set point/i.test(p.n)).forEach((p) => ao.push(p.n)));
+        texto = '**Control:** ' + (ao.length ? 'el BMS ajusta ' + lista(ao, 5) + ' dentro de los límites definidos por el diseño y vigila la respuesta del equipo; ' : 'el equipo mantiene su control propio y el BMS lee sus variables principales; ') + 'ante pérdida de comunicación el equipo continúa con su último modo seguro. !!Confirmar setpoints, límites y modos de operación.!!';
+      } else {
+        const al = []; T.forEach((t) => pts(t).filter((p) => p.alm).forEach((p) => al.push(p.n)));
+        texto = '**Alarmas:** ' + (al.length ? 'se generan alarmas para ' + lista(al, 6) + ', con prioridad, reconocimiento por el operador y tendencia con retención de un año. ' : 'toda entrada analógica tiene alarma alta y baja, y todo comando tiene su estado de retroalimentación; las tendencias se retienen un año. ') + '!!Confirmar umbrales, retardos y prioridad de cada alarma.!!';
+      }
+      S.bloques[i] = { t: 'li', texto }; cuenta.redactados++;
+    });
+    /* 2. requisitos del estándar que las secuencias no cubren: se agrega un párrafo en la sección del tema, con lo pendiente en rojo */
+    const v = validar(true), titulos = () => S.bloques.map((b, i) => ({ b, i })).filter((x) => x.b.t === 'h1');
+    const yaEsta = (r) => { const k = BMS.norm(r.req).slice(0, 50); return S.bloques.some((b) => BMS.norm(b.texto || '').includes(k)); };
+    const pendientes = v.reqs.filter((r) => r.estado !== 'ok' && !yaEsta(r));
+    let general = S.bloques.findIndex((b) => b.t === 'h1' && /Requisitos del estándar por incorporar/i.test(b.texto));
+    pendientes.forEach((r) => {
+      const rr = raices(r.req); let mejor = -1, pm = 0;
+      titulos().forEach((x) => { if (/^\s*Anexo\b/i.test(x.b.texto) || /Requisitos del estándar por incorporar/i.test(x.b.texto)) return; const rs = raices(x.b.texto); const sc = rs.filter((q) => rr.includes(q)).length; if (sc > pm) { pm = sc; mejor = x.i; } });
+      const nota = r.estado === 'parcial' ? 'Cubierto en parte: ' + r.obs : 'No cubierto todavía.';
+      const li = { t: 'li', texto: (r.ref ? r.ref + ': ' : '') + r.req.replace(/[.;]\s*$/, '') + '. !!' + nota.replace(/!!/g, '') + ' Redactar cómo la secuencia lo cumple y confirmar los valores.!!' };
+      if (mejor >= 0) { let f = mejor + 1; while (f < S.bloques.length && S.bloques[f].t !== 'h1') f++; S.bloques.splice(f, 0, li); }
+      else {
+        if (general < 0) { let a = S.bloques.findIndex((b) => b.t === 'h1' && /^\s*Anexo\b/i.test(b.texto)); if (a < 0) a = S.bloques.length; S.bloques.splice(a, 0, { t: 'h1', texto: 'Requisitos del estándar por incorporar' }, { t: 'p', texto: 'Requisitos del estándar del hotel sobre operación y control que las secuencias deben tratar. Lo marcado en rojo se debe redactar o confirmar antes de emitir.' }); general = a; }
+        let f = general + 1; while (f < S.bloques.length && S.bloques[f].t !== 'h1') f++; S.bloques.splice(f, 0, li);
+      }
+      cuenta.requisitos++;
+    });
+    return cuenta;
+  }
+
+  BMS.seq = { completarSecuencia, complementar, generarAnexos, resolverBloques, resolverTexto, validar, letraSiguiente, estructuraBase };
 
   /* ---------- página ---------- */
   const pagina = (root) => {
@@ -407,6 +457,11 @@
         const c = complementar(S); BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
         if (!vacio) setTimeout(() => alert('Se complementaron las secuencias: ' + c.secciones + ' sección(es) nueva(s), ' + c.subsecciones + ' subsección(es) y ' + c.vivos + ' bloque(s) ligado(s) agregados. Lo ya escrito no se modificó.'), 50);
       } }, 'Cargar estructura base del proyecto'),
+      h('button', { class: 'b p', title: 'Redacta lo que falta para cumplir el estándar del hotel: completa las secciones por sistema con las variables del proyecto y agrega los requisitos no cubiertos. Lo que se debe actualizar queda en rojo', onclick: () => {
+        if (!S.estandar.texto.trim() && !confirm('No hay estándar del hotel cargado; solo se completarán las secciones del proyecto. ¿Continuar?')) return;
+        const c = completarSecuencia(S); validar(true); BMS.touch(); BMS.rerender();
+        setTimeout(() => alert('Secuencia completada: ' + c.secciones + ' sección(es) nueva(s), ' + c.redactados + ' párrafo(s) redactado(s) con las variables del proyecto y ' + c.requisitos + ' requisito(s) del estándar agregado(s). Lo marcado en rojo debe revisarse, actualizarse o confirmarse antes de emitir.'), 50);
+      } }, 'Completar la secuencia'),
       h('button', { class: 'b', title: 'Sube el PDF del estándar del hotel para validar las secuencias', onclick: () => { BMS.ui.secSel = -2; cargarEstandar(); } }, 'Subir estándar del hotel (PDF)'),
       h('button', { class: 'b x', onclick: () => { if (confirm('¿Vaciar las secuencias de operación? (el estándar del hotel se conserva)')) { const est = S.estandar; E.secuencias = inicial(); E.secuencias.estandar = est; BMS.ui.secSel = -1; BMS.touch(); BMS.rerender(); } } }, 'Vaciar'), estado);
 
