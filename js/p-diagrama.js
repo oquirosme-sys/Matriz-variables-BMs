@@ -59,15 +59,37 @@
   /* El tag solo se muestra si aporta: no si es un prefijo de numeración (ACH-C-) ni si repite el nombre (UPS / UPS-01). */
   const tagUtil = (it, nom) => { const t = (it.tags[0] || '').trim(); if (!t || /-$/.test(t)) return ''; const w = nom.toUpperCase().split(' ')[0]; return t.toUpperCase().startsWith(w) || nom.toUpperCase().includes(t.toUpperCase()) ? '' : t; };
 
-  /* Equipos cableados de un controlador agrupados por tipo. */
+  /* Etiquetas individuales de un renglón de equipos: «EX-S1» ×3 → EX-S1, EX-S2, EX-S3; «UE-1…5» → UE-1 … UE-5; prefijo «BP-» → BP-1, BP-2… */
+  function etiquetas(tag, qty) {
+    const t = String(tag || '').trim();
+    if (qty <= 1) return [t];
+    if (!t) return Array(qty).fill('');
+    const pad = (n, ref) => String(n).padStart(String(ref).length > 1 && /^0/.test(String(ref)) ? String(ref).length : 0, '0');
+    if (/-$/.test(t)) return Array.from({ length: qty }, (_, i) => t + (i + 1));
+    let m = /^(.*?)(\d+)\s*(?:…|\.{2,3}|–|\/)\s*(\d+)$/.exec(t);
+    if (m) {
+      const a = Number(m[2]), z = Number(m[3]), out = [];
+      for (let n = a; n <= z && out.length < qty; n++) out.push(m[1] + pad(n, m[2]));
+      for (let n = z + 1; out.length < qty; n++) out.push(m[1] + n);
+      return out;
+    }
+    m = /^(.*?)(\d+)$/.exec(t);
+    if (m) return Array.from({ length: qty }, (_, i) => m[1] + pad(Number(m[2]) + i, m[2]));
+    return Array.from({ length: qty }, (_, i) => t + '-' + (i + 1));
+  }
+
+  /* Equipos cableados de un controlador: una caja por equipo (no agrupados por tipo), como en planta. */
   function itemsCtrl(res, cid) {
-    const g = new Map();
+    const out = [];
     res.filas.filter((f) => f.ctrlId === cid && f.tipo && f.eq.qty > 0 && !f.tipo.gw && !f.ip).forEach((f) => {
-      const o = g.get(f.tipo.id) || { tipo: f.tipo, qty: 0, tags: [], t: BMS.calc.vacio() };
-      o.qty += f.eq.qty; if (f.eq.tag) o.tags.push(f.eq.tag);
-      ['ai', 'ao', 'di', 'do', 'int'].forEach((q) => (o.t[q] += f.t[q])); g.set(f.tipo.id, o);
+      const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q);
+      for (let i = 0; i < q; i++) {
+        const t = BMS.calc.vacio();
+        ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (t[k] = Math.round(f.t[k] / q)));
+        out.push({ tipo: f.tipo, qty: 1, tags: [tags[i] || ''], t, idx: i + 1, de: q });
+      }
     });
-    return [...g.values()];
+    return out;
   }
   /* Gateways: BACnet IP y Modbus TCP entran por la red IP; Modbus RTU por gateway sobre la troncal. */
   function gateways(res, nivelDe) {
@@ -76,27 +98,26 @@
       let k = 'A';
       if (f.tipo.gw === 'GW-MODBUS') k = /RTU|Modbus \/ BACnet/i.test(f.tipo.pts.map((p) => p.ifc).join(' ')) ? 'C' : 'E';
       const id = f.tipo.gw + '|' + k;
-      const o = out.get(id) || { gw: f.tipo.gw, clave: k, items: new Map(), host: {} };
-      const it = o.items.get(f.tipo.id) || { tipo: f.tipo, qty: 0, ints: 0, niv: new Set() };
-      it.qty += f.eq.qty; it.ints += f.t.int; const n = nivelDe(f.eq.nivel); if (n) it.niv.add(n.codigo); o.items.set(f.tipo.id, it);
+      const o = out.get(id) || { gw: f.tipo.gw, clave: k, items: [], host: {} };
+      const q = Math.max(1, Math.round(f.eq.qty)), tg = etiquetas(f.eq.tag, q), nv = nivelDe(f.eq.nivel);
+      for (let i = 0; i < q; i++) o.items.push({ tipo: f.tipo, qty: 1, tags: [tg[i] && !/-$/.test(tg[i]) ? tg[i] : ''], ints: Math.round(f.t.int / q), niv: new Set(nv ? [nv.codigo] : []), idx: i + 1, de: q });
       if (f.ctrlId) o.host[f.ctrlId] = (o.host[f.ctrlId] || 0) + f.t.int;
       out.set(id, o);
     });
     return [...out.values()].sort((a, b) => a.gw.localeCompare(b.gw) || a.clave.localeCompare(b.clave)).map((o) => {
       const hid = Object.keys(o.host).sort((a, b) => o.host[b] - o.host[a])[0];
-      return { k: 'gw', gw: o.gw, clave: o.clave, items: [...o.items.values()], host: hid || null };
+      return { k: 'gw', gw: o.gw, clave: o.clave, items: o.items, host: hid || null };
     });
   }
 
   /* Paneles con BACnet/IP: nodos sobre la red IP; sus señales internas se listan debajo del panel. */
   function paneles(res, nivelDe) {
-    const out = new Map();
+    const out = [];
     res.filas.filter((f) => f.ip && f.tipo && f.eq.qty > 0).forEach((f) => {
-      const o = out.get(f.tipo.id + '|' + f.com) || { k: 'panel', clave: f.com, tipo: f.tipo, qty: 0, tags: [], niv: new Set(), int: 0, pts: f.puntos.filter((p) => p.incl).map((p) => p.p.n) };
-      o.qty += f.eq.qty; if (f.eq.tag && !/-$/.test(f.eq.tag)) o.tags.push(f.eq.tag);
-      const n = nivelDe(f.eq.nivel); if (n) o.niv.add(n.codigo); o.int += f.t.int; out.set(f.tipo.id + '|' + f.com, o);
+      const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q), n = nivelDe(f.eq.nivel), pts = f.puntos.filter((p) => p.incl).map((p) => p.p.n);
+      for (let i = 0; i < q; i++) out.push({ k: 'panel', clave: f.com, tipo: f.tipo, qty: 1, tags: tags[i] && !/-$/.test(tags[i]) ? [tags[i]] : [], niv: new Set(n ? [n.codigo] : []), int: Math.round(f.t.int / q), pts });
     });
-    return [...out.values()];
+    return out;
   }
 
   function construir() {
@@ -104,7 +125,7 @@
     cfg = E.diagrama; coloresOn = cfg.colores !== false; cfg.mv = cfg.mv || {};
     E.gabDim = E.gabDim || {};
     const trunk = cfg.troncal === 'A' || cfg.troncal === 'B' ? cfg.troncal : ((M && M.bus) || 'B');
-    const COLW = 238, X0 = 330, PORFILA = 9, MAXIT = 8, ITH = 44, IT0 = 156, awg = cfg.awg || '16';
+    const COLW = 238, X0 = 330, PORFILA = 9, MAXIT = 30, ITH = 44, IT0 = 156, awg = cfg.awg || '16';
     const cps = E.controladores.filter((c) => c.tipo === 'CP');
     const principal = cps[0] || null;
     const nivIdx = (c) => { const n = C.nivelDe(c.nivel); return n ? E.niveles.indexOf(n) : 99; };
@@ -208,7 +229,7 @@
       const kP = Math.min(itsP.length, MAXIT);
       if (kP) line(g, 62, pBus + 114, 62, pBus + 140 + (kP - 1) * ITH - 14, { w: 1.8, color: col('D') });
       itsP.slice(0, MAXIT).forEach((it, i) => dibujaItem(g, 62, pBus + 140 + i * ITH, it, 34, 'cp:i' + i));
-      if (itsP.length > MAXIT) txt(g, 80, pBus + 140 + MAXIT * ITH, '+ ' + (itsP.length - MAXIT) + ' tipos de equipo más (ver matriz)', { size: 8, fill: GRIS });
+      if (itsP.length > MAXIT) txt(g, 80, pBus + 140 + MAXIT * ITH, '+ ' + (itsP.length - MAXIT) + ' equipos más (ver matriz)', { size: 8, fill: GRIS });
     } else {
       rect(g, 44, pos[0].busY, 128, 50, { dash: '5 4' }); txt(g, 108, pos[0].busY + 28, 'Sin controlador principal', { size: 8.5, anchor: 'middle' });
     }
@@ -259,7 +280,7 @@
           const kC = Math.min(nd.its.length, MAXIT);
           if (kC) line(g, cx, busY + 114, cx, busY + IT0 + (kC - 1) * ITH - 14, { w: 1.8, color: col('D') });
           nd.its.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + IT0 + q * ITH, it, 24, 'n:' + c.id + ':i' + q));
-          if (nd.its.length > MAXIT) txt(g, cx + 38, busY + IT0 + MAXIT * ITH, '+ ' + (nd.its.length - MAXIT) + ' tipos más (ver matriz)', { size: 8, fill: GRIS });
+          if (nd.its.length > MAXIT) txt(g, cx + 38, busY + IT0 + MAXIT * ITH, '+ ' + (nd.its.length - MAXIT) + ' equipos más (ver matriz)', { size: 8, fill: GRIS });
         } else if (nd.k === 'panel') {
           const kid = 'p:' + nd.tipo.id + nd.clave, np = Math.min(nd.pts.length, 12);
           mv(g, kid + ':tag', (sg) => txt(sg, cx, busY - 8, (nd.tags[0] || ((nd.tipo.tag || '').replace(/-$/, '').length > 2 ? nd.tipo.tag.replace(/-$/, '') : cut(etiqueta({ tipo: nd.tipo }), 16))) + (nd.qty > 1 ? ' ×' + nd.qty : ''), { size: 11, bold: true, anchor: 'middle' }));
@@ -293,7 +314,7 @@
             const yy = busY + 196 + q * 36;
             simOtros(g, cx - 92, yy, 56);
             mv(g, kid + ':i' + q, (sg) => {
-              txt(sg, cx - 30, yy + 9, cut(etiqueta(it) + (it.qty > 1 ? ' ×' + it.qty : ''), 27), { size: 8.5 });
+              txt(sg, cx - 30, yy + 9, cut(etiqueta(it) + (it.tags && it.tags[0] ? ' ' + it.tags[0] : (it.de > 1 ? ' ' + it.idx : '')), 27), { size: 8.5 });
               txt(sg, cx - 30, yy + 20, `INT ${it.ints}` + (it.niv.size ? ' · ' + [...it.niv].join(', ') : ''), { size: 7.5, fill: GRIS });
             });
           });
@@ -371,7 +392,8 @@
     const directo = it.t.ai + it.t.ao + it.t.di + it.t.do === 0 && it.t.int > 0;
     clave(g, x + 18, yy - 22, directo ? 'A' : 'D');
     line(g, x, yy - 14, x + 14, yy, { w: 1.8, color: col(directo ? 'A' : 'D') }); equipoX(g, x + 14, yy - 9, 18);
-    const nom = etiqueta(it) + (tagUtil(it, etiqueta(it)) ? ' ' + tagUtil(it, etiqueta(it)) : '') + (it.qty > 1 ? ' ×' + it.qty : '');
+    const tg = (it.tags[0] || '').trim(), conTag = tg && !/-$/.test(tg);
+    const nom = etiqueta(it) + (conTag ? ' ' + tg : (it.de > 1 ? ' ' + it.idx : '')) + (it.qty > 1 ? ' ×' + it.qty : '');
     const all = wrap(nom, n), ls = all.slice(0, 2);
     mv(g, key, (sg) => {
       ls.forEach((l, i) => txt(sg, x + 38, yy - 3 + i * 9.5, i === 1 && all.length > 2 ? cut(l, n) : l, { size: 8.5 }));
