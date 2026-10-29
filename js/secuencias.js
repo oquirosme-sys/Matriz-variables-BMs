@@ -283,6 +283,61 @@
       inp.addEventListener('change', () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => alLeer(rd.result, f); comoTexto ? rd.readAsText(f) : rd.readAsArrayBuffer(f); });
       inp.click();
     };
+    /* ---- lectura del estándar: Excel, Word, PDF y texto; uno o varios archivos, o una carpeta ---- */
+    const EXT_EST = /\.(txt|md|csv|docx|xlsx|xls|xlsm|pdf)$/i;
+    const leerBuf = (f) => new Promise((ok, no) => { const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = () => no(rd.error); rd.readAsArrayBuffer(f); });
+    const cargarPdfJs = () => window.pdfjsLib ? Promise.resolve(window.pdfjsLib) : new Promise((ok, no) => {
+      const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; ok(window.pdfjsLib); };
+      sc.onerror = () => no(new Error('no se pudo cargar el lector de PDF (se necesita internet)')); document.head.append(sc);
+    });
+    async function lineasPdf(buf) {
+      const lib = await cargarPdfJs(), pdf = await lib.getDocument({ data: buf }).promise, out = [];
+      for (let n = 1; n <= pdf.numPages; n++) {
+        const items = (await (await pdf.getPage(n)).getTextContent()).items.filter((i) => i.str.trim()), filas = [];
+        items.forEach((i) => { const y = Math.round(i.transform[5]); let f = filas.find((r) => Math.abs(r.y - y) < 3); if (!f) filas.push(f = { y, it: [] }); f.it.push(i); });
+        filas.sort((a, b) => b.y - a.y).forEach((r) => out.push(r.it.sort((a, b) => a.transform[4] - b.transform[4]).map((i) => i.str).join(' ').replace(/\s+/g, ' ').trim()));
+      }
+      /* une las líneas de continuación: una línea nueva empieza con numeración, viñeta o mayúscula tras un punto */
+      const res = []; out.forEach((l) => { if (!res.length || /^(§?\d[\w.\-]*[\s)]|[•\-–·]|[A-Z]\.)/.test(l) || /[.:;]$/.test(res[res.length - 1])) res.push(l); else res[res.length - 1] += ' ' + l; });
+      return res;
+    }
+    function lineasExcel(buf) {
+      const wb = XLSX.read(buf, { type: 'array' }), out = [];
+      wb.SheetNames.forEach((n) => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false }).forEach((r) => {
+        const c = r.map((x) => String(x).trim()).filter(Boolean); if (!c.length) return;
+        if (c.length === 1 && c[0].length < 4) return;
+        if (/^(ref(erencia)?\.?|item|n[o°.]*|#|c[oó]digo)$/i.test(c[0]) && c.length > 1 && c.join(' ').length < 60) return;
+        out.push(c.length > 1 && c[0].length <= 24 && !/\s{2,}/.test(c[0]) ? c[0] + ' | ' + c.slice(1).join(' — ') : c.join(' — '));
+      }));
+      return out;
+    }
+    async function lineasDe(f) {
+      if (/\.(txt|md|csv)$/i.test(f.name)) return (await f.text()).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const buf = await leerBuf(f);
+      if (/\.docx$/i.test(f.name)) return BMS.lineasDocx(buf);
+      if (/\.pdf$/i.test(f.name)) return lineasPdf(buf);
+      return lineasExcel(buf);
+    }
+    function cargarEstandar(carpeta) {
+      const inp = document.createElement('input'); inp.type = 'file';
+      if (carpeta) inp.webkitdirectory = true; else { inp.multiple = true; inp.accept = '.txt,.md,.csv,.docx,.xlsx,.xls,.xlsm,.pdf'; }
+      inp.addEventListener('change', async () => {
+        const fs = [...inp.files].filter((f) => EXT_EST.test(f.name)).sort((a, b) => a.name.localeCompare(b.name));
+        if (!fs.length) { alert('No se encontraron archivos de Excel, Word, PDF o texto.'); return; }
+        const S = BMS.estado.secuencias, lineas = [], fallos = [];
+        for (const f of fs) { try { const l = await lineasDe(f); lineas.push(...l); } catch (e) { fallos.push(f.name + ': ' + e.message); } }
+        if (!lineas.length) { alert('No se pudo leer texto de los archivos.' + (fallos.length ? '\n' + fallos.join('\n') : '')); return; }
+        let agregar = false;
+        if ((S.estandar.texto || '').trim()) agregar = !confirm('Ya hay requisitos cargados.\n\nAceptar = reemplazarlos con ' + fs.length + ' archivo(s).\nCancelar = agregar al final.');
+        S.estandar.texto = (agregar ? S.estandar.texto.replace(/\s+$/, '') + '\n' : '') + lineas.join('\n');
+        const nom = carpeta ? ((fs[0].webkitRelativePath || '').split('/')[0] || 'Carpeta') : (fs.length === 1 ? fs[0].name.replace(/\.\w+$/, '') : fs.length + ' archivos');
+        if (!agregar || !S.estandar.nombre) S.estandar.nombre = nom;
+        guardar(); BMS.rerender();
+        if (fallos.length) alert('Se cargaron ' + (fs.length - fallos.length) + ' archivo(s). No se pudieron leer:\n' + fallos.join('\n'));
+      });
+      inp.click();
+    }
     const barra = h('div', { class: 'fila noprint' },
       h('button', { class: 'b p', onclick: exportar }, 'Exportar a Word'),
       h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
@@ -314,18 +369,12 @@
       const conteo = (c) => h('span', null, h('span', { class: 'chip ok' }, c.ok + ' cumplen'), ' ', h('span', { class: 'chip warn' }, c.parcial + ' parciales'), ' ', h('span', { class: 'chip bad' }, c.falta + ' no cumplen'));
       derecha = h('div', null,
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Estándar del hotel'),
-          h('p', { class: 'hint' }, 'Pegue o cargue los requisitos del estándar del hotel, uno por línea (opcional: "referencia | requisito"). La herramienta revisa en vivo si las secuencias los tratan y con qué valores, y señala lo que falta. Se preasigna una base de requisitos Fairfield CALA tomada del documento de secuencias; reemplácela por el texto del estándar.'),
+          h('p', { class: 'hint' }, 'Pegue los requisitos del estándar del hotel, o cárguelos desde archivos de Excel, Word, PDF o texto (uno o varios, o una carpeta completa), uno por línea (opcional: "referencia | requisito"). La herramienta revisa en vivo si las secuencias los tratan y con qué valores, y señala lo que falta. Se preasigna una base de requisitos Fairfield CALA tomada del documento de secuencias; reemplácela por el texto del estándar.'),
           h('label', { class: 'f' }, 'Nombre del estándar', h('input', { class: 'in', value: S.estandar.nombre || '', onchange: (e) => { S.estandar.nombre = e.target.value; guardar(); } })),
           h('label', { class: 'f', style: { marginTop: '8px' } }, 'Requisitos (uno por línea)', h('textarea', { class: 'in', rows: 12, style: { width: '100%' }, value: S.estandar.texto || '', onchange: (e) => { S.estandar.texto = e.target.value; guardar(); BMS.rerender(); } })),
           h('div', { class: 'fila' },
-            h('button', { class: 'b', onclick: () => archivo('.txt,.docx', async (dato, f) => {
-              try {
-                let t = dato;
-                if (/\.docx$/i.test(f.name)) { const r = await BMS.lineasDocx(dato); t = r.join('\n'); }
-                if (S.estandar.texto && !confirm('Esto reemplaza los requisitos actuales. ¿Continuar?')) return;
-                S.estandar.texto = t; S.estandar.nombre = S.estandar.nombre || f.name.replace(/\.\w+$/, ''); guardar(); BMS.rerender();
-              } catch (e) { alert('No se pudo leer el archivo: ' + e.message); }
-            }, true) }, 'Cargar desde archivo (.txt o .docx)'),
+            h('button', { class: 'b', onclick: () => cargarEstandar(false) }, 'Cargar archivos (Excel, Word, PDF, TXT)'),
+            h('button', { class: 'b', onclick: () => cargarEstandar(true) }, 'Cargar carpeta…'),
             h('button', { class: 'b', onclick: () => { if (!S.estandar.texto || confirm('Esto reemplaza los requisitos actuales por la base Fairfield CALA. ¿Continuar?')) { S.estandar.texto = ESTANDAR_BASE; S.estandar.nombre = 'Estándar Fairfield CALA (abril 2026)'; guardar(); BMS.rerender(); } } }, 'Usar la base Fairfield CALA'),
             h('button', { class: 'b', onclick: () => BMS.rerender() }, 'Revalidar'))),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Comprobaciones del proyecto'), h('div', { class: 'fila' }, conteo(val.cuentaPr)),
