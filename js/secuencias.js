@@ -91,7 +91,7 @@
   }
 
   const MAX_REQ = 600; /* tope de requisitos revisados, para que un estándar muy largo no deje la página lenta */
-  function validar() {
+  function validarCalc() {
     const E = BMS.estado, S = E.secuencias, P = E.proyecto, C = BMS.calc, res = C.todo(), mot = C.motor(res, P.marca);
     const doc = textoDelDocumento();
     const tdoc = new Set(raices(doc.todo)), compactoDoc = doc.todo.replace(/\s+/g, '').replace(/,/g, '.');
@@ -134,6 +134,15 @@
     if (!S.bloques.length) add('falta', 'Secuencias vacías', 'Todavía no hay secuencias redactadas.');
     const cuenta = (a) => a.reduce((x, r) => { x[r.estado || r.nivel] = (x[r.estado || r.nivel] || 0) + 1; return x; }, { ok: 0, parcial: 0, falta: 0 });
     return { reqs, pr, cuentaReqs: cuenta(reqs), cuentaPr: cuenta(pr) };
+  }
+  /* el estándar y el documento solo se vuelven a analizar cuando cambian (o con «Revalidar»); abrir la pestaña reutiliza el último resultado */
+  const hash = (t) => { let x = 5381; for (let i = 0; i < t.length; i++) x = ((x << 5) + x + t.charCodeAt(i)) | 0; return t.length + ':' + x; };
+  let cacheVal = null;
+  function validar(forzar) {
+    const E = BMS.estado, S = E.secuencias;
+    const clave = hash((S.estandar && S.estandar.texto) || '') + '|' + hash(textoDelDocumento().todo) + '|' + hash(JSON.stringify([E.proyecto, E.niveles, E.controladores, E.equipos, S.bloques.length]));
+    if (!forzar && cacheVal && cacheVal.clave === clave) return cacheVal.val;
+    const val = validarCalc(); cacheVal = { clave, val }; return val;
   }
   const chipDe = (e) => h('span', { class: 'chip ' + (e === 'ok' ? 'ok' : e === 'parcial' ? 'warn' : 'bad') }, e === 'ok' ? 'Cumple' : e === 'parcial' ? 'Parcial' : 'No cumple / falta');
 
@@ -405,7 +414,7 @@
             h('button', { class: 'b', onclick: () => cargarEstandar(false) }, 'Cargar archivos (Excel, Word, PDF, TXT)'),
             h('button', { class: 'b', onclick: () => cargarEstandar(true) }, 'Cargar carpeta…'),
             h('button', { class: 'b', onclick: () => { if (!S.estandar.texto || confirm('Esto reemplaza los requisitos actuales por la base Fairfield CALA. ¿Continuar?')) { S.estandar.texto = ESTANDAR_BASE; S.estandar.nombre = 'Estándar Fairfield CALA (abril 2026)'; guardar(); BMS.rerender(); } } }, 'Usar la base Fairfield CALA'),
-            h('button', { class: 'b', onclick: () => BMS.rerender() }, 'Revalidar'))),
+            h('button', { class: 'b', onclick: () => { validar(true); BMS.rerender(); } }, 'Revalidar'))),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Comprobaciones del proyecto'), h('div', { class: 'fila' }, conteo(val.cuentaPr)),
           val.pr.length ? h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tema', 'Estado', 'Observación'].map((x) => h('th', null, x)))), h('tbody', null, val.pr.map((r) => h('tr', null, h('td', { style: { fontWeight: 600 } }, r.tema), h('td', { class: 'c' }, chipDe(r.nivel)), h('td', null, r.obs))))) : h('p', { class: 'hint' }, 'Sin observaciones.')),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Requisitos del estándar frente a las secuencias'), h('div', { class: 'fila' }, conteo(val.cuentaReqs)),
