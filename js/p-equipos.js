@@ -88,7 +88,7 @@
           h('td', { class: 'c' }, h('button', { class: 'b s', title: 'Ver variables', onclick: () => { abierto ? BMS.ui.abiertos.delete(eq.id) : BMS.ui.abiertos.add(eq.id); BMS.rerender(); } }, abierto ? '▾' : '▸')),
           h('td', null, selTipo),
           h('td', null, h('input', { class: 'in', style: { width: '120px' }, value: eq.tag || '', placeholder: 'Tag(s)', onchange: (e) => { eq.tag = e.target.value; BMS.touch(); } })),
-          h('td', null, h('input', { class: 'in n', type: 'number', min: 0, step: 1, value: eq.qty, onchange: (e) => { eq.qty = Math.max(0, Math.round(num(e.target.value))); e.target.value = eq.qty; BMS.touch(); actualizar(); } })),
+          h('td', null, h('input', { class: 'in n', type: 'number', min: 0, step: 1, value: eq.qty, disabled: C.porHabCant(eq), title: C.porHabCant(eq) ? 'La cantidad es el número de habitaciones del nivel (pestaña 1, Niveles).' : '', onchange: (e) => { eq.qty = Math.max(0, Math.round(num(e.target.value))); e.target.value = eq.qty; BMS.touch(); actualizar(); } })),
           ipCell, ctlCell, c('ai'), c('ao'), c('di'), c('do'), c('int'), c('tot'),
           h('td', null, h('input', { class: 'in', style: { width: '160px' }, value: eq.obs || '', placeholder: 'Observación', onchange: (e) => { eq.obs = e.target.value; BMS.touch(); } })),
           h('td', { class: 'c' }, h('button', { class: 'b x', title: 'Quitar', onclick: () => { E.equipos.splice(E.equipos.indexOf(eq), 1); BMS.ui.abiertos.delete(eq.id); BMS.touch(); BMS.rerender(); } }, '✕'))));

@@ -64,8 +64,13 @@
   const esIP = (eq, tipo) => comDe(eq, tipo) !== 'D';
 
   /* Calcula todo el proyecto: filas de equipos con asignación de controlador y totales agrupados. */
+  /* Equipos que se repiten en cada habitación: su cantidad es el número de habitaciones del nivel (si el nivel lo tiene definido). */
+  const CANT_HAB = new Set(['fcu', 'fcu_simple']);
+  const habsDe = (nivelId) => { const n = nivelDe(nivelId); return n && n.habs > 0 ? Math.round(n.habs) : 0; };
+  const porHabCant = (eq) => CANT_HAB.has(eq.tipoId) && habsDe(eq.nivel) > 0;
   function todo() {
     const E = BMS.estado;
+    E.equipos.forEach((eq) => { if (porHabCant(eq)) eq.qty = habsDe(eq.nivel); });
     const ctrlTotales = {}; E.controladores.forEach((c) => (ctrlTotales[c.id] = vacio()));
     const sin = vacio(), porNivel = {}, porCat = {}, filas = [];
     E.niveles.forEach((n) => (porNivel[n.id] = vacio()));
@@ -225,5 +230,5 @@
     return lista;
   }
 
-  Object.assign(BMS, { calc: { comDe, PANELES, panelCanon, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
+  Object.assign(BMS, { calc: { habsDe, porHabCant, comDe, PANELES, panelCanon, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
 })();

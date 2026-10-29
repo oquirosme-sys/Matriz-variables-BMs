@@ -80,6 +80,7 @@
 
   /* Equipos que se repiten en cada habitación: una sola caja por nivel con «×N hab.» (la cantidad es el número de habitaciones). */
   const POR_HAB = new Set(['fcu', 'fcu_simple', 'grms_n']);
+  const nHab = (f, q) => BMS.calc.habsDe(f.eq.nivel) || q;
   const porHab = (tipo) => tipo.hab === true || POR_HAB.has(tipo.id);
   const nomHab = (it) => etiqueta(it).replace(/ por nivel$/i, '').replace(/ de habitaciones/i, '') + (it.qty > 1 ? ' ×' + it.qty + ' hab.' : '');
   const tagHab = (tag) => { const t = String(tag || '').trim(); return /-$/.test(t) ? '' : t.replace(/\s*\d+\s*(?:…|\.{2,3}|–|\/).*$/, ''); };
@@ -89,7 +90,7 @@
     const out = [];
     res.filas.filter((f) => f.ctrlId === cid && f.tipo && f.eq.qty > 0 && !f.tipo.gw && !f.ip).forEach((f) => {
       const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q);
-      if (porHab(f.tipo)) { const t = BMS.calc.vacio(); ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (t[k] = Math.round(f.t[k]))); out.push({ tipo: f.tipo, qty: q, hab: true, tags: [tagHab(f.eq.tag)], t, idx: 1, de: 1 }); return; }
+      if (porHab(f.tipo)) { const t = BMS.calc.vacio(); ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (t[k] = Math.round(f.t[k]))); out.push({ tipo: f.tipo, qty: nHab(f, q), hab: true, tags: [tagHab(f.eq.tag)], t, idx: 1, de: 1 }); return; }
       for (let i = 0; i < q; i++) {
         const t = BMS.calc.vacio();
         ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (t[k] = Math.round(f.t[k] / q)));
@@ -107,7 +108,7 @@
       const id = f.tipo.gw + '|' + k;
       const o = out.get(id) || { gw: f.tipo.gw, clave: k, items: [], host: {} };
       const q = Math.max(1, Math.round(f.eq.qty)), tg = etiquetas(f.eq.tag, q), nv = nivelDe(f.eq.nivel);
-      if (porHab(f.tipo)) o.items.push({ tipo: f.tipo, qty: q, hab: true, tags: [tagHab(f.eq.tag)], ints: Math.round(f.t.int), niv: new Set(nv ? [nv.codigo] : []), idx: 1, de: 1 });
+      if (porHab(f.tipo)) o.items.push({ tipo: f.tipo, qty: nHab(f, q), hab: true, tags: [tagHab(f.eq.tag)], ints: Math.round(f.t.int), niv: new Set(nv ? [nv.codigo] : []), idx: 1, de: 1 });
       else for (let i = 0; i < q; i++) o.items.push({ tipo: f.tipo, qty: 1, tags: [tg[i] && !/-$/.test(tg[i]) ? tg[i] : ''], ints: Math.round(f.t.int / q), niv: new Set(nv ? [nv.codigo] : []), idx: i + 1, de: q });
       if (f.ctrlId) o.host[f.ctrlId] = (o.host[f.ctrlId] || 0) + f.t.int;
       out.set(id, o);

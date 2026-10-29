@@ -79,6 +79,7 @@
             n.codigo = v; e.target.value = v; BMS.touch(); BMS.rerender();
           } }), 'codigo', i)),
           h('td', null, conAsa(h('input', { class: 'in', style: { width: '100%' }, value: n.nombre, onchange: (e) => { n.nombre = e.target.value; BMS.touch(); } }), 'nombre', i)),
+          h('td', { class: 'c' }, h('input', { class: 'in n', type: 'number', min: 0, step: 1, style: { width: '70px' }, value: n.habs || '', placeholder: '—', title: 'Habitaciones del nivel. Define la cantidad de fan coil (FCU) del nivel y la cantidad de habitaciones que se muestra en el diagrama.', onchange: (e) => { n.habs = Math.max(0, Math.round(Number(e.target.value) || 0)); BMS.touch(); BMS.rerender(); } })),
           h('td', { class: 'c' }, usos + ' equipos'),
           h('td', { class: 'c' },
             h('button', { class: 'b s', title: 'Subir', disabled: i === 0, onclick: () => { E.niveles.splice(i - 1, 0, E.niveles.splice(i, 1)[0]); BMS.touch(); BMS.rerender(); } }, '↑'), ' ',
@@ -96,7 +97,7 @@
     pintaNiveles();
     root.append(h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Niveles del edificio'),
       h('p', { class: 'hint' }, 'De abajo hacia arriba: el primer nivel de la lista es el más bajo (en el diagrama se dibuja al pie).'),
-      h('table', { class: 't', style: { maxWidth: '720px' } }, h('thead', null, h('tr', null, ['#', 'Código', 'Nombre', 'Uso', ''].map((x) => h('th', null, x)))), cuerpoN),
+      h('table', { class: 't', style: { maxWidth: '720px' } }, h('thead', null, h('tr', null, ['#', 'Código', 'Nombre', 'Habitaciones', 'Uso', ''].map((x) => h('th', null, x)))), cuerpoN),
       h('div', { class: 'fila' },
         h('button', { class: 'b p', onclick: () => { const n = E.niveles.length + 1; E.niveles.push({ id: uid(), codigo: 'N' + n, nombre: 'Nivel ' + n }); BMS.touch(); BMS.rerender(); } }, '+ Agregar nivel'))));
 
