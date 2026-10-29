@@ -78,11 +78,18 @@
     return Array.from({ length: qty }, (_, i) => t + '-' + (i + 1));
   }
 
+  /* Equipos que se repiten en cada habitación: una sola caja por nivel con «×N hab.» (la cantidad es el número de habitaciones). */
+  const POR_HAB = new Set(['fcu', 'fcu_simple', 'grms_n']);
+  const porHab = (tipo) => tipo.hab === true || POR_HAB.has(tipo.id);
+  const nomHab = (it) => etiqueta(it).replace(/ por nivel$/i, '').replace(/ de habitaciones/i, '') + (it.qty > 1 ? ' ×' + it.qty + ' hab.' : '');
+  const tagHab = (tag) => { const t = String(tag || '').trim(); return /-$/.test(t) ? '' : t.replace(/\s*\d+\s*(?:…|\.{2,3}|–|\/).*$/, ''); };
+
   /* Equipos cableados de un controlador: una caja por equipo (no agrupados por tipo), como en planta. */
   function itemsCtrl(res, cid) {
     const out = [];
     res.filas.filter((f) => f.ctrlId === cid && f.tipo && f.eq.qty > 0 && !f.tipo.gw && !f.ip).forEach((f) => {
       const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q);
+      if (porHab(f.tipo)) { const t = BMS.calc.vacio(); ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (t[k] = Math.round(f.t[k]))); out.push({ tipo: f.tipo, qty: q, hab: true, tags: [tagHab(f.eq.tag)], t, idx: 1, de: 1 }); return; }
       for (let i = 0; i < q; i++) {
         const t = BMS.calc.vacio();
         ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (t[k] = Math.round(f.t[k] / q)));
@@ -100,7 +107,8 @@
       const id = f.tipo.gw + '|' + k;
       const o = out.get(id) || { gw: f.tipo.gw, clave: k, items: [], host: {} };
       const q = Math.max(1, Math.round(f.eq.qty)), tg = etiquetas(f.eq.tag, q), nv = nivelDe(f.eq.nivel);
-      for (let i = 0; i < q; i++) o.items.push({ tipo: f.tipo, qty: 1, tags: [tg[i] && !/-$/.test(tg[i]) ? tg[i] : ''], ints: Math.round(f.t.int / q), niv: new Set(nv ? [nv.codigo] : []), idx: i + 1, de: q });
+      if (porHab(f.tipo)) o.items.push({ tipo: f.tipo, qty: q, hab: true, tags: [tagHab(f.eq.tag)], ints: Math.round(f.t.int), niv: new Set(nv ? [nv.codigo] : []), idx: 1, de: 1 });
+      else for (let i = 0; i < q; i++) o.items.push({ tipo: f.tipo, qty: 1, tags: [tg[i] && !/-$/.test(tg[i]) ? tg[i] : ''], ints: Math.round(f.t.int / q), niv: new Set(nv ? [nv.codigo] : []), idx: i + 1, de: q });
       if (f.ctrlId) o.host[f.ctrlId] = (o.host[f.ctrlId] || 0) + f.t.int;
       out.set(id, o);
     });
@@ -327,7 +335,7 @@
             const yy = busY + 196 + q * 36;
             simOtros(g, cx - 92, yy, 56);
             mv(g, kid + ':i' + q, (sg) => {
-              txt(sg, cx - 30, yy + 9, cut(etiqueta(it) + (it.tags && it.tags[0] ? ' ' + it.tags[0] : (it.de > 1 ? ' ' + it.idx : '')), 27), { size: 8.5 });
+              txt(sg, cx - 30, yy + 9, cut(it.hab ? nomHab(it) : etiqueta(it) + (it.tags && it.tags[0] ? ' ' + it.tags[0] : (it.de > 1 ? ' ' + it.idx : '')), 27), { size: 8.5 });
               txt(sg, cx - 30, yy + 20, `INT ${it.ints}` + (it.niv.size ? ' · ' + [...it.niv].join(', ') : ''), { size: 7.5, fill: GRIS });
             });
           });
@@ -406,7 +414,7 @@
     clave(g, x + 18 * sg, yy - 22, directo ? 'A' : 'D');
     line(g, x, yy - 14, x + 14 * sg, yy, { w: 1.8, color: col(directo ? 'A' : 'D') }); equipoX(g, izq ? x - 32 : x + 14, yy - 9, 18);
     const tg = (it.tags[0] || '').trim(), conTag = tg && !/-$/.test(tg);
-    const nom = etiqueta(it) + (conTag ? ' ' + tg : (it.de > 1 ? ' ' + it.idx : '')) + (it.qty > 1 ? ' ×' + it.qty : '');
+    const nom = it.hab ? nomHab(it) : etiqueta(it) + (conTag ? ' ' + tg : (it.de > 1 ? ' ' + it.idx : '')) + (it.qty > 1 ? ' ×' + it.qty : '');
     const all = wrap(nom, n), ls = all.slice(0, 2), tx = izq ? x - 38 : x + 38, an = izq ? 'end' : 'start';
     mv(g, key, (sg2) => {
       ls.forEach((l, i) => txt(sg2, tx, yy - 3 + i * 9.5, i === 1 && all.length > 2 ? cut(l, n) : l, { size: 8.5, anchor: an }));
