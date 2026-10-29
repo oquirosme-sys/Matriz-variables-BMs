@@ -382,6 +382,32 @@
     return /[.;:]$/.test(t.replace(/!!$/, '')) ? t : t + '.';
   }
 
+  /* un solo idioma en el documento: lo que esté en inglés se pasa a español (con la biblioteca de redacción o, si no hay tema, por glosario y en rojo);
+     también se quitan los comentarios que dejaba una versión anterior de «Completar la secuencia» */
+  const LIMPIAR = /\s*!!(?:No cubierto todavía\.|Cubierto en parte:)[^!]*!!/g;
+  function textoEnEspanol(t) {
+    let x = String(t == null ? '' : t).replace(LIMPIAR, '').trim();
+    if (!x || !BMS.trad) return x;
+    const marcado = /!!/.test(x);
+    const partes = x.split(/(?<=[.;])\s+/);
+    const ing = partes.filter((q) => BMS.trad.esIngles(q.replace(/!!|\*\*|==/g, '')));
+    if (!ing.length) return x;
+    if (ing.length >= partes.length / 2) {
+      const lim = x.replace(/!!|\*\*|==/g, '').replace(/^[a-z]\.\s+/i, '');
+      const lib = redactarRequisito(BMS.trad.aEs(lim), lim);
+      if (lib) return lib;
+      return '!!' + BMS.trad.aEs(lim).replace(/\s+/g, ' ') + '!!';
+    }
+    return partes.map((q) => (BMS.trad.esIngles(q.replace(/!!|\*\*|==/g, '')) ? '!!' + BMS.trad.aEs(q.replace(/!!|\*\*|==/g, '')) + '!!' : q)).join(' ');
+  }
+  function unificarEspanol(bl) {
+    return bl.map((b) => {
+      if (b.t === 'tabla') return { ...b, filas: b.filas.map((f) => f.map((c) => (String(c).split(/\s+/).length >= 5 ? textoEnEspanol(c) : c))) };
+      if (b.texto != null && (b.t === 'p' || b.t === 'li' || b.t === 'h2')) return { ...b, texto: textoEnEspanol(b.texto) };
+      return b;
+    });
+  }
+
   /* ---------- completar la secuencia: redacta lo que falta para cumplir el estándar y deja en rojo lo que se debe actualizar ---------- */
   function completarSecuencia(S, doc = 'bms') {
     const E = BMS.estado, res = BMS.calc.todo(), cuenta = { secciones: 0, redactados: 0, requisitos: 0 };
@@ -432,7 +458,7 @@
     return cuenta;
   }
 
-  BMS.seq = { completarSecuencia, complementar, generarAnexos, resolverBloques, resolverTexto, validar, letraSiguiente, estructuraBase };
+  BMS.seq = { unificarEspanol, completarSecuencia, complementar, generarAnexos, resolverBloques, resolverTexto, validar, letraSiguiente, estructuraBase };
 
   /* ---------- página ---------- */
   const pagina = (root) => {
@@ -462,6 +488,7 @@
         if (doc === 'inc' && /^Secuencias de operación del BMS\/BAS$/i.test((portada[1] || '').trim())) portada[1] = 'Secuencias de operación del sistema de alarma contra incendio';
         const en = S.opciones.idioma === 'en';
         let titulo = doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación', bl = [...resolverBloques(mios), ...anexos];
+        if (S.opciones.idioma !== 'en') bl = unificarEspanol(bl);
         BMS.docxLang = en ? 'en' : 'es';
         if (en) { portada = portada.map((x) => BMS.trad.aEn(x)); bl = BMS.trad.bloques(bl); titulo = doc === 'inc' ? 'Fire alarm sequences' : 'Sequences of operation'; if (bl.pendientes) estado.textContent = bl.pendientes + ' texto(s) sin traducir quedaron en rojo en el Word…'; }
         const blob = await BMS.exportarSecuenciasDocx(titulo, portada, bl);
@@ -656,6 +683,7 @@
       if (b.t === 'vivo') return b;
       return { ...b, texto: txt(b.texto != null ? b.texto : b.x) };
     });
+    S.bloques.forEach((b) => { if (b.texto && LIMPIAR.test(b.texto)) b.texto = b.texto.replace(LIMPIAR, '').trim(); LIMPIAR.lastIndex = 0; });
     if (!S.estandar || typeof S.estandar !== 'object') S.estandar = { nombre: 'Estándar del hotel', texto: txt(S.estandar) };
     S.estandar.texto = txt(S.estandar.texto); S.estandar.nombre = txt(S.estandar.nombre);
     /* un estándar largo guardado antes del filtro se reduce una vez a los requisitos de operación y control */
