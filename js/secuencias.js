@@ -230,7 +230,7 @@
       anexo('Lista de controladores y dispositivos', 'Controladores con el modelo seleccionado para la marca ' + P.marca + ', dispositivos de red e integraciones, y lista de materiales de controladores y módulos. Los modelos se validan con el integrador antes de emitir.');
       const resumenCfg = (cfg) => (cfg.base ? cfg.baseQty + '× ' + cfg.base + Object.keys(cfg.modulos || {}).filter((k) => cfg.modulos[k]).map((k) => ' + ' + cfg.modulos[k] + '× ' + k).join('') : 'Sin hardware (solo integración)');
       out.push({ t: 'tabla', titulo: 'Controladores del sistema', cols: [2.2, 1, 1.2, 2.2, 1.6, 4.4, 1.2, 1.2], filas: [['Controlador', 'Tipo', 'Nivel', 'Cuarto / ubicación', 'Panel', 'Modelo y módulos', 'Cableados', 'Con reserva'],
-        ...mot.detalle.map((d) => { const n = C.nivelDe(d.c.nivel); return [C.nombreCtrl(d.c), d.c.tipo === 'CP' ? 'Principal' : 'Secundario', n ? n.codigo : '—', d.c.ubicacion || '—', (E.gabDim && E.gabDim[d.c.gab || d.c.id]) || C.panelSugerido(C.unidadesPanel(d.c, detMap)), resumenCfg(d.cfg), num(C.cable(d.t)), num(C.cable(d.req))]; })] });
+        ...mot.detalle.map((d) => { const n = C.nivelDe(d.c.nivel); return [C.nombreCtrl(d.c), d.c.tipo === 'CP' ? 'Principal' : 'Secundario', n ? n.codigo : '—', d.c.ubicacion || '—', (E.gabDim && E.gabDim[C.gabDe(d.c) || d.c.id]) || C.panelSugerido(C.unidadesPanel(d.c, detMap)), resumenCfg(d.cfg), num(C.cable(d.t)), num(C.cable(d.req))]; })] });
       const disp = [];
       if (mot.motor) disp.push([mot.motor.cod + ' — ' + (mot.motor.desc || 'motor de red'), 'Motor de red / supervisor', '1', '—', '—']);
       BMS.diag.gateways(res, C.nivelDe).forEach((g) => disp.push([g.gw + ' (' + g.items.map((i) => corto(i.tipo.nombre)).join(', ') + ')', 'Gateway ' + NOMRED[g.clave], '1', [...new Set(g.items.flatMap((i) => [...i.niv]))].join(', ') || '—', num(g.items.reduce((a, i) => a + i.ints, 0))]));
@@ -238,6 +238,9 @@
       out.push({ t: 'tabla', titulo: 'Dispositivos de red e integraciones', cols: [6, 3, 1, 2, 1.4], filas: [['Dispositivo', 'Tipo y protocolo', 'Cant.', 'Niveles', 'Puntos INT'], ...(disp.length ? disp : [['—', '—', '—', '—', '—']])] });
       const bom = Object.keys(mot.bom || {}).map((cod) => { const m = M && (M.bases.find((x) => x.cod === cod) || M.modulos.find((x) => x.cod === cod)); return [cod, m ? m.desc.replace(/\s*\[.*?\]/g, '') : '—', M && M.bases.some((x) => x.cod === cod) ? 'Controlador' : 'Módulo', num(mot.bom[cod])]; });
       if (mot.motor) bom.push([mot.motor.cod, mot.motor.desc || '—', 'Motor de red', '1']);
+      const cajas = new Map(); const vistos = new Set();
+      mot.detalle.forEach((d) => { const k = C.gabDe(d.c) || d.c.id; if (vistos.has(k)) return; vistos.add(k); const dim = (E.gabDim && E.gabDim[k]) || C.panelSugerido(C.unidadesPanel(d.c, detMap)); cajas.set(dim, (cajas.get(dim) || 0) + 1); });
+      [...cajas.entries()].forEach(([dim, q]) => bom.push([dim, C.panelModelo(dim), 'Caja', String(q)]));
       out.push({ t: 'tabla', titulo: 'Lista de controladores y módulos', cols: [3, 7, 2, 1], filas: [['Código', 'Descripción', 'Tipo', 'Cant.'], ...(bom.length ? bom : [['—', '—', '—', '—']])] });
     }
     if (op.e) {

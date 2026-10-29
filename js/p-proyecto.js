@@ -117,8 +117,13 @@
           h('td', null, h('input', { class: 'in n', type: 'number', min: 1, value: c.consec, onchange: (e) => { const ant = c.consec; c.consec = Math.max(1, Math.round(num(e.target.value, 1))); if (dup()) { alert('Ya existe un controlador con ese nombre.'); c.consec = ant; e.target.value = ant; } act(); } })),
           nm,
           h('td', null, h('input', { class: 'in', style: { width: '100%' }, value: c.ubicacion || '', onchange: (e) => { c.ubicacion = e.target.value; BMS.touch(); } })),
-          h('td', null, h('input', { class: 'in', style: { width: '110px' }, list: 'gabs', placeholder: 'Sin gabinete', value: c.gab || '', onchange: (e) => { c.gab = e.target.value.trim(); BMS.touch(); BMS.rerender(); } })),
-          h('td', null, h('input', { class: 'in', style: { width: '110px' }, list: 'dims', placeholder: 'Sugerido ' + BMS.calc.panelSugerido(BMS.calc.unidadesPanel(c, detMap)), title: 'Dimensión del panel (gabinete). Si se deja vacía, el diagrama usa la sugerida según el hardware elegido.', value: E.gabDim[c.gab || c.id] || '', onchange: (e) => { E.gabDim[c.gab || c.id] = e.target.value.trim(); BMS.touch(); } })),
+          h('td', null, h('input', { class: 'in', style: { width: '120px' }, list: 'gabs', placeholder: BMS.calc.gabDe(c) ? 'Auto: ' + BMS.calc.gabDe(c) : 'Individual (auto)', title: 'Automático: los controladores del mismo nivel y del mismo cuarto comparten gabinete. Escriba un nombre para forzar otro agrupamiento.', value: c.gab || '', onchange: (e) => { c.gab = e.target.value.trim(); BMS.touch(); BMS.rerender(); } })),
+          h('td', null, (() => {
+            const clave = BMS.calc.gabDe(c) || c.id, sug = BMS.calc.panelSugerido(BMS.calc.unidadesPanel(c, detMap));
+            return h('div', null, h('select', { class: 'in', style: { width: '170px' }, value: E.gabDim[clave] || '', title: BMS.calc.panelModelo(E.gabDim[clave] || sug), onchange: (e) => { if (e.target.value) E.gabDim[clave] = e.target.value; else delete E.gabDim[clave]; BMS.touch(); BMS.rerender(); } },
+              h('option', { value: '' }, 'Auto: ' + sug), ...BMS.calc.PANELES.map((x) => h('option', { value: x[0] }, x[0]))),
+              h('div', { class: 'mute', style: { fontSize: '11px', marginTop: '2px', maxWidth: '170px' } }, BMS.calc.panelModelo(E.gabDim[clave] || sug).replace('Schneider ', '')));
+          })()),
           h('td', null, h('input', { class: 'in', style: { width: '100%' }, value: c.obs || '', onchange: (e) => { c.obs = e.target.value; BMS.touch(); } })),
           h('td', { class: 'c' }, h('button', { class: 'b x', onclick: () => {
             const nq = E.equipos.filter((q) => q.ctrl === c.id).length;
@@ -136,9 +141,9 @@
       BMS.touch(); BMS.rerender();
     };
     root.append(h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Controladores'),
-      h('p', { class: 'hint' }, 'El consecutivo se cuenta por nivel y por tipo (CS-N2-01, CS-N2-02…). El modelo de cada controlador se escoge en la pestaña 5. Gabinete: los controladores que estén en el mismo cuarto y compartan nombre de gabinete se dibujan dentro de un mismo panel (recuadro punteado); la dimensión del panel se escribe una vez por gabinete.'),
+      h('p', { class: 'hint' }, 'El consecutivo se cuenta por nivel y por tipo (CS-N2-01, CS-N2-02…). El modelo de cada controlador se escoge en la pestaña 5. Gabinete: los controladores que estén en el mismo cuarto y compartan nombre de gabinete se dibujan dentro de un mismo panel (recuadro punteado); el gabinete es automático (mismo nivel y mismo cuarto) y la caja se escoge sola según el hardware, entre las cajas plásticas Schneider Thalassa con tapa transparente (PLA hasta 50 x 40 cm, PLM en poliéster desde 70 x 50 cm; referencia exacta por confirmar con el catálogo). Puede cambiar la caja en el selector.'),
       h('datalist', { id: 'dims' }, BMS.calc.PANELES.map((x) => h('option', { value: x[0] }))),
-      h('datalist', { id: 'gabs' }, [...new Set(E.controladores.map((c) => c.gab).filter(Boolean))].map((g) => h('option', { value: g }))),
+      h('datalist', { id: 'gabs' }, [...new Set(E.controladores.map((c) => BMS.calc.gabDe(c)).filter(Boolean))].map((g) => h('option', { value: g }))),
       h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tipo', 'Nivel', 'Consec.', 'Nombre', 'Cuarto / ubicación', 'Gabinete', 'Panel (dimensión)', 'Observación', ''].map((x) => h('th', null, x)))), cuerpoC)),
       h('div', { class: 'fila' },
         h('button', { class: 'b p', onclick: () => agregar('CS') }, '+ Controlador secundario (CS)'),

@@ -108,9 +108,9 @@
     const cps = E.controladores.filter((c) => c.tipo === 'CP');
     const principal = cps[0] || null;
     const nivIdx = (c) => { const n = C.nivelDe(c.nivel); return n ? E.niveles.indexOf(n) : 99; };
-    const clv = (c) => (c.gab ? 'a' + c.gab : 'b' + c.tipo + String(c.consec).padStart(3, '0'));
+    const clv = (c) => (C.gabDe(c) ? 'a' + C.gabDe(c) : 'b' + c.tipo + String(c.consec).padStart(3, '0'));
     const resto = E.controladores.filter((c) => c !== principal).sort((a, b) => nivIdx(a) - nivIdx(b) || clv(a).localeCompare(clv(b)));
-    const nodosC = resto.map((c) => ({ k: 'ctrl', c, gab: c.gab || '', its: itemsCtrl(res, c.id) }));
+    const nodosC = resto.map((c) => ({ k: 'ctrl', c, gab: C.gabDe(c), its: itemsCtrl(res, c.id) }));
     const gws = gateways(res, C.nivelDe).map((g, i) => ({ ...g, n: i + 1 }));
     const nodosT = [...nodosC, ...gws.filter((g) => g.clave === 'C')];
     const nodosIP = [...gws.filter((g) => g.clave !== 'C'), ...paneles(res, C.nivelDe)];
@@ -193,7 +193,7 @@
 
     /* ---- controlador principal ---- */
     const busIni = principal ? 192 : 60;
-    const dimDe = (c) => E.gabDim[c.gab || c.id] || C.panelSugerido(C.unidadesPanel(c, det));
+    const dimDe = (c) => E.gabDim[C.gabDe(c) || c.id] || C.panelSugerido(C.unidadesPanel(c, det));
     if (principal) {
       const d = det[principal.id], pBus = pos[0].busY;
       line(g, 108, 270, 108, pBus - 40, { w: 2.4, color: col('A') }); rect(g, 103, 330, 10, 10); clave(g, 128, 352, 'A');

@@ -22,11 +22,32 @@
 
   /* Paneles (gabinetes) estándar y unidades equivalentes que admiten:
      controlador base = 2, módulo IO = 1, más 2 de fuente y protecciones (y 2 del motor de red en el principal). Valores de referencia editables por controlador. */
-  const PANELES = [['24 x 18 cm', 4], ['40 x 30 cm', 8], ['50 x 40 cm', 12], ['70 x 50 cm', 20], ['100 x 80 cm', 40], ['120 x 100 cm', 70]];
+  /* Cajas plásticas con tapa transparente de Schneider Electric (Thalassa): PLA en ABS/policarbonato hasta 50 x 40 cm y PLM en poliéster desde 70 x 50 cm.
+     Las dimensiones son de referencia y la referencia comercial exacta se confirma con el catálogo vigente. */
+  const PANELES = [
+    ['24 x 18 cm', 4, 'Schneider Thalassa PLA — caja plástica con tapa transparente'],
+    ['40 x 30 cm', 8, 'Schneider Thalassa PLA — caja plástica con tapa transparente'],
+    ['50 x 40 cm', 12, 'Schneider Thalassa PLA — caja plástica con tapa transparente'],
+    ['70 x 50 cm', 20, 'Schneider Thalassa PLM — caja de poliéster con tapa transparente'],
+    ['100 x 80 cm', 40, 'Schneider Thalassa PLM — caja de poliéster con tapa transparente'],
+    ['120 x 100 cm', 70, 'Schneider Thalassa PLM — caja de poliéster con tapa transparente']
+  ];
+  const panelModelo = (dim) => { const p = PANELES.find((x) => x[0] === dim); return p ? p[2] : 'Caja a medida (' + dim + ')'; };
   const panelSugerido = (u) => (PANELES.find((p) => p[1] >= u) || PANELES[PANELES.length - 1])[0];
+  /* Gabinete: el que se escribió a mano; si no, los controladores del mismo nivel y del mismo cuarto comparten un gabinete automático. */
+  const gabDe = (c) => {
+    if (c.gab) return c.gab;
+    const E = BMS.estado, cuarto = (x) => String(x.ubicacion || '').trim().toLowerCase();
+    if (!cuarto(c)) return '';
+    const mismos = E.controladores.filter((x) => !x.gab && x.nivel === c.nivel && cuarto(x) === cuarto(c));
+    if (mismos.length < 2) return '';
+    const niv = E.niveles.find((n) => n.id === c.nivel), cod = niv ? niv.codigo : '';
+    const cuartos = []; E.controladores.forEach((x) => { if (!x.gab && x.nivel === c.nivel && cuarto(x) && E.controladores.filter((y) => !y.gab && y.nivel === c.nivel && cuarto(y) === cuarto(x)).length > 1 && !cuartos.includes(cuarto(x))) cuartos.push(cuarto(x)); });
+    return 'GAB-' + cod + '-' + String(cuartos.indexOf(cuarto(c)) + 1).padStart(2, '0');
+  };
   const unidadesPanel = (c, detMap) => {
     const E = BMS.estado, uno = (x) => { const d = detMap[x.id]; return d && d.cfg ? 2 * (d.cfg.baseQty || 0) + Object.values(d.cfg.modulos || {}).reduce((a, y) => a + y, 0) : 0; };
-    const miembros = c.gab ? E.controladores.filter((x) => x.gab === c.gab) : [c];
+    const g = gabDe(c), miembros = g ? E.controladores.filter((x) => gabDe(x) === g) : [c];
     return miembros.reduce((a, x) => a + uno(x), 0) + 2 + (c.tipo === 'CP' ? 2 : 0);
   };
 
@@ -203,5 +224,5 @@
     return lista;
   }
 
-  Object.assign(BMS, { calc: { comDe, PANELES, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
+  Object.assign(BMS, { calc: { comDe, PANELES, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
 })();
