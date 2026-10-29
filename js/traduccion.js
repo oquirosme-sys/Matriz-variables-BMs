@@ -230,18 +230,26 @@
     const es = w.filter((x) => ['de', 'la', 'el', 'los', 'las', 'que', 'para', 'con', 'por', 'una', 'del', 'debe', 'cada'].includes(x)).length;
     return en > es && en >= 1;
   };
-  function aEs(texto) {
-    let t = String(texto);
+  function aEs(texto, conservar = true) {
+    const pr = conservar ? proteger(texto) : { x: String(texto), mapa: [] }; let t = pr.x;
     FR_ES.forEach(([e, es]) => { t = t.replace(new RegExp('(?<![A-Za-z])' + e.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(?![A-Za-z])', 'gi'), (m) => (/[A-Z]/.test(m[0]) ? es[0].toUpperCase() + es.slice(1) : es)); });
     t = t.replace(/(?<![\p{L}\p{N}])[A-Za-z][A-Za-z\-']*/gu, (w) => {
       const k = w.toLowerCase(); if (!(k in EN)) return w;
       const r = EN[k]; return r && /^[A-Z][a-z]/.test(w) ? r[0].toUpperCase() + r.slice(1) : r;
     });
-    return t.replace(/\s{2,}/g, ' ').replace(/\s+([.,;:])/g, '$1').trim();
+    return restaurar(t, pr.mapa).replace(/\s{2,}/g, ' ').replace(/\s+([.,;:])/g, '$1').trim();
   }
   /* palabras en inglés que quedan sin traducir (para marcar la redacción como pendiente de revisión) */
   const inglesResidual = (t) => (String(t).match(/(?<![\p{L}])[a-z]{3,}(?![\p{L}])/gu) || []).filter((w) => /^(the|and|shall|that|with|from|this|when|which|their|also|have|into|only|than|such|each|for|are|will)$/.test(w)).length;
 
+
+
+  /* términos de oficio que se dejan en inglés al traducir al español (además de toda sigla en mayúsculas: BMS, HVAC, FACP, DDC, CPU…) */
+  const TERMINOS = ['dampers?', 'setpoints?', 'set points?', 'strobes?', 'sounders?', 'sounder bases?', 'annunciators?', 'supervisory', 'trouble', 'gateways?', 'firmware', 'software', 'hardware', 'thin[- ]clients?', 'workstations?', 'dimmers?', 'fan coils?', 'VAV boxes?', 'make-up air', 'key cards?', 'BACnet(?:/IP)?', 'MS/TP', 'Modbus(?: RTU| TCP)?', 'LonWorks', 'BTL', 'trends?', 'reset', 'hoistway', 'firefighters?', 'chillers?', 'reheat', 'economizers?', 'outstations?', 'DDC', 'PMS', 'GRMS', 'HOA'];
+  const RE_TERM = new RegExp('(?<![A-Za-z])(' + TERMINOS.join('|') + '|[A-Z]{2,}[A-Z0-9]*(?:/[A-Z0-9]+)*)(?![A-Za-z])', 'g');
+  const proteger = (t) => { const mapa = []; const x = String(t).replace(RE_TERM, (m) => { mapa.push(m); return 'QTERM' + (mapa.length - 1) + 'Q'; }); return { x, mapa }; };
+  const restaurar = (t, mapa) => String(t).replace(/QTERM\s?(\d+)\s?Q/gi, (m, i) => (mapa[i] != null ? mapa[i] : m));
+  const completo = (t, mapa) => mapa.every((_, i) => new RegExp('QTERM\s?' + i + '\s?Q', 'i').test(t));
 
   /* ---------- traductor integrado del navegador (Chrome 138 o superior): traduce en el equipo, sin enviar el texto a terceros ---------- */
   async function crearTraductor(prog) {
@@ -259,7 +267,14 @@
     for (let i = 0; i < lineas.length; i++) {
       const l = lineas[i];
       if (!esIngles(l)) out.push(l);
-      else { try { out.push(String(await tr.translate(l)).replace(/\s+/g, ' ').trim()); } catch (e) { out.push(l); } }
+      else {
+        try {
+          const pr = proteger(l); let r = String(await tr.translate(pr.x));
+          if (!completo(r, pr.mapa)) r = String(await tr.translate(l));   /* si el traductor alteró una marca, se traduce sin proteger */
+          else r = restaurar(r, pr.mapa);
+          out.push(r.replace(/\s+/g, ' ').trim());
+        } catch (e) { out.push(l); }
+      }
       if (prog) prog(i + 1, lineas.length);
     }
     return out;

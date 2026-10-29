@@ -84,7 +84,7 @@
   /* req = texto como está en el estándar; reqM = versión en español (por glosario si sigue en inglés) que se usa solo para comparar con las secuencias */
   const analizarEstandar = (texto) => String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l0, i) => {
     const a = partirRef(l0), ing = BMS.trad && BMS.trad.esIngles(l0);
-    return { n: i + 1, ref: a.ref, req: a.req, reqM: ing ? partirRef(BMS.trad.aEs(l0)).req : a.req, orig: l0 };
+    return { n: i + 1, ref: a.ref, req: a.req, reqM: ing ? partirRef(BMS.trad.aEs(l0, false)).req : a.req, orig: l0 };
   });
 
   function textoDelDocumento(dd = docActual()) {
