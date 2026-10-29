@@ -138,7 +138,7 @@
     const itsP = principal ? itemsCtrl(res, principal.id) : [];
     const kmax = (n) => Math.min(n, MAXIT + 1);
     /* controlador con muchos equipos: se reparten en dos columnas, una a cada lado de la línea (espejo) */
-    const UMBRAL = 6, LW = 200, SEP = 9;
+    const UMBRAL = 6, LW = 108, SEP = 9;
     const espejo = (n) => n.k === 'ctrl' && n.its.length > UMBRAL;
     const lw = (n) => (espejo(n) ? LW : 0);
     const filasIt = (n) => (espejo(n) ? Math.ceil(n.its.length / 2) : n.its.length);
@@ -264,7 +264,7 @@
       }
       nodes.forEach((nd, i) => {
         const x = px[i], xs = x + 22, cx = xs + 28;
-        if (i > 0) clave(g, cx - (COLW + lw(nd)) / 2, busY, kk);
+        if (i > 0) clave(g, cx - 38, busY, kk);   /* la clave queda pegada al controlador */
         if (nd.k === 'ctrl') {
           const c = nd.c, d = det[c.id], t = d.t, esCP = c.tipo === 'CP', n1 = C.nivelDe(c.nivel);
           mv(g, 'n:' + c.id + ':tag', (sg) => {
