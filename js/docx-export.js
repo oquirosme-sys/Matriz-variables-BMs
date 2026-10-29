@@ -12,8 +12,18 @@
   const ALTO_H = 6600;                                 // alto máximo de una figura en hoja apaisada (twips), dejando lugar al título y al pie
   const esc = (t) => String(t == null ? '' : t).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  const run = (t, o = {}) => '<w:r>' + (o.b || o.i || o.color ? '<w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.color ? '<w:color w:val="' + o.color + '"/>' : '') + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(t) + '</w:t></w:r>';
-  const runs = (texto, o = {}) => String(texto == null ? '' : texto).split('**').map((s, i) => (s ? run(s, { ...o, b: o.b || i % 2 === 1 }) : '')).join('');
+  const run = (t, o = {}) => '<w:r>' + (o.b || o.i || o.color || o.hl ? '<w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.color ? '<w:color w:val="' + o.color + '"/>' : '') + (o.hl ? '<w:highlight w:val="yellow"/>' : '') + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(t) + '</w:t></w:r>';
+  /* **negrita**, ==resaltado amarillo== (lo que hay que arreglar o actualizar); lo que va entre [corchetes] se resalta solo */
+  const runs = (texto, o = {}) => {
+    let b = false, hl = false, out = '';
+    String(texto == null ? '' : texto).split(/(\*\*|==)/).forEach((s) => {
+      if (s === '**') { b = !b; return; }
+      if (s === '==') { hl = !hl; return; }
+      if (!s) return;
+      s.split(/(\[[^\]\n]{1,120}\])/).forEach((q) => { if (q) out += run(q, { ...o, b: o.b || b, hl: o.hl || hl || /^\[[^\]]+\]$/.test(q) }); });
+    });
+    return out;
+  };
   const P = (texto, o = {}) => '<w:p><w:pPr>' + (o.estilo ? '<w:pStyle w:val="' + o.estilo + '"/>' : '') + (o.keep ? '<w:keepNext/>' : '') +
     (o.num != null ? '<w:numPr><w:ilvl w:val="' + (o.ilvl || 0) + '"/><w:numId w:val="' + o.num + '"/></w:numPr>' : '') + (o.jc ? '<w:jc w:val="' + o.jc + '"/>' : '') + '</w:pPr>' + runs(texto, o.run || {}) + '</w:p>';
   const H1 = (t) => '<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr></w:pPr>' + runs(t) + '</w:p>';
@@ -161,14 +171,16 @@
           const negrita = !!b && !['0', 'false'].includes(b.getAttributeNS(W, 'val'));
           let t = '';
           [...c.childNodes].forEach((x) => { if (x.localName === 't') t += x.textContent; else if (x.localName === 'tab') t += ' '; else if (x.localName === 'br') t += ' '; });
-          if (t) corridas.push({ t, b: negrita });
+          const hi = rpr ? hijos(rpr, 'highlight')[0] : null, sh = rpr ? hijos(rpr, 'shd')[0] : null;
+          const resaltado = (!!hi && hi.getAttributeNS(W, 'val') !== 'none') || (!!sh && /^(FFFF00|FFF2CC|FFFF99|FFEB9C|FFD966)$/i.test(sh.getAttributeNS(W, 'fill') || ''));
+          if (t) corridas.push({ t, b: negrita, h: resaltado });
         } else if (['hyperlink', 'ins', 'smartTag', 'sdt', 'sdtContent'].includes(c.localName)) rec(c);
       });
       rec(p);
       /* une corridas contiguas con el mismo formato y marca la negrita con ** */
-      const m = []; corridas.forEach((c) => { const u = m[m.length - 1]; if (u && u.b === c.b) u.t += c.t; else m.push({ ...c }); });
+      const m = []; corridas.forEach((c) => { const u = m[m.length - 1]; if (u && u.b === c.b && u.h === c.h) u.t += c.t; else m.push({ ...c }); });
       const todoNegrita = m.length && m.every((c) => c.b);
-      s = m.map((c) => (c.b && !todoNegrita && c.t.trim() ? '**' + c.t.trim() + '**' + (/\s$/.test(c.t) ? ' ' : '') : c.t)).join('');
+      s = m.map((c) => { let x = c.t.trim(); if (!x) return c.t; if (c.h) x = '==' + x + '=='; if (c.b && !todoNegrita) x = '**' + x + '**'; return (/^\s/.test(c.t) ? ' ' : '') + x + (/\s$/.test(c.t) ? ' ' : ''); }).join('');
       return s.replace(/\s+/g, ' ').trim();
     };
     const cuerpo = hijos(dom.getElementsByTagNameNS(W, 'body')[0], 'p').length ? dom.getElementsByTagNameNS(W, 'body')[0] : null;

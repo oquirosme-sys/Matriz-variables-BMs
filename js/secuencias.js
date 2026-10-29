@@ -221,7 +221,7 @@
     if (op.f) {
       const v = validar(), S = E.secuencias;
       anexo('Validación contra el estándar del hotel', 'Revisión de las secuencias y del proyecto contra «' + ((S.estandar && S.estandar.nombre) || 'el estándar del hotel') + '». La revisión de requisitos compara términos y valores del estándar con el texto de las secuencias; no reemplaza la validación del diseñador. Cumple: ' + v.cuentaReqs.ok + ' · Parcial: ' + v.cuentaReqs.parcial + ' · No cumple o falta: ' + v.cuentaReqs.falta + '.');
-      const nom = (e) => (e === 'ok' ? 'Cumple' : e === 'parcial' ? 'Parcial' : 'No cumple / falta');
+      const nom = (e) => (e === 'ok' ? 'Cumple' : '==' + (e === 'parcial' ? 'Parcial' : 'No cumple / falta') + '==');
       if (v.reqs.length) out.push({ t: 'tabla', titulo: 'Requisitos del estándar frente a las secuencias', cols: [1.4, 6, 1.4, 6], filas: [['Referencia', 'Requisito del estándar', 'Estado', 'Observación'], ...v.reqs.map((r) => [r.ref || '—', r.req, nom(r.estado), r.obs])] });
       out.push({ t: 'tabla', titulo: 'Comprobaciones del proyecto', cols: [4, 1.4, 9], filas: [['Tema', 'Estado', 'Observación'], ...(v.pr.length ? v.pr.map((r) => [r.tema, nom(r.nivel), r.obs]) : [['Sin observaciones', 'Cumple', 'No se encontraron diferencias.']])] });
     }
@@ -250,7 +250,33 @@
     return { portada, bloques: b };
   }
 
-  BMS.seq = { generarAnexos, resolverBloques, resolverTexto, validar, letraSiguiente, estructuraBase };
+  /* complementa las secuencias existentes con la estructura base: agrega solo lo que falta (secciones, subsecciones y bloques vivos) y no toca el texto ya escrito */
+  function complementar(S) {
+    const base = estructuraBase();
+    const clave = (t) => BMS.norm(String(t || '').replace(/^\s*(SOO-\d+|Anexo [A-Z]|\d+(\.\d+)*)[.\s]+/i, '')).replace(/[^a-z0-9]+/g, ' ').trim();
+    const mismo = (a, b) => { const x = clave(a), y = clave(b); if (x === y) return true; const rx = raices(x), ry = raices(y); if (!rx.length || !ry.length) return false; const c = rx.filter((r) => ry.includes(r)).length; return c / Math.min(rx.length, ry.length) >= 0.6; };
+    const secciones = (bl) => { const out = []; bl.forEach((b) => { if (b.t === 'h1' || !out.length) out.push({ h: b.t === 'h1' ? b : null, b: b.t === 'h1' ? [] : [b] }); else out[out.length - 1].b.push(b); }); return out; };
+    const subs = (bl) => { const out = []; bl.forEach((b) => { if (b.t === 'h2' || !out.length) out.push({ h: b.t === 'h2' ? b : null, b: [b] }); else out[out.length - 1].b.push(b); }); return out; };
+    const ex = secciones(S.bloques), nuevas = [], cuenta = { secciones: 0, subsecciones: 0, vivos: 0 };
+    const llave = (b) => b.t === 'vivo' ? 'vivo:' + b.fuente + ':' + b.cat + ':' + (b.fuente === 'tabla' ? 1 : 0) : '';
+    secciones(base.bloques).forEach((sb) => {
+      const e = sb.h && ex.find((x) => x.h && mismo(x.h.texto, sb.h.texto));
+      if (!e) { nuevas.push(sb); cuenta.secciones++; return; }
+      const tiene = new Set(e.b.map(llave).filter(Boolean));
+      const faltan = sb.b.filter((b) => b.t === 'vivo' && !tiene.has(llave(b)));
+      if (faltan.length) { e.b = [...faltan, ...e.b]; cuenta.vivos += faltan.length; }
+      const yaSub = e.b.filter((b) => b.t === 'h2').map((b) => b.texto);
+      subs(sb.b.filter((b) => b.t !== 'vivo')).filter((g) => g.h && !yaSub.some((t) => mismo(t, g.h.texto))).forEach((g) => { e.b.push(...g.b); cuenta.subsecciones++; });
+    });
+    /* las secciones nuevas van antes del primer anexo del documento, o al final si no hay */
+    let corte = ex.findIndex((x) => x.h && /^\s*Anexo\b/i.test(x.h.texto)); if (corte < 0) corte = ex.length;
+    const salida = [...ex.slice(0, corte), ...nuevas.filter((x) => !/^\s*Anexo\b/i.test(x.h.texto)), ...ex.slice(corte), ...nuevas.filter((x) => /^\s*Anexo\b/i.test(x.h.texto) && !ex.some((y) => y.h && mismo(y.h.texto, x.h.texto)))];
+    S.bloques = salida.flatMap((x) => (x.h ? [x.h] : []).concat(x.b));
+    S.portada = (S.portada || []).concat(['', '', '', '', '']).slice(0, 5).map((v, i) => (String(v || '').trim() ? v : base.portada[i] || ''));
+    return cuenta;
+  }
+
+  BMS.seq = { complementar, generarAnexos, resolverBloques, resolverTexto, validar, letraSiguiente, estructuraBase };
 
   /* ---------- página ---------- */
   BMS.pSecuencias = (root) => {
@@ -347,9 +373,10 @@
           S.portada = r.portada; S.bloques = r.bloques; BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
         } catch (e) { alert('No se pudo importar: ' + e.message); }
       }) }, 'Importar desde Word'),
-      h('button', { class: 'b', title: 'Crea secciones SOO-n por sistema con listas de equipos y totales ligados en vivo al proyecto', onclick: () => {
-        if (S.bloques.length && !confirm('Esto reemplaza las secuencias actuales. ¿Continuar?')) return;
-        const r = estructuraBase(); S.portada = r.portada; S.bloques = r.bloques; BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
+      h('button', { class: 'b', title: 'Agrega las secciones SOO-n, subsecciones y bloques ligados en vivo que falten, sin tocar lo ya escrito', onclick: () => {
+        const vacio = !S.bloques.length;
+        const c = complementar(S); BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
+        if (!vacio) setTimeout(() => alert('Se complementaron las secuencias: ' + c.secciones + ' sección(es) nueva(s), ' + c.subsecciones + ' subsección(es) y ' + c.vivos + ' bloque(s) ligado(s) agregados. Lo ya escrito no se modificó.'), 50);
       } }, 'Cargar estructura base del proyecto'),
       h('button', { class: 'b x', onclick: () => { if (confirm('¿Vaciar las secuencias de operación? (el estándar del hotel se conserva)')) { const est = S.estandar; E.secuencias = inicial(); E.secuencias.estandar = est; BMS.ui.secSel = -1; BMS.touch(); BMS.rerender(); } } }, 'Vaciar'), estado);
 
