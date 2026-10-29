@@ -17,7 +17,14 @@
     const root = document.getElementById('app');
     root.replaceChildren();
     const pg = BMS.paginas.find((p) => p.id === BMS.ui.pagina);
-    pg.fn()(root);
+    try { pg.fn()(root); } catch (e) {
+      console.error(e); root.replaceChildren();
+      root.append(h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'No se pudo mostrar esta pestaña'), h('p', null, String(e && e.message || e)),
+        h('p', { class: 'hint' }, 'Pruebe con otra pestaña. Si el problema continúa, puede exportar el proyecto y borrar los datos guardados de este navegador.'),
+        h('div', { class: 'fila' },
+          h('button', { class: 'b', onclick: () => BMS.ir('proyecto') }, 'Ir a Proyecto'),
+          h('button', { class: 'b x', onclick: () => { if (confirm('Esto borra el proyecto y los catálogos guardados en este navegador. ¿Continuar?')) { Object.keys(localStorage).filter((k) => k.indexOf('bms.') === 0).forEach((k) => localStorage.removeItem(k)); location.reload(); } } }, 'Borrar datos guardados'))));
+    }
     document.getElementById('proyNombre').textContent = [BMS.estado.proyecto.nombre, BMS.estado.proyecto.ubicacion].filter(Boolean).join(' · ');
     document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.id === BMS.ui.pagina));
     window.scrollTo(0, y);
@@ -50,5 +57,5 @@
     } catch (e) { alert('No se pudo importar: ' + e.message); }
   });
 
-  BMS.cargarTodo().then(() => { tabs(); BMS.rerender(); });
+  BMS.cargarTodo().catch((e) => { console.error(e); BMS.estado = BMS.estado || BMS.proyectoNuevo(); }).then(() => { tabs(); BMS.rerender(); });
 })();
