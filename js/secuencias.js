@@ -279,7 +279,7 @@
   BMS.seq = { complementar, generarAnexos, resolverBloques, resolverTexto, validar, letraSiguiente, estructuraBase };
 
   /* ---------- página ---------- */
-  BMS.pSecuencias = (root) => {
+  const pagina = (root) => {
     const E = BMS.estado;
     E.secuencias = E.secuencias || inicial();
     const S = E.secuencias; S.opciones = Object.assign({ b: true, c: true, d: true, e: true, f: true, detalle: false }, S.opciones || {});
@@ -459,4 +459,25 @@
       h('p', { class: 'hint' }, 'Documento de secuencias del BMS en formato Sinergia, ligado en vivo al proyecto: las listas de equipos, los totales, los marcadores {{…}} y los anexos se actualizan con lo que se va llenando. Se exporta a Word con anexos (diagrama, variables y totales por nivel, controladores y dispositivos, variables por controlador, validación), se puede importar de nuevo, y se valida contra el estándar del hotel. Los valores entre corchetes [ ] son propuestas por validar.'),
       barra, h('div', { class: 'split' }, lista, derecha));
   };
+  /* deja el estado guardado en una forma válida (datos de versiones anteriores o incompletos) */
+  function sanear(E) {
+    const base = inicial(), S = E.secuencias = (E.secuencias && typeof E.secuencias === 'object') ? E.secuencias : base;
+    const txt = (v) => (v == null ? '' : String(v));
+    S.portada = Array.from({ length: 5 }, (_, i) => txt((Array.isArray(S.portada) ? S.portada : [])[i]));
+    S.bloques = (Array.isArray(S.bloques) ? S.bloques : []).filter((b) => b && ['h1', 'h2', 'p', 'li', 'tabla', 'vivo'].includes(b.t)).map((b) => {
+      if (b.t === 'tabla') return { ...b, filas: (Array.isArray(b.filas) ? b.filas : []).map((f) => (Array.isArray(f) ? f : [f]).map(txt)) };
+      if (b.t === 'vivo') return b;
+      return { ...b, texto: txt(b.texto != null ? b.texto : b.x) };
+    });
+    if (!S.estandar || typeof S.estandar !== 'object') S.estandar = { nombre: 'Estándar del hotel', texto: txt(S.estandar) };
+    S.estandar.texto = txt(S.estandar.texto); S.estandar.nombre = txt(S.estandar.nombre);
+  }
+  BMS.pSecuencias = (root) => {
+    try { sanear(BMS.estado); return pagina(root); } catch (e) {
+      console.error(e);
+      root.append(h('h2', null, 'Secuencias de operación'), h('div', { class: 'card' }, h('p', null, 'No se pudo mostrar esta pestaña: ' + e.message),
+        h('div', { class: 'fila' }, h('button', { class: 'b x', onclick: () => { if (confirm('Esto vacía las secuencias guardadas (el proyecto no se toca). ¿Continuar?')) { BMS.estado.secuencias = inicial(); BMS.touch(); BMS.rerender(); } } }, 'Restablecer secuencias'))));
+    }
+  };
+
 })();
