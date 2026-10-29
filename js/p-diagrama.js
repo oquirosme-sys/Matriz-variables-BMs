@@ -137,13 +137,19 @@
     const nodosIP = [...gws.filter((g) => g.clave !== 'C'), ...paneles(res, C.nivelDe)];
     const itsP = principal ? itemsCtrl(res, principal.id) : [];
     const kmax = (n) => Math.min(n, MAXIT + 1);
-    const altNodo = (n) => (n.k === 'ctrl' ? IT0 + kmax(n.its.length) * ITH + 20 : n.k === 'panel' ? 200 + Math.min(n.pts.length, 12) * 9.5 : 220 + n.items.length * 36);
+    /* controlador con muchos equipos: se reparten en dos columnas, una a cada lado de la línea (espejo) */
+    const UMBRAL = 6, LW = 190;
+    const espejo = (n) => n.k === 'ctrl' && n.its.length > UMBRAL;
+    const lw = (n) => (espejo(n) ? LW : 0);
+    const filasIt = (n) => (espejo(n) ? Math.ceil(n.its.length / 2) : n.its.length);
+    const altNodo = (n) => (n.k === 'ctrl' ? IT0 + kmax(filasIt(n)) * ITH + 20 : n.k === 'panel' ? 200 + Math.min(n.pts.length, 12) * 9.5 : 220 + n.items.length * 36);
 
     /* filas de la troncal: un gabinete nunca se parte entre dos filas */
     const grupos = [];
     nodosT.forEach((n) => { const u = grupos[grupos.length - 1]; if (n.gab && u && u[0].gab === n.gab) u.push(n); else grupos.push([n]); });
     const filas = []; let cur = [];
-    grupos.forEach((gr) => { if (cur.length && cur.length + gr.length > PORFILA) { filas.push({ nodes: cur }); cur = []; } cur.push(...gr); });
+    let curW = 0;
+    grupos.forEach((gr) => { const wgr = gr.reduce((a, n) => a + COLW + lw(n), 0); if (cur.length && curW + wgr > PORFILA * COLW + 1) { filas.push({ nodes: cur }); cur = []; curW = 0; } cur.push(...gr); curW += wgr; });
     if (cur.length || !filas.length) filas.push({ nodes: cur });
     /* Redes IP separadas por protocolo: BACnet/IP (A) y Modbus TCP (E), cada una en su propia línea */
     ['A', 'E', 'B', 'C'].forEach((k) => { const l = nodosIP.filter((n) => n.clave === k); for (let i = 0; i < l.length; i += PORFILA) filas.push({ nodes: l.slice(i, i + PORFILA), ip: k }); });
@@ -237,8 +243,9 @@
     /* ---- troncales y nodos ---- */
     filas.forEach((fila, ri) => {
       const { busY } = pos[ri], nodes = fila.nodes, n = nodes.length, kk = fila.ip || trunk;
-      const xIni = ri === 0 && principal ? busIni + 48 : 40, xFin = n ? X0 + (n - 1) * COLW + 50 + 60 : xIni + 40;
-      g.append(s('path', { d: `M${xIni} ${busY} ` + nodes.map((_, i) => { const c0 = X0 + i * COLW + 50; return `H${c0 - 16} L${c0} ${busY + 22} L${c0 + 16} ${busY}`; }).join(' ') + ` H${xFin}`, fill: 'none', stroke: col(kk), 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
+      const px = []; { let acc = X0; nodes.forEach((nd0, i0) => { acc += lw(nd0); px[i0] = acc; acc += COLW; }); }
+      const xIni = ri === 0 && principal ? busIni + 48 : 40, xFin = n ? px[n - 1] + 50 + 60 : xIni + 40;
+      g.append(s('path', { d: `M${xIni} ${busY} ` + nodes.map((_, i) => { const c0 = px[i] + 50; return `H${c0 - 16} L${c0} ${busY + 22} L${c0 + 16} ${busY}`; }).join(' ') + ` H${xFin}`, fill: 'none', stroke: col(kk), 'stroke-width': 2.4, 'stroke-linejoin': 'round' }));
       if (fila.ip) { mv(g, 'iplab' + ri, (sg) => txt(sg, 40, busY - 14, (fila.ip === 'A' || fila.ip === 'E' ? 'Red IP (LAN por otros) — ' : fila.ip === 'B' ? 'Dispositivos en la troncal ' : 'Línea ') + NOMRED[fila.ip], { size: 9 })); clave(g, 300, busY, fila.ip); }
       else if (ri > 0) { mv(g, 'trlab' + ri, (sg) => txt(sg, 40, busY - 14, 'Continúa troncal (fila ' + (ri + 1) + ')', { size: 9 })); clave(g, 280, busY, kk); }
       /* paneles (gabinetes): cada controlador, o el grupo que comparte gabinete, va dentro de un recuadro punteado con su dimensión */
@@ -248,7 +255,7 @@
           const nd = nodes[i]; let j = i;
           if (nd.k === 'ctrl') {
             if (nd.gab) while (j + 1 < n && nodes[j + 1].k === 'ctrl' && nodes[j + 1].gab === nd.gab) j++;
-            const x1 = X0 + i * COLW - 14, x2 = X0 + j * COLW + COLW - 34;
+            const x1 = px[i] - lw(nd) - 14, x2 = px[j] + COLW - 34;
             rect(g, x1, busY - 30, x2 - x1, 156, { dash: '6 4', w: 0.9, fill: 'none' });
             mv(g, 'gab:' + (nd.gab || nd.c.id), (sg) => txt(sg, (x1 + x2) / 2, busY - 36, (nd.gab && j > i ? nd.gab + ' — ' : '') + 'Panel ' + dimDe(nd.c), { size: 9, bold: true, anchor: 'middle' }));
           }
@@ -256,8 +263,8 @@
         }
       }
       nodes.forEach((nd, i) => {
-        const x = X0 + i * COLW, xs = x + 22, cx = xs + 28;
-        if (i > 0) clave(g, cx - COLW / 2, busY, kk);
+        const x = px[i], xs = x + 22, cx = xs + 28;
+        if (i > 0) clave(g, cx - (COLW + lw(nd)) / 2, busY, kk);
         if (nd.k === 'ctrl') {
           const c = nd.c, d = det[c.id], t = d.t, esCP = c.tipo === 'CP', n1 = C.nivelDe(c.nivel);
           mv(g, 'n:' + c.id + ':tag', (sg) => {
@@ -277,10 +284,13 @@
             const ls = wrap(mods, 30); ls.slice(0, 2).forEach((l, q) => L(q === 1 && ls.length > 2 ? l + ' …' : l, { size: 7.5, fill: GRIS }));
           });
           if (d.ev.falta) g.append(s('circle', { cx: xs + 62, cy: busY + 34, r: 5, fill: '#c00' }));
-          const kC = Math.min(nd.its.length, MAXIT);
+          const esp = espejo(nd), nF = filasIt(nd), kC = Math.min(nF, MAXIT);
+          const der = esp ? nd.its.slice(0, nF) : nd.its, izq = esp ? nd.its.slice(nF) : [];
           if (kC) line(g, cx, busY + 114, cx, busY + IT0 + (kC - 1) * ITH - 14, { w: 1.8, color: col('D') });
-          nd.its.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + IT0 + q * ITH, it, 24, 'n:' + c.id + ':i' + q));
-          if (nd.its.length > MAXIT) txt(g, cx + 38, busY + IT0 + MAXIT * ITH, '+ ' + (nd.its.length - MAXIT) + ' equipos más (ver matriz)', { size: 8, fill: GRIS });
+          der.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + IT0 + q * ITH, it, 24, 'n:' + c.id + ':i' + q));
+          izq.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + IT0 + q * ITH, it, 24, 'n:' + c.id + ':l' + q, true));
+          const mostrados = Math.min(der.length, MAXIT) + Math.min(izq.length, MAXIT);
+          if (nd.its.length > mostrados) txt(g, cx + 38, busY + IT0 + MAXIT * ITH, '+ ' + (nd.its.length - mostrados) + ' equipos más (ver matriz)', { size: 8, fill: GRIS });
         } else if (nd.k === 'panel') {
           const kid = 'p:' + nd.tipo.id + nd.clave, np = Math.min(nd.pts.length, 12);
           mv(g, kid + ':tag', (sg) => txt(sg, cx, busY - 8, (nd.tags[0] || ((nd.tipo.tag || '').replace(/-$/, '').length > 2 ? nd.tipo.tag.replace(/-$/, '') : cut(etiqueta({ tipo: nd.tipo }), 16))) + (nd.qty > 1 ? ' ×' + nd.qty : ''), { size: 11, bold: true, anchor: 'middle' }));
@@ -388,16 +398,16 @@
   }
 
   /* Una fila de equipo colgando del controlador: clave D (cableado) o A (equipo IP directo, solo puntos INT). */
-  function dibujaItem(g, x, yy, it, n, key) {
-    const directo = it.t.ai + it.t.ao + it.t.di + it.t.do === 0 && it.t.int > 0;
-    clave(g, x + 18, yy - 22, directo ? 'A' : 'D');
-    line(g, x, yy - 14, x + 14, yy, { w: 1.8, color: col(directo ? 'A' : 'D') }); equipoX(g, x + 14, yy - 9, 18);
+  function dibujaItem(g, x, yy, it, n, key, izq) {
+    const directo = it.t.ai + it.t.ao + it.t.di + it.t.do === 0 && it.t.int > 0, sg = izq ? -1 : 1;
+    clave(g, x + 18 * sg, yy - 22, directo ? 'A' : 'D');
+    line(g, x, yy - 14, x + 14 * sg, yy, { w: 1.8, color: col(directo ? 'A' : 'D') }); equipoX(g, izq ? x - 32 : x + 14, yy - 9, 18);
     const tg = (it.tags[0] || '').trim(), conTag = tg && !/-$/.test(tg);
     const nom = etiqueta(it) + (conTag ? ' ' + tg : (it.de > 1 ? ' ' + it.idx : '')) + (it.qty > 1 ? ' ×' + it.qty : '');
-    const all = wrap(nom, n), ls = all.slice(0, 2);
-    mv(g, key, (sg) => {
-      ls.forEach((l, i) => txt(sg, x + 38, yy - 3 + i * 9.5, i === 1 && all.length > 2 ? cut(l, n) : l, { size: 8.5 }));
-      txt(sg, x + 38, yy - 3 + ls.length * 9.5 + 1, directo ? `INT ${it.t.int} · red IP` : `AI ${it.t.ai} AO ${it.t.ao} DI ${it.t.di} DO ${it.t.do}`, { size: 7.5, fill: GRIS });
+    const all = wrap(nom, n), ls = all.slice(0, 2), tx = izq ? x - 38 : x + 38, an = izq ? 'end' : 'start';
+    mv(g, key, (sg2) => {
+      ls.forEach((l, i) => txt(sg2, tx, yy - 3 + i * 9.5, i === 1 && all.length > 2 ? cut(l, n) : l, { size: 8.5, anchor: an }));
+      txt(sg2, tx, yy - 3 + ls.length * 9.5 + 1, directo ? `INT ${it.t.int} · red IP` : `AI ${it.t.ai} AO ${it.t.ao} DI ${it.t.di} DO ${it.t.do}`, { size: 7.5, fill: GRIS, anchor: an });
     });
   }
 
