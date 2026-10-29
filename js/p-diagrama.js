@@ -138,7 +138,7 @@
     const itsP = principal ? itemsCtrl(res, principal.id) : [];
     const kmax = (n) => Math.min(n, MAXIT + 1);
     /* controlador con muchos equipos: se reparten en dos columnas, una a cada lado de la línea (espejo) */
-    const UMBRAL = 6, LW = 190;
+    const UMBRAL = 6, LW = 250, SEP = 78;
     const espejo = (n) => n.k === 'ctrl' && n.its.length > UMBRAL;
     const lw = (n) => (espejo(n) ? LW : 0);
     const filasIt = (n) => (espejo(n) ? Math.ceil(n.its.length / 2) : n.its.length);
@@ -284,11 +284,14 @@
             const ls = wrap(mods, 30); ls.slice(0, 2).forEach((l, q) => L(q === 1 && ls.length > 2 ? l + ' …' : l, { size: 7.5, fill: GRIS }));
           });
           if (d.ev.falta) g.append(s('circle', { cx: xs + 62, cy: busY + 34, r: 5, fill: '#c00' }));
-          const esp = espejo(nd), nF = filasIt(nd), kC = Math.min(nF, MAXIT);
+          const esp = espejo(nd), nF = filasIt(nd);
           const der = esp ? nd.its.slice(0, nF) : nd.its, izq = esp ? nd.its.slice(nF) : [];
-          if (kC) line(g, cx, busY + 114, cx, busY + IT0 + (kC - 1) * ITH - 14, { w: 1.8, color: col('D') });
+          const kD = Math.min(der.length, MAXIT), kI = Math.min(izq.length, MAXIT), xL = cx - SEP;
+          if (kD) line(g, cx, busY + 114, cx, busY + IT0 + (kD - 1) * ITH - 14, { w: 1.8, color: col('D') });
+          /* la columna izquierda sale con su propia línea, separada de la central */
+          if (kI) { line(g, cx, busY + 114, xL, busY + 114, { w: 1.8, color: col('D') }); line(g, xL, busY + 114, xL, busY + IT0 + (kI - 1) * ITH - 14, { w: 1.8, color: col('D') }); }
           der.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + IT0 + q * ITH, it, 24, 'n:' + c.id + ':i' + q));
-          izq.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, cx, busY + IT0 + q * ITH, it, 24, 'n:' + c.id + ':l' + q, true));
+          izq.slice(0, MAXIT).forEach((it, q) => dibujaItem(g, xL, busY + IT0 + q * ITH, it, 24, 'n:' + c.id + ':l' + q, true));
           const mostrados = Math.min(der.length, MAXIT) + Math.min(izq.length, MAXIT);
           if (nd.its.length > mostrados) txt(g, cx + 38, busY + IT0 + MAXIT * ITH, '+ ' + (nd.its.length - mostrados) + ' equipos más (ver matriz)', { size: 8, fill: GRIS });
         } else if (nd.k === 'panel') {
