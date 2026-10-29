@@ -609,7 +609,7 @@
       h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
         try {
           const r = await BMS.leerSecuenciasDocx(buf);
-          if (S.bloques.length && !confirm('Se leyeron ' + r.bloques.length + ' bloques' + (r.descartados ? ' (se descartaron ' + r.descartados + ' de anexos generados, que se vuelven a generar al exportar)' : '') + '. Esto reemplaza las secuencias actuales. ¿Continuar?')) return;
+          if (S.bloques.length && !confirm('Se leyeron ' + r.bloques.length + ' bloques' + (r.descartados ? ' (se descartaron ' + r.descartados + ' de anexos generados, que se vuelven a generar al exportar)' : '') + '. Esto reemplaza las secuencias actuales. Su texto queda protegido (no se traduce ni se redacta encima) y los anexos se vuelven a generar con los datos del proyecto al exportar; los cambios hechos a mano dentro de los anexos no se conservan. ¿Continuar?')) return;
           S.portada = r.portada; S.bloques = r.bloques.map((b) => ({ ...b, fijo: true })); BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
         } catch (e) { alert('No se pudo importar: ' + e.message); }
       }) }, 'Importar desde Word'),
