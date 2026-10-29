@@ -114,6 +114,15 @@
   const ES_INC = /incend|facp|humo|presuriz|rociador|sprinkler|nfpa|escalera|detecci[o]n de/;
   const docDe = (h1) => (h1.doc === 'inc' || h1.doc === 'bms' ? h1.doc : (!/^\s*Anexo\b/i.test(h1.texto || '') && ES_INC.test(BMS.norm(h1.texto || '')) ? 'inc' : 'bms'));
   const DOCS = { bms: 'Secuencias del BMS', inc: 'Secuencias de alarma contra incendio' };
+  /* un requisito es de alarma contra incendio si trata de detección, notificación, FACP, humo, rociadores, anunciador, evacuación… */
+  const ES_LINEA_INC = /incend|facp|humo|smoke|fire|firefight|sprinkler|rociador|strobe|sounder|annunciat|anunciador|notification appliance|nfpa|evacuat|escalera|stair|presuriz|pressuriz|bomberos|egress/;
+  const esLineaIncendio = (t) => ES_LINEA_INC.test(BMS.norm(t));
+  /* los dos estándares cargados forman un solo conjunto: cada requisito se valida en el sistema al que pertenece */
+  const requisitosDe = (S, dd) => {
+    const vistos = new Set();
+    return analizarEstandar([S.estandar && S.estandar.texto, S.estandarInc && S.estandarInc.texto].filter(Boolean).join('\n'))
+      .filter((r) => { const k = BMS.norm(r.req); if (vistos.has(k)) return false; vistos.add(k); return esLineaIncendio(r.orig + ' ' + r.req) === (dd === 'inc'); });
+  };
   const docActual = () => (BMS.ui.secDoc === 'inc' ? 'inc' : 'bms');
   /* cada documento tiene su propio estándar a validar */
   const estDe = (S, doc = docActual()) => (doc === 'inc' ? (S.estandarInc = S.estandarInc || { nombre: 'Estándar de alarma contra incendio', texto: '', filtrado: true }) : S.estandar);
@@ -131,7 +140,7 @@
     const E = BMS.estado, S = E.secuencias, P = E.proyecto, C = BMS.calc, res = C.todo(), mot = C.motor(res, P.marca);
     const doc = textoDelDocumento(dd), bl = bloquesDe(S.bloques, dd);
     const tdoc = new Set(raices(doc.todo)), compactoDoc = doc.todo.replace(/\s+/g, '').replace(/,/g, '.');
-    const reqs = analizarEstandar(estDe(S, dd).texto).slice(0, MAX_REQ).map((r) => {
+    const reqs = requisitosDe(S, dd).slice(0, MAX_REQ).map((r) => {
       const rs = raices(r.req);
       const hit = rs.filter((x) => tdoc.has(x)), falt = rs.filter((x) => !tdoc.has(x));
       const vals = valoresDe(r.req);
@@ -173,7 +182,7 @@
   const cacheVal = {};
   function validar(forzar, dd = docActual()) {
     const E = BMS.estado, S = E.secuencias;
-    const clave = hash(estDe(S, dd).texto || '') + '|' + hash(textoDelDocumento(dd).todo) + '|' + hash(JSON.stringify([E.proyecto, E.niveles, E.controladores, E.equipos, S.bloques.length]));
+    const clave = hash(((S.estandar && S.estandar.texto) || '') + ((S.estandarInc && S.estandarInc.texto) || '')) + '|' + hash(textoDelDocumento(dd).todo) + '|' + hash(JSON.stringify([E.proyecto, E.niveles, E.controladores, E.equipos, S.bloques.length]));
     if (!forzar && cacheVal[dd] && cacheVal[dd].clave === clave) return cacheVal[dd].val;
     const val = validarCalc(dd); cacheVal[dd] = { clave, val }; return val;
   }
