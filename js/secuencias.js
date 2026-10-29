@@ -36,7 +36,7 @@
     '15A | Submedición eléctrica por tableros: HVAC, iluminación, fuerza, cocina y lavandería'
   ].join('\n');
 
-  const inicial = () => ({ portada: ['', 'Secuencias de operación del BMS/BAS', '', '', ''], bloques: [], opciones: { b: true, c: true, d: true, e: true, f: true, detalle: false }, estandar: { nombre: 'Estándar Fairfield CALA (abril 2026)', texto: ESTANDAR_BASE } });
+  const inicial = () => ({ portada: ['', 'Secuencias de operación del BMS/BAS', '', '', ''], bloques: [], opciones: { b: true, c: true, d: true, e: true, f: true, detalle: false }, estandar: { nombre: 'Estándar Fairfield CALA (abril 2026)', texto: baseDe('bms') } });
 
   /* ---------- ligado en vivo con el proyecto ---------- */
   const catDe = (id) => BMS.catEq.categorias.find((c) => c.id === id);
@@ -85,10 +85,10 @@
     return { n: i + 1, ref, req, orig: l0 };
   });
 
-  function textoDelDocumento() {
+  function textoDelDocumento(dd = docActual()) {
     const S = BMS.estado.secuencias;
     /* los párrafos agregados por «Completar la secuencia» siguen pendientes (en rojo) y no cuentan como cobertura */
-    const util = S.bloques.filter((b) => !/Redactar cómo la secuencia lo cumple/.test(b.texto || ''));
+    const util = bloquesDe(S.bloques, dd).filter((b) => !/Redactar cómo la secuencia lo cumple/.test(b.texto || ''));
     const bl = resolverBloques(util);
     const propio = util.filter((b) => b.t !== 'vivo').map((b) => (b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || '')).join(' \n ');
     const todo = bl.map((b) => (b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || '')).join(' \n ');
@@ -114,18 +114,24 @@
   const ES_INC = /incend|facp|humo|presuriz|rociador|sprinkler|nfpa|escalera|detecci[o]n de/;
   const docDe = (h1) => (h1.doc === 'inc' || h1.doc === 'bms' ? h1.doc : (!/^\s*Anexo\b/i.test(h1.texto || '') && ES_INC.test(BMS.norm(h1.texto || '')) ? 'inc' : 'bms'));
   const DOCS = { bms: 'Secuencias del BMS', inc: 'Secuencias de alarma contra incendio' };
+  const docActual = () => (BMS.ui.secDoc === 'inc' ? 'inc' : 'bms');
+  /* cada documento tiene su propio estándar a validar */
+  const estDe = (S, doc = docActual()) => (doc === 'inc' ? (S.estandarInc = S.estandarInc || { nombre: 'Estándar de alarma contra incendio', texto: '', filtrado: true }) : S.estandar);
+  const catDoc = (id) => { const c = BMS.catEq.categorias.find((x) => x.id === id); return c && ES_INC.test(BMS.norm(c.nombre)) ? 'inc' : 'bms'; };
+  const baseDe = (doc) => ESTANDAR_BASE.split('\n').filter((l) => ES_INC.test(BMS.norm(l)) === (doc === 'inc')).join('\n');
   /* bloques de un documento: cada sección (Título 1 y su contenido) va al documento que le corresponde */
+  const bloquesNoDe = (bl, doc) => { const out = []; let actual = 'bms'; bl.forEach((b) => { if (b.t === 'h1') actual = docDe(b); if (actual !== doc) out.push(b); }); return out; };
   function bloquesDe(bl, doc) {
     const out = []; let actual = 'bms';
     bl.forEach((b) => { if (b.t === 'h1') actual = docDe(b); if (actual === doc) out.push(b); });
     return out;
   }
   const MAX_REQ = 600; /* tope de requisitos revisados, para que un estándar muy largo no deje la página lenta */
-  function validarCalc() {
+  function validarCalc(dd = docActual()) {
     const E = BMS.estado, S = E.secuencias, P = E.proyecto, C = BMS.calc, res = C.todo(), mot = C.motor(res, P.marca);
-    const doc = textoDelDocumento();
+    const doc = textoDelDocumento(dd), bl = bloquesDe(S.bloques, dd);
     const tdoc = new Set(raices(doc.todo)), compactoDoc = doc.todo.replace(/\s+/g, '').replace(/,/g, '.');
-    const reqs = analizarEstandar(S.estandar && S.estandar.texto).slice(0, MAX_REQ).map((r) => {
+    const reqs = analizarEstandar(estDe(S, dd).texto).slice(0, MAX_REQ).map((r) => {
       const rs = raices(r.req);
       const hit = rs.filter((x) => tdoc.has(x)), falt = rs.filter((x) => !tdoc.has(x));
       const vals = valoresDe(r.req);
@@ -141,35 +147,35 @@
     /* comprobaciones del proyecto */
     const pr = [];
     const add = (nivel, tema, obs) => pr.push({ nivel, tema, obs });
-    if (Number(P.reserva) < 10) add('falta', 'Reserva de puntos', 'La reserva configurada es ' + P.reserva + ' % y el estándar pide 10 % (15A.15.B.3.a).');
-    const sistemasConEq = BMS.catEq.categorias.filter((c) => res.filas.some((f) => f.tipo && f.tipo.cat === c.id && f.eq.qty > 0));
+    if (dd === 'bms' && Number(P.reserva) < 10) add('falta', 'Reserva de puntos', 'La reserva configurada es ' + P.reserva + ' % y el estándar pide 10 % (15A.15.B.3.a).');
+    const sistemasConEq = BMS.catEq.categorias.filter((c) => catDoc(c.id) === dd && res.filas.some((f) => f.tipo && f.tipo.cat === c.id && f.eq.qty > 0));
     sistemasConEq.forEach((c) => {
       const ras = raices(c.nombre).slice(0, 3);
-      const titulos = BMS.norm(S.bloques.filter((b) => b.t === 'h1' || b.t === 'h2').map((b) => b.texto || '').join(' '));
+      const titulos = BMS.norm(bl.filter((b) => b.t === 'h1' || b.t === 'h2').map((b) => b.texto || '').join(' '));
       if (!ras.some((x) => titulos.includes(x))) add('falta', 'Sistema sin secuencia', 'El proyecto tiene equipos en «' + c.nombre + '» pero no hay una sección de secuencia con ese tema.');
     });
-    const tipos = new Map(); res.filas.filter((f) => f.tipo && f.eq.qty > 0).forEach((f) => tipos.set(f.tipo.id, f.tipo));
+    const tipos = new Map(); res.filas.filter((f) => f.tipo && f.eq.qty > 0 && catDoc(f.tipo.cat) === dd).forEach((f) => tipos.set(f.tipo.id, f.tipo));
     const sinDescribir = [...tipos.values()].filter((t) => { const ras = raices(corto(t.nombre)).slice(0, 2); return ras.length && !ras.some((x) => doc.propio.includes(x)); });
     if (sinDescribir.length) add('parcial', 'Equipos sin secuencia descrita', 'No se menciona en el texto de las secuencias: ' + sinDescribir.slice(0, 14).map((t) => corto(t.nombre)).join('; ') + (sinDescribir.length > 14 ? '; y ' + (sinDescribir.length - 14) + ' más' : '') + '.');
     const aiSinAlarma = [...tipos.values()].filter((t) => t.pts.some((p) => p.ai > 0 && !p.alm && !t.ip));
     if (aiSinAlarma.length) add('parcial', 'Entradas analógicas sin alarma', 'Cada entrada analógica debe tener alarma alta y baja (15A.15.B.3.a). Tipos con variables analógicas sin alarma definida: ' + aiSinAlarma.slice(0, 10).map((t) => corto(t.nombre)).join('; ') + (aiSinAlarma.length > 10 ? '; y ' + (aiSinAlarma.length - 10) + ' más' : '') + '.');
     const sinEstado = [...tipos.values()].filter((t) => t.pts.some((p) => p.do > 0) && !t.pts.some((p) => p.di > 0 || p.ai > 0 || p.int > 0));
     if (sinEstado.length) add('parcial', 'Comandos sin retroalimentación', 'Cada comando debe tener un estado (15A.15.B.2.c). Equipos con comando y sin estado: ' + sinEstado.slice(0, 10).map((t) => corto(t.nombre)).join('; ') + '.');
-    const corchetes = []; S.bloques.forEach((b) => { const t = b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || ''; (t.match(/\[[^\]]{1,60}\]/g) || []).forEach((m) => corchetes.push(m)); });
+    const corchetes = []; bl.forEach((b) => { const t = b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || ''; (t.match(/\[[^\]]{1,60}\]/g) || []).forEach((m) => corchetes.push(m)); });
     if (corchetes.length) add('parcial', 'Valores propuestos por validar', corchetes.length + ' valores entre corchetes [ ] pendientes de validar por el diseñador (por ejemplo ' + [...new Set(corchetes)].slice(0, 5).join(', ') + ').');
     /* la validación se limita a temas de secuencias de operación; el dimensionamiento de controladores se revisa en la pestaña Controladores */
-    if (!S.bloques.length) add('falta', 'Secuencias vacías', 'Todavía no hay secuencias redactadas.');
+    if (!bl.length) add('falta', 'Secuencias vacías', 'Todavía no hay secuencias redactadas.');
     const cuenta = (a) => a.reduce((x, r) => { x[r.estado || r.nivel] = (x[r.estado || r.nivel] || 0) + 1; return x; }, { ok: 0, parcial: 0, falta: 0 });
     return { reqs, pr, cuentaReqs: cuenta(reqs), cuentaPr: cuenta(pr) };
   }
   /* el estándar y el documento solo se vuelven a analizar cuando cambian (o con «Revalidar»); abrir la pestaña reutiliza el último resultado */
   const hash = (t) => { let x = 5381; for (let i = 0; i < t.length; i++) x = ((x << 5) + x + t.charCodeAt(i)) | 0; return t.length + ':' + x; };
-  let cacheVal = null;
-  function validar(forzar) {
+  const cacheVal = {};
+  function validar(forzar, dd = docActual()) {
     const E = BMS.estado, S = E.secuencias;
-    const clave = hash((S.estandar && S.estandar.texto) || '') + '|' + hash(textoDelDocumento().todo) + '|' + hash(JSON.stringify([E.proyecto, E.niveles, E.controladores, E.equipos, S.bloques.length]));
-    if (!forzar && cacheVal && cacheVal.clave === clave) return cacheVal.val;
-    const val = validarCalc(); cacheVal = { clave, val }; return val;
+    const clave = hash(estDe(S, dd).texto || '') + '|' + hash(textoDelDocumento(dd).todo) + '|' + hash(JSON.stringify([E.proyecto, E.niveles, E.controladores, E.equipos, S.bloques.length]));
+    if (!forzar && cacheVal[dd] && cacheVal[dd].clave === clave) return cacheVal[dd].val;
+    const val = validarCalc(dd); cacheVal[dd] = { clave, val }; return val;
   }
   const chipDe = (e) => h('span', { class: 'chip ' + (e === 'ok' ? 'ok' : e === 'parcial' ? 'warn' : 'bad') }, e === 'ok' ? 'Cumple' : e === 'parcial' ? 'Parcial' : 'No cumple / falta');
 
@@ -260,7 +266,7 @@
       });
     }
     if (op.f) {
-      const v = validar(), S = E.secuencias;
+      const v = validar(false, 'bms'), S = E.secuencias;
       anexo('Validación contra el estándar del hotel', 'Revisión de las secuencias y del proyecto contra «' + ((S.estandar && S.estandar.nombre) || 'el estándar del hotel') + '». La revisión de requisitos compara términos y valores del estándar con el texto de las secuencias; no reemplaza la validación del diseñador. Cumple: ' + v.cuentaReqs.ok + ' · Parcial: ' + v.cuentaReqs.parcial + ' · No cumple o falta: ' + v.cuentaReqs.falta + '.');
       const nom = (e) => (e === 'ok' ? 'Cumple' : '!!' + (e === 'parcial' ? 'Parcial' : 'No cumple / falta') + '!!');
       const rojo = (e, t) => (e === 'ok' || !t ? t : '!!' + t + '!!');
@@ -293,8 +299,10 @@
   }
 
   /* complementa las secuencias existentes con la estructura base: agrega solo lo que falta (secciones, subsecciones y bloques vivos) y no toca el texto ya escrito */
-  function complementar(S) {
+  function complementar(S, doc = 'bms') {
     const base = estructuraBase();
+    base.bloques = bloquesDe(base.bloques, doc);
+    if (doc === 'inc' && !base.bloques.some((b) => b.t === 'h1' && /alcance/i.test(b.texto))) base.bloques.unshift({ t: 'h1', texto: '0. Alcance del sistema de alarma contra incendio', doc: 'inc' }, { t: 'p', texto: 'Este documento describe la interacción del BMS de {{proyecto}} con el sistema de alarma contra incendio (FACP): las señales que el BMS recibe, los equipos que se detienen o arrancan ante una alarma y los estados que se registran. Las funciones de seguridad de vida las ejecuta el FACP y el BMS no puede silenciarlas ni reponerlas.' });
     const clave = (t) => BMS.norm(String(t || '').replace(/^\s*(SOO-\d+|Anexo [A-Z]|\d+(\.\d+)*)[.\s]+/i, '')).replace(/[^a-z0-9]+/g, ' ').trim();
     const mismo = (a, b) => { const x = clave(a), y = clave(b); if (x === y) return true; const rx = raices(x), ry = raices(y); if (!rx.length || !ry.length) return false; const c = rx.filter((r) => ry.includes(r)).length; return c / Math.min(rx.length, ry.length) >= 0.6; };
     const secciones = (bl) => { const out = []; bl.forEach((b) => { if (b.t === 'h1' || !out.length) out.push({ h: b.t === 'h1' ? b : null, b: b.t === 'h1' ? [] : [b] }); else out[out.length - 1].b.push(b); }); return out; };
@@ -375,9 +383,9 @@
   }
 
   /* ---------- completar la secuencia: redacta lo que falta para cumplir el estándar y deja en rojo lo que se debe actualizar ---------- */
-  function completarSecuencia(S) {
+  function completarSecuencia(S, doc = 'bms') {
     const E = BMS.estado, res = BMS.calc.todo(), cuenta = { secciones: 0, redactados: 0, requisitos: 0 };
-    const c0 = complementar(S); cuenta.secciones = c0.secciones;
+    const c0 = complementar(S, doc); cuenta.secciones = c0.secciones;
     const lista = (a, n) => { const u = [...new Set(a)]; return u.slice(0, n).join(', ') + (u.length > n ? ' y ' + (u.length - n) + ' más' : ''); };
     const PEND = { 'Habilitación y horario': '[por definir]', 'Control': '[por definir]', 'Alarmas': '[por definir]' };
     /* 1. secciones SOO-n con marcadores «[por definir]»: se redactan a partir de las variables del catálogo */
@@ -385,6 +393,7 @@
       if (b.t !== 'li') return;
       const m = /^\*\*(Habilitación y horario|Control|Alarmas):\*\*\s*\[por definir\]\.?$/.exec(b.texto || ''); if (!m) return;
       let k = i; while (k >= 0 && S.bloques[k].t !== 'h1') k--;
+      if (k >= 0 && docDe(S.bloques[k]) !== doc) return;
       const cat = k >= 0 && BMS.catEq.categorias.find((c) => BMS.norm(S.bloques[k].texto).includes(BMS.norm(c.nombre)));
       if (!cat) return;
       const tipos = new Map(); res.filas.filter((f) => f.tipo && f.tipo.cat === cat.id && f.eq.qty > 0).forEach((f) => tipos.set(f.tipo.id, f.tipo));
@@ -403,10 +412,10 @@
       S.bloques[i] = { t: 'li', texto }; cuenta.redactados++;
     });
     /* 2. requisitos del estándar que las secuencias no cubren: se agrega un párrafo en la sección del tema, con lo pendiente en rojo */
-    const v = validar(true), titulos = () => S.bloques.map((b, i) => ({ b, i })).filter((x) => x.b.t === 'h1');
+    const v = validar(true, doc), titulos = () => S.bloques.map((b, i) => ({ b, i })).filter((x) => x.b.t === 'h1' && docDe(x.b) === doc);
     const yaEsta = (r) => S.bloques.some((b) => b.req === r.req);
     const pendientes = v.reqs.filter((r) => r.estado !== 'ok' && !yaEsta(r));
-    let general = S.bloques.findIndex((b) => b.t === 'h1' && /Requisitos del estándar por incorporar/i.test(b.texto));
+    let general = S.bloques.findIndex((b) => b.t === 'h1' && /Requisitos del estándar por incorporar/i.test(b.texto) && docDe(b) === doc);
     pendientes.forEach((r) => {
       const rr = raices(r.req); let mejor = -1, pm = 0;
       titulos().forEach((x) => { if (/^\s*Anexo\b/i.test(x.b.texto) || /Requisitos del estándar por incorporar/i.test(x.b.texto)) return; const rs = raices(x.b.texto); const sc = rs.filter((q) => rr.includes(q)).length; if (sc > pm) { pm = sc; mejor = x.i; } });
@@ -415,7 +424,7 @@
       const li = { t: 'li', req: r.req, texto: txt };
       if (mejor >= 0) { let f = mejor + 1; while (f < S.bloques.length && S.bloques[f].t !== 'h1') f++; S.bloques.splice(f, 0, li); }
       else {
-        if (general < 0) { let a = S.bloques.findIndex((b) => b.t === 'h1' && /^\s*Anexo\b/i.test(b.texto)); if (a < 0) a = S.bloques.length; S.bloques.splice(a, 0, { t: 'h1', texto: 'Requisitos del estándar por incorporar' }, { t: 'p', texto: 'Requisitos del estándar del hotel sobre operación y control que las secuencias deben tratar. Lo marcado en rojo se debe redactar o confirmar antes de emitir.' }); general = a; }
+        if (general < 0) { let a = S.bloques.findIndex((b) => b.t === 'h1' && /^\s*Anexo\b/i.test(b.texto)); if (a < 0) a = S.bloques.length; S.bloques.splice(a, 0, { t: 'h1', texto: 'Requisitos del estándar por incorporar', doc }, { t: 'p', texto: 'Requisitos del estándar del hotel sobre operación y control que las secuencias deben tratar. Lo marcado en rojo se debe redactar o confirmar antes de emitir.' }); general = a; }
         let f = general + 1; while (f < S.bloques.length && S.bloques[f].t !== 'h1') f++; S.bloques.splice(f, 0, li);
       }
       cuenta.requisitos++;
@@ -431,13 +440,16 @@
     E.secuencias = E.secuencias || inicial();
     const S = E.secuencias; S.opciones = Object.assign({ b: true, c: true, d: true, e: true, f: true, detalle: false }, S.opciones || {});
     S.estandar = S.estandar || { nombre: 'Estándar del hotel', texto: '' };
+    estDe(S);
+    const DOC = docActual();
     const ini = S.bloques.map((x, i) => (x.t === 'h1' ? i : -1)).filter((i) => i >= 0);
-    if (BMS.ui.secSel == null || BMS.ui.secSel >= ini.length) BMS.ui.secSel = ini.length ? 0 : -1;
+    const iniDoc = ini.filter((bi) => docDe(S.bloques[bi]) === DOC);
+    if (BMS.ui.secSel == null || (BMS.ui.secSel >= 0 && (BMS.ui.secSel >= ini.length || docDe(S.bloques[ini[BMS.ui.secSel]]) !== DOC))) BMS.ui.secSel = iniDoc.length ? ini.indexOf(iniDoc[0]) : -1;
     const sel = BMS.ui.secSel;
     const estado = h('span', { class: 'mute' });
     const guardar = () => BMS.touch();
     const nuevoTipo = (tipo) => (tipo === 'tabla' ? { t: 'tabla', filas: [['Columna 1', 'Columna 2'], ['', '']] } : tipo === 'vivo' ? { t: 'vivo', fuente: 'equipos', cat: (BMS.catEq.categorias[0] || {}).id } : { t: tipo, texto: '' });
-    const val = validar();
+    const val = validar(false, DOC);
     const nObs = val.cuentaReqs.falta + val.cuentaReqs.parcial + val.pr.length;
 
     const exportar = async (doc = 'bms') => {
@@ -515,19 +527,19 @@
         if (lineas.length > 600 && !confirm('El archivo tiene ' + lineas.length + ' líneas de texto. Para que la herramienta siga ágil solo se usarán las primeras 600 líneas. ¿Continuar?\n\nSi el estándar es largo, pegue en el cuadro solo los requisitos que quiere validar.')) return;
         lineas.splice(600);
         let agregar = false;
-        if ((S.estandar.texto || '').trim()) agregar = !confirm('Ya hay requisitos cargados.\n\nAceptar = reemplazarlos con ' + fs.length + ' archivo(s).\nCancelar = agregar al final.');
-        S.estandar.texto = (agregar ? S.estandar.texto.replace(/\s+$/, '') + '\n' : '') + lineas.join('\n');
-        S.estandar.texto = S.estandar.texto.slice(0, 60000); S.estandar.filtrado = true;
+        if ((estDe(S).texto || '').trim()) agregar = !confirm('Ya hay requisitos cargados.\n\nAceptar = reemplazarlos con ' + fs.length + ' archivo(s).\nCancelar = agregar al final.');
+        estDe(S).texto = (agregar ? estDe(S).texto.replace(/\s+$/, '') + '\n' : '') + lineas.join('\n');
+        estDe(S).texto = estDe(S).texto.slice(0, 60000); estDe(S).filtrado = true;
         const nom = fs[0].name.replace(/\.\w+$/, '');
-        if (!agregar || !S.estandar.nombre) S.estandar.nombre = nom;
+        if (!agregar || !estDe(S).nombre) estDe(S).nombre = nom;
         guardar(); BMS.rerender();
         if (fallos.length) alert('Se cargaron ' + (fs.length - fallos.length) + ' archivo(s). No se pudieron leer:\n' + fallos.join('\n'));
       });
       inp.click();
     }
     const barra = h('div', { class: 'fila noprint' },
-      h('button', { class: 'b p', title: 'Word con las secuencias del BMS y los anexos', onclick: () => exportar('bms') }, 'Exportar Word — BMS'),
-      h('button', { class: 'b p', title: 'Word aparte con las secuencias del sistema de alarma contra incendio', onclick: () => exportar('inc') }, 'Exportar Word — Alarma contra incendio'),
+      h('select', { class: 'in', title: 'Sistema con el que trabaja: las secciones, la validación, «Completar la secuencia» y la exportación se limitan a este sistema', style: { width: '300px', fontWeight: 700 }, value: DOC, onchange: (e) => { BMS.ui.secDoc = e.target.value; BMS.ui.secSel = null; BMS.rerender(); } }, h('option', { value: 'bms' }, 'Sistema: BMS'), h('option', { value: 'inc' }, 'Sistema: Alarmas contra incendio')),
+      h('button', { class: 'b p', title: 'Genera el Word de este sistema', onclick: () => exportar(DOC) }, 'Exportar Word — ' + (DOC === 'inc' ? 'Alarma contra incendio' : 'BMS')),
       h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
         try {
           const r = await BMS.leerSecuenciasDocx(buf);
@@ -541,18 +553,18 @@
         if (!vacio) setTimeout(() => alert('Se complementaron las secuencias: ' + c.secciones + ' sección(es) nueva(s), ' + c.subsecciones + ' subsección(es) y ' + c.vivos + ' bloque(s) ligado(s) agregados. Lo ya escrito no se modificó.'), 50);
       } }, 'Cargar estructura base del proyecto'),
       h('button', { class: 'b p', title: 'Redacta lo que falta para cumplir el estándar del hotel: completa las secciones por sistema con las variables del proyecto y agrega los requisitos no cubiertos. Lo que se debe actualizar queda en rojo', onclick: () => {
-        if (!S.estandar.texto.trim() && !confirm('No hay estándar del hotel cargado; solo se completarán las secciones del proyecto. ¿Continuar?')) return;
-        const c = completarSecuencia(S); validar(true); BMS.touch(); BMS.rerender();
+        if (!estDe(S).texto.trim() && !confirm('No hay estándar del hotel cargado; solo se completarán las secciones del proyecto. ¿Continuar?')) return;
+        const c = completarSecuencia(S, DOC); validar(true, DOC); BMS.touch(); BMS.rerender();
         setTimeout(() => alert('Secuencia completada: ' + c.secciones + ' sección(es) nueva(s), ' + c.redactados + ' párrafo(s) redactado(s) con las variables del proyecto y ' + c.requisitos + ' requisito(s) del estándar redactado(s) como secuencia. Los datos que debe validar con el diseño quedan en rojo.'), 50);
       } }, 'Completar la secuencia'),
       h('button', { class: 'b', title: 'Sube el PDF del estándar del hotel para validar las secuencias', onclick: () => { BMS.ui.secSel = -2; cargarEstandar(); } }, 'Subir estándar del hotel (PDF)'),
-      h('button', { class: 'b x', onclick: () => { if (confirm('¿Vaciar las secuencias de operación? (el estándar del hotel se conserva)')) { const est = S.estandar; E.secuencias = inicial(); E.secuencias.estandar = est; BMS.ui.secSel = -1; BMS.touch(); BMS.rerender(); } } }, 'Vaciar'), estado);
+      h('button', { class: 'b x', onclick: () => { if (confirm('¿Vaciar las secciones de «' + DOCS[DOC] + '»? (los estándares del hotel se conservan)')) { S.bloques = bloquesNoDe(S.bloques, DOC); BMS.ui.secSel = -1; BMS.touch(); BMS.rerender(); } } }, 'Vaciar'), estado);
 
-    const lista = h('div', { class: 'lista' }, h('div', { class: 'grp' }, 'Documento'),
+    const lista = h('div', { class: 'lista' }, h('div', { class: 'grp' }, DOC === 'inc' ? 'Alarmas contra incendio' : 'BMS'),
       h('div', { class: 'it' + (sel === -1 ? ' on' : ''), onclick: () => { BMS.ui.secSel = -1; BMS.rerender(); } }, h('span', null, 'Portada y anexos')),
       h('div', { class: 'it' + (sel === -2 ? ' on' : ''), onclick: () => { BMS.ui.secSel = -2; BMS.rerender(); } }, h('span', null, 'Validación con el estándar'), h('span', { class: 'badge', style: nObs ? { color: 'var(--bad)' } : null }, nObs)),
       );
-    ['bms', 'inc'].forEach((d) => {
+    [DOC].forEach((d) => {
       lista.append(h('div', { class: 'grp' }, DOCS[d]));
       let hay = false;
       ini.forEach((bi, k) => {
@@ -560,9 +572,9 @@
         const fin = k + 1 < ini.length ? ini[k + 1] : S.bloques.length;
         lista.append(h('div', { class: 'it' + (sel === k ? ' on' : ''), onclick: () => { BMS.ui.secSel = k; BMS.rerender(); } }, h('span', null, cut(S.bloques[bi].texto, 44)), h('span', { class: 'badge' }, fin - bi - 1)));
       });
-      if (!hay) lista.append(h('div', { class: 'mute', style: { fontSize: '12px', padding: '4px 10px' } }, 'Sin secciones'));
+      if (!hay) lista.append(h('div', { class: 'mute', style: { fontSize: '12px', padding: '4px 10px' } }, 'Sin secciones: use «Completar la secuencia» o agregue una.'));
     });
-    lista.append(h('div', { class: 'it', style: { color: 'var(--accent)' }, onclick: () => { S.bloques.push({ t: 'h1', texto: 'Nueva sección' }); BMS.ui.secSel = ini.length; guardar(); BMS.rerender(); } }, h('span', null, '+ Agregar sección')));
+    lista.append(h('div', { class: 'it', style: { color: 'var(--accent)' }, onclick: () => { S.bloques.push({ t: 'h1', texto: 'Nueva sección', doc: DOC }); BMS.ui.secSel = ini.length; guardar(); BMS.rerender(); } }, h('span', null, '+ Agregar sección')));
 
     let derecha;
     if (sel === -2) {
@@ -571,11 +583,11 @@
       derecha = h('div', null,
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Estándar del hotel'),
           h('p', { class: 'hint' }, 'Pegue los requisitos del estándar del hotel, o cárguelos desde un PDF, uno por línea (opcional: "referencia | requisito"). La herramienta revisa en vivo si las secuencias los tratan y con qué valores, y señala lo que falta. Se preasigna una base de requisitos Fairfield CALA tomada del documento de secuencias; reemplácela por el texto del estándar.'),
-          h('label', { class: 'f' }, 'Nombre del estándar', h('input', { class: 'in', value: S.estandar.nombre || '', onchange: (e) => { S.estandar.nombre = e.target.value; guardar(); } })),
-          h('label', { class: 'f', style: { marginTop: '8px' } }, 'Requisitos (uno por línea)', h('textarea', { class: 'in', rows: 12, style: { width: '100%' }, value: S.estandar.texto || '', onchange: (e) => { S.estandar.texto = e.target.value; S.estandar.filtrado = true; guardar(); BMS.rerender(); } })),
+          h('label', { class: 'f' }, 'Nombre del estándar', h('input', { class: 'in', value: estDe(S).nombre || '', onchange: (e) => { estDe(S).nombre = e.target.value; guardar(); } })),
+          h('label', { class: 'f', style: { marginTop: '8px' } }, 'Requisitos (uno por línea)', h('textarea', { class: 'in', rows: 12, style: { width: '100%' }, value: estDe(S).texto || '', onchange: (e) => { estDe(S).texto = e.target.value; estDe(S).filtrado = true; guardar(); BMS.rerender(); } })),
           h('div', { class: 'fila' },
             h('button', { class: 'b', onclick: () => cargarEstandar() }, 'Cargar estándar (PDF)'),
-            h('button', { class: 'b', onclick: () => { if (!S.estandar.texto || confirm('Esto reemplaza los requisitos actuales por la base Fairfield CALA. ¿Continuar?')) { S.estandar.texto = ESTANDAR_BASE; S.estandar.nombre = 'Estándar Fairfield CALA (abril 2026)'; guardar(); BMS.rerender(); } } }, 'Usar la base Fairfield CALA'),
+            h('button', { class: 'b', onclick: () => { if (!estDe(S).texto || confirm('Esto reemplaza los requisitos actuales por la base Fairfield CALA. ¿Continuar?')) { estDe(S).texto = baseDe(DOC); estDe(S).nombre = DOC === 'inc' ? 'Base Fairfield CALA — alarma contra incendio' : 'Estándar Fairfield CALA (abril 2026)'; guardar(); BMS.rerender(); } } }, 'Usar la base Fairfield CALA (' + (DOC === 'inc' ? 'incendio' : 'BMS') + ')'),
             h('button', { class: 'b', onclick: () => { validar(true); BMS.rerender(); } }, 'Revalidar'))),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Comprobaciones del proyecto'), h('div', { class: 'fila' }, conteo(val.cuentaPr)),
           val.pr.length ? h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tema', 'Estado', 'Observación'].map((x) => h('th', null, x)))), h('tbody', null, val.pr.map((r) => h('tr', null, h('td', { style: { fontWeight: 600 } }, r.tema), h('td', { class: 'c' }, chipDe(r.nivel)), h('td', null, r.obs))))) : h('p', { class: 'hint' }, 'Sin observaciones.')),
@@ -587,7 +599,7 @@
       derecha = h('div', null,
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Portada'), h('p', { class: 'hint' }, 'Puede usar marcadores ligados en vivo al proyecto: {{proyecto}}, {{ubicacion}}, {{marca}}, {{reserva}}, {{niveles}}, {{controladores}}, {{equipos}} y {{puntos}}; funcionan también en cualquier párrafo, viñeta o tabla.'), h('div', { class: 'grid' },
           campo('Proyecto y ubicación', 0, '{{proyecto}} — {{ubicacion}}'), campo('Título del documento', 1), campo('Entregable / referencia', 2, 'Entregable 60 % — Comentario #…'), campo('Autor · fecha · estado', 3, 'Sinergia Ingeniería · fecha · Borrador'), campo('Nota inicial', 4, 'Aclaración sobre valores entre corchetes'))),
-        h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Anexos generados al exportar'),
+        h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Anexos generados al exportar (solo en el documento del BMS)'),
           h('p', { class: 'hint' }, 'Se generan con los datos actuales del proyecto (niveles, controladores, equipos, marca y reserva) y siguen la letra del último anexo del documento. Van en hojas apaisadas.'),
           h('label', { class: 'f', style: { maxWidth: '320px', marginBottom: '10px' } }, 'Idioma del documento exportado', h('select', { class: 'in', value: S.opciones.idioma || 'es', onchange: (e) => { S.opciones.idioma = e.target.value; guardar(); } }, h('option', { value: 'es' }, 'Español'), h('option', { value: 'en' }, 'English (traducción con glosario; lo no traducido sale en rojo)'))),
           h('div', { style: { display: 'grid', gap: '6px' } }, casilla('Diagrama unifilar (imagen en partes a ancho de hoja)', 'b'), casilla('Resumen de variables por sistema y por tipo de equipo, y totales por nivel', 'c'), casilla('Lista de controladores, dispositivos de red y materiales', 'd'), casilla('Variables por controlador (equipos y puntos)', 'e'), casilla('   … detallando cada variable por controlador (documento más largo)', 'detalle'), casilla('Validación contra el estándar del hotel (observaciones)', 'f'))));
