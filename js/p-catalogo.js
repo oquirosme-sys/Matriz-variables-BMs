@@ -73,7 +73,9 @@
         CAT.tipos.push({ id, cat: (tipo && tipo.cat) || CAT.categorias[0].id, nombre, tag: '', gw: '', nota: '', pts: [{ id: id + '_1', n: 'Estado', ai: 0, ao: 0, di: 1, do: 0, int: 0, alm: '', tend: '', ifc: 'Cableado' }] });
         BMS.ui.tipoSel = id; BMS.guardarCatEq(); BMS.rerender();
       } }, '+ Nuevo equipo en el catálogo'),
-      h('button', { class: 'b', onclick: () => BMS.descargar('catalogo-equipos.json', JSON.stringify(CAT, null, 1), 'application/json') }, 'Exportar catálogo'),
+      h('button', { class: 'b p', title: 'Una pestaña por disciplina, con numeración, cantidades y totales por fórmula, para que el equipo de cada disciplina valide las variables', onclick: () => BMS.exportarCatalogoXlsx() }, 'Exportar a Excel (por disciplina)'),
+      h('button', { class: 'b', title: 'Lee el Excel exportado (con los cambios validados por cada disciplina) y actualiza el catálogo', onclick: () => BMS.importarCatalogoXlsx() }, 'Importar desde Excel (validado)'),
+      h('button', { class: 'b', onclick: () => BMS.descargar('catalogo-equipos.json', JSON.stringify(CAT, null, 1), 'application/json') }, 'Exportar catálogo (JSON)'),
       h('button', { class: 'b', onclick: () => BMS.leerArchivo('.json', (t) => { try { const d = JSON.parse(t); if (!d.tipos || !d.categorias) throw new Error('Formato no válido'); if (!confirm('Reemplazar el catálogo actual?')) return; BMS.catEq = d; BMS.guardarCatEq(); BMS.rerender(); } catch (e) { alert('No se pudo importar: ' + e.message); } }) }, 'Importar catálogo'),
       h('button', { class: 'b', onclick: () => { if (confirm('Restaurar el catálogo base del Excel? Se pierden los cambios hechos al catálogo.')) { BMS.catEq = BMS.clone(window.BMS_CATALOGO_EQUIPOS); BMS.ui.tipoSel = null; BMS.guardarCatEq(); BMS.rerender(); } } }, 'Restaurar catálogo base')));
     root.append(h('div', { class: 'split' }, izq, editor));
