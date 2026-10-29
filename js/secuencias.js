@@ -75,11 +75,14 @@
   const PARADAS = new Set('para como cada debe deben desde sobre entre este esta estos estas cuando donde segun tiene tienen sera seran puede pueden todo toda todos todas otros otras mismo misma hacia hasta tambien solo solamente cualquier'.split(' '));
   const raices = (t) => [...new Set(BMS.norm(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 5 && !PARADAS.has(w)).map((w) => w.slice(0, 6)))];
   const valoresDe = (t) => [...String(t).matchAll(/(\d+(?:[.,]\d+)?)\s?(%|horas?|h\b|min\b|s\b|°c|pa\b|n\b|ppm|psi|gpm|kw|btu\/h|btu|hp|gb|aÃ±os?|año|años)/gi)].map((m) => ({ txt: m[0], n: m[1].replace(',', '.'), u: m[2].toLowerCase().replace(/^horas?$/, 'h') }));
-  const analizarEstandar = (texto) => String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l, i) => {
-    let ref = '', req = l;
+  const analizarEstandar = (texto) => String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l0, i) => {
+    let l = l0;
+    let ref = '', req;
+    if (BMS.trad && BMS.trad.esIngles(l)) l = BMS.trad.aEs(l);
+    req = l;
     if (l.includes('|')) { const k = l.indexOf('|'); ref = l.slice(0, k).trim(); req = l.slice(k + 1).trim(); }
     else { const m = /^(§?\s*\d[\w.\-]*)\s+(.*)$/.exec(l); if (m) { ref = m[1]; req = m[2]; } }
-    return { n: i + 1, ref, req };
+    return { n: i + 1, ref, req, orig: l0 };
   });
 
   function textoDelDocumento() {
@@ -126,7 +129,9 @@
       const rs = raices(r.req);
       const hit = rs.filter((x) => tdoc.has(x)), falt = rs.filter((x) => !tdoc.has(x));
       const vals = valoresDe(r.req);
-      const sinVal = vals.filter((v) => !compactoDoc.includes((v.n + v.u).toLowerCase().replace(/\s/g, '')) && !compactoDoc.includes(v.n.toLowerCase()));
+      const UN = { h: ['h', 'hora', 'horas'], min: ['min', 'minuto', 'minutos'], 'año': ['ano', 'anos'], 'años': ['ano', 'anos'] };
+      const hay = (v) => (UN[v.u] || [BMS.norm(v.u)]).some((u) => new RegExp('(?<![\d.])' + v.n.replace(/\./g, '\.') + u.replace(/[.*+?^${}()|[\]\\/]/g, '\$&')).test(compactoDoc));
+      const sinVal = vals.filter((v) => !hay(v));
       const cob = rs.length ? hit.length / rs.length : 1;
       const estado = cob >= 0.6 && !sinVal.length ? 'ok' : cob >= 0.3 || (cob >= 0.6 && sinVal.length) ? 'parcial' : 'falta';
       const palabras = falt.slice(0, 8).map((x) => { const w = BMS.norm(r.req).split(/[^a-z0-9]+/).find((y) => y.slice(0, 6) === x); return w || x; });
@@ -310,6 +315,62 @@
     return cuenta;
   }
 
+  /* ---------- biblioteca de redacción: párrafos de secuencia en español para los temas habituales del estándar del hotel ----------
+     Cada entrada se activa por palabras clave (en español o inglés) y toma del requisito los valores con unidad (minutos, %, °C, Pa…),
+     que quedan en rojo para validarlos contra los datos del diseño. */
+  const BIBLIOTECA = [
+    { k: ['unoccupied', 'purge', 'desocupad', 'ciclo de purga', 'outside air and exhaust'], es: 'Cuando la habitación permanece desocupada durante 20 minutos, el controlador de habitación cierra automáticamente las compuertas de aire exterior y de extracción y la habitación ejecuta un ciclo de purga de 1 hora. Mientras está desocupada, la temperatura y la humedad se mantienen en los valores de habitación desocupada y, al detectar ocupación, se restablece el modo normal.' },
+    { k: ['room controller', 'controlador de habitaci', 'key card', 'tarjeta de acceso', 'occupancy based', 'master lighting'], es: 'El controlador de habitación regula la temperatura, la ventilación mediante las compuertas de aire de reposición y de extracción, y la humedad, según la ocupación. Si el código lo exige, comanda también el relé maestro de iluminación por ocupación. Recibe del PMS el estado de renta y el de la cerradura de la puerta de entrada, está en red con el BMS y con la consola del operador del hotel, y no se permiten ranuras de tarjeta de acceso.' },
+    { k: ['doas', '100 % outside', '100% outside', 'energy recovery', 'recuperador', 'dedicated outdoor'], es: 'La unidad de aire exterior dedicado (DOAS) opera con 100 % de aire exterior y recuperador de energía, con ventiladores de velocidad variable. El BMS mantiene el espacio a 24 °C y 50 % de humedad relativa, modula la velocidad de los ventiladores y la recuperación de energía, y genera alarma ante falla de ventilador, filtro sucio o temperatura de suministro fuera de rango.' },
+    { k: ['demand', 'reset', 'demanda'], es: 'El BMS monitorea la demanda de cada zona y de cada sistema, detecta las zonas que fuerzan el reset del setpoint de suministro y permite al operador retirarlas del algoritmo. El reset se limita a los valores máximo y mínimo definidos por el diseño.' },
+    { k: ['feedback', 'retroaliment', 'command status'], es: 'Cada comando tiene al menos un estado de retroalimentación. Cuando el estado no coincide con el comando después del retardo definido, el BMS genera una alarma de falla de comando.' },
+    { k: ['analog input', 'entrada anal', 'high and low alarm', 'alarma alta'], es: 'Cada entrada analógica tiene al menos una alarma alta y una baja, con retardo y prioridad configurables. El BMS reserva 10 % de capacidad de puntos para ampliaciones.' },
+    { k: ['trend', 'tendencia', 'history', 'historial'], es: 'El BMS registra tendencias de todas las variables analógicas y de los estados, con retención de 1 año, y las muestra en gráficos que el operador puede exportar.' },
+    { k: ['alarm priority', 'prioridad de alarma', 'acknowledge', 'reconocimiento', 'alarms shall'], es: 'Las alarmas se clasifican por prioridad y se presentan con nivel, hora, usuario que las reconoce y comentario obligatorio para el cierre. Las alarmas críticas se notifican de inmediato al operador del hotel.' },
+    { k: ['schedule', 'calendar', 'horario', 'calendario'], es: 'Los horarios semanales y el calendario de excepciones se editan desde la interfaz web del BMS, con prioridad configurable y retorno automático al horario normal al terminar la excepción.' },
+    { k: ['loss of communication', 'loss of power', 'pérdida de comunicaci', 'perdida de energ', 'power failure'], es: 'Ante la pérdida de comunicación o de energía, los puntos afectados se marcan como no confiables, el BMS genera una alarma mayor y, al restablecerse la energía, los equipos rearrancan de forma escalonada para limitar la demanda.' },
+    { k: ['ups', 'uninterruptible', 'backup power', 'respaldo'], es: 'El servidor y los controladores cuentan con UPS de 4 horas de respaldo. El BMS avisa al operar en batería y genera alarma mayor por falla o batería baja.' },
+    { k: ['server', 'servidor', 'graphics', 'gráficos', 'workstation', 'web client', 'cliente web', 'password', 'contraseña'], es: 'El servidor central del BMS ofrece gráficos a color, una pantalla por equipo o zona y un resumen por piso con color según la desviación de la temperatura respecto del setpoint. El acceso del cliente web es por usuario y contraseña con niveles de acceso, y la sesión se cierra automáticamente por inactividad.' },
+    { k: ['laptop', 'portátil', 'portatil', 'service port', 'puerto de conexi'], es: 'Cada tablero de controladores cuenta con un puerto de conexión para laptop que permite ajustar los setpoints y revisar el estado localmente.' },
+    { k: ['bacnet', 'btl', 'object', 'objeto'], es: 'La red es BACnet/IP sobre Ethernet entre servidor, controladores y gateways. Todo punto, horario, setpoint, tendencia y alarma se expone como objeto BACnet, y los controladores, estaciones y componentes están listados por BACnet Testing Laboratories (BTL).' },
+    { k: ['fuel', 'combustible', 'tank', 'tanque', 'overfill', 'sobrellenado', 'interstitial'], es: 'El BMS monitorea el nivel remoto del tanque de combustible, la detección de fugas, el monitoreo intersticial y la protección contra sobrellenado, con autonomía de 8 horas a plena carga, y genera alarma por nivel bajo, fuga o sobrellenado.' },
+    { k: ['smoke', 'humo', 'stair', 'escalera', 'pressurization', 'presuriz'], es: 'Ante una señal del FACP, el sistema de control de humo presuriza las escaleras a un mínimo de 12.5 Pa, con una fuerza de apertura de puertas no mayor a 133 N. El BMS supervisa los estados y las alarmas, y no puede anular las funciones de seguridad de vida.' },
+    { k: ['facp', 'fire alarm', 'alarma de incendio', 'life safety', 'seguridad de vida'], es: 'El BMS recibe las señales del FACP y no puede silenciarlas ni reponerlas; las funciones de seguridad de vida las ejecuta el FACP. Ante una alarma de incendio, el BMS detiene los equipos definidos en la matriz causa-efecto y registra el evento.' },
+    { k: ['water meter', 'medición de agua', 'water consumption', 'flow totalizer', 'leak alarm'], es: 'El BMS mide el caudal de agua con totalizador cada hora y genera alarma de fuga cuando detecta consumo continuo fuera de horario.' },
+    { k: ['submeter', 'submedici', 'electrical meter', 'energy meter', 'medidor de energ'], es: 'El BMS registra la submedición eléctrica por tableros de HVAC, iluminación, fuerza, cocina y lavandería, con demanda y consumo cada hora.' },
+    { k: ['ashrae guideline 202', 'commissioning', 'acceptance test', 'pruebas de aceptaci', 'third party', 'tercero'], es: 'Las pruebas de aceptación las realiza un tercero según ASHRAE Guideline 202, sobre todo el equipo central y una muestra estadística de las unidades terminales.' },
+    { k: ['required if', 'central plant', 'planta central', 'bas is required', 'bas es obligatorio'], es: 'El BAS es obligatorio si hay una planta central o un VRF que atienda más de tres zonas con 300 000 Btu/h (50 t) o más, o sistemas con más de tres zonas y ventiladores de 10 hp o más.' }
+  ];
+  /* pone en el párrafo de la biblioteca los valores que trae el requisito (misma unidad) y los marca en rojo para validarlos */
+  function aplicarValores(es, reqOriginal) {
+    const vals = [...String(reqOriginal).matchAll(BMS.trad.NUM_UN)].map((m) => ({ n: m[1], u: m[2].toLowerCase().replace(/^(hours?|horas?|h)$/, 'h').replace(/^(minutes?|minutos?|min)$/, 'min').replace(/^(years?|años?)$/, 'a'), txt: m[0] }));
+    const usados = new Set();
+    return es.replace(BMS.trad.NUM_UN, (m, n, u) => {
+      const uk = u.toLowerCase().replace(/^(hours?|horas?|h)$/, 'h').replace(/^(minutes?|minutos?|min)$/, 'min').replace(/^(years?|años?)$/, 'a');
+      const i = vals.findIndex((v, j) => !usados.has(j) && v.u === uk);
+      if (i >= 0) { usados.add(i); return '!!' + vals[i].n + m.slice(n.length) + '!!'; }
+      return '!!' + m + '!!';
+    });
+  }
+  function redactarRequisito(reqEs, reqOriginal) {
+    const base = (reqOriginal || reqEs), low = BMS.norm(base) + ' ' + BMS.norm(reqEs);
+    let mejor = null, pm = 0;
+    BIBLIOTECA.forEach((e) => { const sc = e.k.filter((k) => low.includes(BMS.norm(k))).length; if (sc > pm) { pm = sc; mejor = e; } });
+    if (mejor && pm >= 1) return aplicarValores(mejor.es, base);
+    return null;
+  }
+
+  /* convierte un requisito del estándar en un párrafo de secuencia en español; los valores del estándar quedan en rojo para validarlos con el diseño */
+  function redactar(req) {
+    let t = String(req).replace(/\s+/g, ' ').trim().replace(/^[a-z]\.\s+/i, '');
+    t = t.replace(/\b(\p{L}+s)\s+(también\s+|automáticamente\s+)?debe\b/giu, (m, a, b) => a + ' ' + (b || '') + 'deben');
+    t = t.replace(/\bdebe automáticamente\b/gi, 'debe de forma automática').replace(/\bdeben automáticamente\b/gi, 'deben de forma automática');
+    t = t.replace(BMS.trad.NUM_UN, (m) => '!!' + m + '!!');
+    t = t.replace(/\b(\w+)\s+!!/g, '$1 !!').replace(/!!\s*!!/g, '');
+    t = t.charAt(0).toUpperCase() + t.slice(1);
+    return /[.;:]$/.test(t.replace(/!!$/, '')) ? t : t + '.';
+  }
+
   /* ---------- completar la secuencia: redacta lo que falta para cumplir el estándar y deja en rojo lo que se debe actualizar ---------- */
   function completarSecuencia(S) {
     const E = BMS.estado, res = BMS.calc.todo(), cuenta = { secciones: 0, redactados: 0, requisitos: 0 };
@@ -340,14 +401,15 @@
     });
     /* 2. requisitos del estándar que las secuencias no cubren: se agrega un párrafo en la sección del tema, con lo pendiente en rojo */
     const v = validar(true), titulos = () => S.bloques.map((b, i) => ({ b, i })).filter((x) => x.b.t === 'h1');
-    const yaEsta = (r) => { const k = BMS.norm(r.req).slice(0, 50); return S.bloques.some((b) => BMS.norm(b.texto || '').includes(k)); };
+    const yaEsta = (r) => S.bloques.some((b) => b.req === r.req);
     const pendientes = v.reqs.filter((r) => r.estado !== 'ok' && !yaEsta(r));
     let general = S.bloques.findIndex((b) => b.t === 'h1' && /Requisitos del estándar por incorporar/i.test(b.texto));
     pendientes.forEach((r) => {
       const rr = raices(r.req); let mejor = -1, pm = 0;
       titulos().forEach((x) => { if (/^\s*Anexo\b/i.test(x.b.texto) || /Requisitos del estándar por incorporar/i.test(x.b.texto)) return; const rs = raices(x.b.texto); const sc = rs.filter((q) => rr.includes(q)).length; if (sc > pm) { pm = sc; mejor = x.i; } });
-      const nota = r.estado === 'parcial' ? 'Cubierto en parte: ' + r.obs : 'No cubierto todavía.';
-      const li = { t: 'li', texto: (r.ref ? r.ref + ': ' : '') + r.req.replace(/[.;]\s*$/, '') + '. !!' + nota.replace(/!!/g, '') + ' Redactar cómo la secuencia lo cumple y confirmar los valores.!!' };
+      const txt = redactarRequisito(r.req, r.orig) || ('!!' + redactar(r.req).replace(/!!/g, '') + '!!');
+      if (S.bloques.some((b) => b.texto === txt)) return;
+      const li = { t: 'li', req: r.req, texto: txt };
       if (mejor >= 0) { let f = mejor + 1; while (f < S.bloques.length && S.bloques[f].t !== 'h1') f++; S.bloques.splice(f, 0, li); }
       else {
         if (general < 0) { let a = S.bloques.findIndex((b) => b.t === 'h1' && /^\s*Anexo\b/i.test(b.texto)); if (a < 0) a = S.bloques.length; S.bloques.splice(a, 0, { t: 'h1', texto: 'Requisitos del estándar por incorporar' }, { t: 'p', texto: 'Requisitos del estándar del hotel sobre operación y control que las secuencias deben tratar. Lo marcado en rojo se debe redactar o confirmar antes de emitir.' }); general = a; }
@@ -381,10 +443,14 @@
         const mios = bloquesDe(S.bloques, doc);
         const letra0 = letraSiguiente(mios);
         const anexos = doc === 'bms' && ['b', 'c', 'd', 'e', 'f'].some((k) => S.opciones[k]) ? await generarAnexos(S.opciones, letra0) : [];
-        const portada = S.portada.map((x) => resolverTexto(x));
+        let portada = S.portada.map((x) => resolverTexto(x));
         if (doc === 'inc' && /^Secuencias de operación del BMS\/BAS$/i.test((portada[1] || '').trim())) portada[1] = 'Secuencias de operación del sistema de alarma contra incendio';
-        const blob = await BMS.exportarSecuenciasDocx(doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación', portada, [...resolverBloques(mios), ...anexos]);
-        BMS.descargar((doc === 'inc' ? 'Secuencias_alarma_contra_incendio_' : 'Secuencias_de_operacion_BMS_') + (E.proyecto.nombre || 'proyecto').replace(/[^\w\-]+/g, '_') + '.docx', blob);
+        const en = S.opciones.idioma === 'en';
+        let titulo = doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación', bl = [...resolverBloques(mios), ...anexos];
+        BMS.docxLang = en ? 'en' : 'es';
+        if (en) { portada = portada.map((x) => BMS.trad.aEn(x)); bl = BMS.trad.bloques(bl); titulo = doc === 'inc' ? 'Fire alarm sequences' : 'Sequences of operation'; if (bl.pendientes) estado.textContent = bl.pendientes + ' texto(s) sin traducir quedaron en rojo en el Word…'; }
+        const blob = await BMS.exportarSecuenciasDocx(titulo, portada, bl);
+        BMS.descargar((S.opciones.idioma === 'en' ? (doc === 'inc' ? 'Fire_alarm_sequences_' : 'Sequences_of_operation_') : doc === 'inc' ? 'Secuencias_alarma_contra_incendio_' : 'Secuencias_de_operacion_BMS_') + (E.proyecto.nombre || 'proyecto').replace(/[^\w\-]+/g, '_') + '.docx', blob);
         estado.textContent = 'Documento exportado (' + Math.round(blob.size / 1024) + ' KB).';
       } catch (e) { estado.textContent = ''; alert('No se pudo exportar: ' + e.message); }
     };
@@ -438,7 +504,8 @@
         const S = BMS.estado.secuencias, lineas = [], fallos = [];
         for (const f of fs) { try { const l = await lineasDe(f); lineas.push(...l); } catch (e) { fallos.push(f.name + ': ' + e.message); } }
         if (!lineas.length) { alert('No se pudo leer texto de los archivos.' + (fallos.length ? '\n' + fallos.join('\n') : '')); return; }
-        const total = lineas.length, utiles = soloOperacion(lineas);
+        const total = lineas.length; lineas.splice(0, lineas.length, ...lineas.map((l) => (BMS.trad.esIngles(l) ? BMS.trad.aEs(l) : l)));
+        const utiles = soloOperacion(lineas);
         if (!utiles.length) { alert('No se encontraron requisitos de operación y control en el PDF (' + total + ' líneas leídas). Pegue en el cuadro los requisitos que quiere validar.'); return; }
         lineas.splice(0, lineas.length, ...utiles);
         alert('Del PDF se tomaron ' + utiles.length + ' requisitos de operación y control (de ' + total + ' líneas leídas). Revise la lista y quite o agregue líneas en el cuadro si hace falta.');
@@ -473,7 +540,7 @@
       h('button', { class: 'b p', title: 'Redacta lo que falta para cumplir el estándar del hotel: completa las secciones por sistema con las variables del proyecto y agrega los requisitos no cubiertos. Lo que se debe actualizar queda en rojo', onclick: () => {
         if (!S.estandar.texto.trim() && !confirm('No hay estándar del hotel cargado; solo se completarán las secciones del proyecto. ¿Continuar?')) return;
         const c = completarSecuencia(S); validar(true); BMS.touch(); BMS.rerender();
-        setTimeout(() => alert('Secuencia completada: ' + c.secciones + ' sección(es) nueva(s), ' + c.redactados + ' párrafo(s) redactado(s) con las variables del proyecto y ' + c.requisitos + ' requisito(s) del estándar agregado(s). Lo marcado en rojo debe revisarse, actualizarse o confirmarse antes de emitir.'), 50);
+        setTimeout(() => alert('Secuencia completada: ' + c.secciones + ' sección(es) nueva(s), ' + c.redactados + ' párrafo(s) redactado(s) con las variables del proyecto y ' + c.requisitos + ' requisito(s) del estándar redactado(s) como secuencia. Los datos que debe validar con el diseño quedan en rojo.'), 50);
       } }, 'Completar la secuencia'),
       h('button', { class: 'b', title: 'Sube el PDF del estándar del hotel para validar las secuencias', onclick: () => { BMS.ui.secSel = -2; cargarEstandar(); } }, 'Subir estándar del hotel (PDF)'),
       h('button', { class: 'b x', onclick: () => { if (confirm('¿Vaciar las secuencias de operación? (el estándar del hotel se conserva)')) { const est = S.estandar; E.secuencias = inicial(); E.secuencias.estandar = est; BMS.ui.secSel = -1; BMS.touch(); BMS.rerender(); } } }, 'Vaciar'), estado);
@@ -519,6 +586,7 @@
           campo('Proyecto y ubicación', 0, '{{proyecto}} — {{ubicacion}}'), campo('Título del documento', 1), campo('Entregable / referencia', 2, 'Entregable 60 % — Comentario #…'), campo('Autor · fecha · estado', 3, 'Sinergia Ingeniería · fecha · Borrador'), campo('Nota inicial', 4, 'Aclaración sobre valores entre corchetes'))),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Anexos generados al exportar'),
           h('p', { class: 'hint' }, 'Se generan con los datos actuales del proyecto (niveles, controladores, equipos, marca y reserva) y siguen la letra del último anexo del documento. Van en hojas apaisadas.'),
+          h('label', { class: 'f', style: { maxWidth: '320px', marginBottom: '10px' } }, 'Idioma del documento exportado', h('select', { class: 'in', value: S.opciones.idioma || 'es', onchange: (e) => { S.opciones.idioma = e.target.value; guardar(); } }, h('option', { value: 'es' }, 'Español'), h('option', { value: 'en' }, 'English (traducción con glosario; lo no traducido sale en rojo)'))),
           h('div', { style: { display: 'grid', gap: '6px' } }, casilla('Diagrama unifilar (imagen en partes a ancho de hoja)', 'b'), casilla('Resumen de variables por sistema y por tipo de equipo, y totales por nivel', 'c'), casilla('Lista de controladores, dispositivos de red y materiales', 'd'), casilla('Variables por controlador (equipos y puntos)', 'e'), casilla('   … detallando cada variable por controlador (documento más largo)', 'detalle'), casilla('Validación contra el estándar del hotel (observaciones)', 'f'))));
     } else {
       const bi = ini[sel], fin = sel + 1 < ini.length ? ini[sel + 1] : S.bloques.length;
@@ -577,7 +645,7 @@
     S.estandar.texto = txt(S.estandar.texto); S.estandar.nombre = txt(S.estandar.nombre);
     /* un estándar largo guardado antes del filtro se reduce una vez a los requisitos de operación y control */
     const ls = S.estandar.texto.split(/\r?\n/).filter(Boolean);
-    if (!S.estandar.filtrado && ls.length > 60) { S.estandar.texto = soloOperacion(ls).join('\n'); S.estandar.filtrado = true; BMS.touch(); }
+    if (!S.estandar.filtrado && ls.length > 60) { S.estandar.texto = soloOperacion(ls.map((l) => (BMS.trad.esIngles(l) ? BMS.trad.aEs(l) : l))).join('\n'); S.estandar.filtrado = true; BMS.touch(); }
   }
   BMS.pSecuencias = (root) => {
     try { sanear(BMS.estado); return pagina(root); } catch (e) {

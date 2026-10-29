@@ -12,7 +12,7 @@
   const ALTO_H = 6600;                                 // alto máximo de una figura en hoja apaisada (twips), dejando lugar al título y al pie
   const esc = (t) => String(t == null ? '' : t).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  const run = (t, o = {}) => '<w:r>' + (o.b || o.i || o.color || o.hl || o.rojo ? '<w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.rojo ? '<w:color w:val="C00000"/>' : o.color ? '<w:color w:val="' + o.color + '"/>' : '') + (o.hl ? '<w:highlight w:val="yellow"/>' : '') + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(t) + '</w:t></w:r>';
+  const run = (t, o = {}) => '<w:r>' + (o.b || o.i || o.color || o.hl || o.rojo ? '<w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.rojo || o.hl ? '<w:color w:val="C00000"/>' : o.color ? '<w:color w:val="' + o.color + '"/>' : '') + '' + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(t) + '</w:t></w:r>';
   /* **negrita**, ==resaltado amarillo== (por validar), !!rojo!! (lo que debe modificarse); lo que va entre [corchetes] se resalta solo */
   const runs = (texto, o = {}) => {
     let b = false, hl = false, rojo = false, out = '';
@@ -47,7 +47,7 @@
     const align = b.align || Array.from({ length: n }, (_, c) => (filas.slice(1).filter((f) => f[c] != null && String(f[c]).trim() !== '').length && filas.slice(1).filter((f) => f[c] != null && String(f[c]).trim() !== '').every((f) => esNum(f[c])) ? 'r' : 'l'));
     let x = '';
     ctx.tablas = (ctx.tablas || 0) + 1;
-    x += '<w:p><w:pPr><w:pStyle w:val="TablaTitulo"/></w:pPr><w:r><w:t xml:space="preserve">Tabla No. </w:t></w:r>' + campoSeq('Tabla', ctx.tablas) + '</w:p>';
+    x += '<w:p><w:pPr><w:pStyle w:val="TablaTitulo"/></w:pPr><w:r><w:t xml:space="preserve">' + (BMS.docxLang === 'en' ? 'Table No. ' : 'Tabla No. ') + '</w:t></w:r>' + campoSeq('Tabla', ctx.tablas) + '</w:p>';
     x += '<w:p><w:pPr><w:pStyle w:val="TablaTitulo"/><w:spacing w:before="0"/></w:pPr>' + runs(b.titulo || 'Tabla de datos') + '</w:p>';
     if (b.fuente) x += P(b.fuente, { estilo: 'TablaFuente' });
     x += '<w:tbl><w:tblPr><w:tblStyle w:val="TablaSinergia"/><w:tblW w:w="' + ancho + '" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblLook w:val="0420" w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid>' + w.map((v) => '<w:gridCol w:w="' + v + '"/>').join('') + '</w:tblGrid>';
@@ -82,15 +82,15 @@
     const out = [];
     for (let i = 0; i < bloques.length; i++) {
       const b = bloques[i];
-      if (b.t === 'p' && /^tabla\s+no\.?\s*\d*\s*$/i.test(String(b.texto).trim())) {
+      if (b.t === 'p' && /^(tabla|table)\s+no\.?\s*\d*\s*$/i.test(String(b.texto).trim())) {
         const sig = bloques[i + 1];
         const titulo = sig && sig.t === 'p' ? sig.texto : '';
         const tab = bloques[i + (titulo ? 2 : 1)];
         if (tab && tab.t === 'tabla') { out.push({ ...tab, titulo: tab.titulo || titulo }); i += titulo ? 2 : 1;
-          const nx = bloques[i + 1]; if (nx && nx.t === 'p' && /^(fuente|nota)\b/i.test(String(nx.texto).trim())) { out[out.length - 1].nota = nx.texto; i++; }
+          const nx = bloques[i + 1]; if (nx && nx.t === 'p' && /^(fuente|nota|source|note)\b/i.test(String(nx.texto).trim())) { out[out.length - 1].nota = nx.texto; i++; }
           continue; }
       }
-      if (b.t === 'tabla' && !b.titulo) { const u = out[out.length - 1]; if (u && u.t === 'p' && String(u.texto).length <= 80 && !/^tabla\s+no/i.test(u.texto)) { out.pop(); out.push({ ...b, titulo: String(u.texto).replace(/[:.]\s*$/, '') }); continue; } }
+      if (b.t === 'tabla' && !b.titulo) { const u = out[out.length - 1]; if (u && u.t === 'p' && String(u.texto).length <= 80 && !/^(tabla|table)\s+no/i.test(u.texto)) { out.pop(); out.push({ ...b, titulo: String(u.texto).replace(/[:.]\s*$/, '') }); continue; } }
       out.push(b);
     }
     return out;
