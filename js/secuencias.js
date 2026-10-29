@@ -356,19 +356,19 @@
       if (/\.pdf$/i.test(f.name)) return lineasPdf(buf);
       return lineasExcel(buf);
     }
-    function cargarEstandar(carpeta) {
+    function cargarEstandar() {
       const inp = document.createElement('input'); inp.type = 'file';
-      if (carpeta) inp.webkitdirectory = true; else { inp.multiple = true; inp.accept = '.txt,.md,.csv,.docx,.xlsx,.xls,.xlsm,.pdf'; }
+      inp.accept = '.pdf,application/pdf';
       inp.addEventListener('change', async () => {
-        const fs = [...inp.files].filter((f) => EXT_EST.test(f.name)).sort((a, b) => a.name.localeCompare(b.name));
-        if (!fs.length) { alert('No se encontraron archivos de Excel, Word, PDF o texto.'); return; }
+        const fs = [...inp.files].filter((f) => /\.pdf$/i.test(f.name)).sort((a, b) => a.name.localeCompare(b.name));
+        if (!fs.length) { alert('Seleccione un archivo PDF.'); return; }
         const S = BMS.estado.secuencias, lineas = [], fallos = [];
         for (const f of fs) { try { const l = await lineasDe(f); lineas.push(...l); } catch (e) { fallos.push(f.name + ': ' + e.message); } }
         if (!lineas.length) { alert('No se pudo leer texto de los archivos.' + (fallos.length ? '\n' + fallos.join('\n') : '')); return; }
         let agregar = false;
         if ((S.estandar.texto || '').trim()) agregar = !confirm('Ya hay requisitos cargados.\n\nAceptar = reemplazarlos con ' + fs.length + ' archivo(s).\nCancelar = agregar al final.');
         S.estandar.texto = (agregar ? S.estandar.texto.replace(/\s+$/, '') + '\n' : '') + lineas.join('\n');
-        const nom = carpeta ? ((fs[0].webkitRelativePath || '').split('/')[0] || 'Carpeta') : (fs.length === 1 ? fs[0].name.replace(/\.\w+$/, '') : fs.length + ' archivos');
+        const nom = fs[0].name.replace(/\.\w+$/, '');
         if (!agregar || !S.estandar.nombre) S.estandar.nombre = nom;
         guardar(); BMS.rerender();
         if (fallos.length) alert('Se cargaron ' + (fs.length - fallos.length) + ' archivo(s). No se pudieron leer:\n' + fallos.join('\n'));
@@ -407,12 +407,11 @@
       const conteo = (c) => h('span', null, h('span', { class: 'chip ok' }, c.ok + ' cumplen'), ' ', h('span', { class: 'chip warn' }, c.parcial + ' parciales'), ' ', h('span', { class: 'chip bad' }, c.falta + ' no cumplen'));
       derecha = h('div', null,
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Estándar del hotel'),
-          h('p', { class: 'hint' }, 'Pegue los requisitos del estándar del hotel, o cárguelos desde archivos de Excel, Word, PDF o texto (uno o varios, o una carpeta completa), uno por línea (opcional: "referencia | requisito"). La herramienta revisa en vivo si las secuencias los tratan y con qué valores, y señala lo que falta. Se preasigna una base de requisitos Fairfield CALA tomada del documento de secuencias; reemplácela por el texto del estándar.'),
+          h('p', { class: 'hint' }, 'Pegue los requisitos del estándar del hotel, o cárguelos desde un PDF, uno por línea (opcional: "referencia | requisito"). La herramienta revisa en vivo si las secuencias los tratan y con qué valores, y señala lo que falta. Se preasigna una base de requisitos Fairfield CALA tomada del documento de secuencias; reemplácela por el texto del estándar.'),
           h('label', { class: 'f' }, 'Nombre del estándar', h('input', { class: 'in', value: S.estandar.nombre || '', onchange: (e) => { S.estandar.nombre = e.target.value; guardar(); } })),
           h('label', { class: 'f', style: { marginTop: '8px' } }, 'Requisitos (uno por línea)', h('textarea', { class: 'in', rows: 12, style: { width: '100%' }, value: S.estandar.texto || '', onchange: (e) => { S.estandar.texto = e.target.value; guardar(); BMS.rerender(); } })),
           h('div', { class: 'fila' },
-            h('button', { class: 'b', onclick: () => cargarEstandar(false) }, 'Cargar archivos (Excel, Word, PDF, TXT)'),
-            h('button', { class: 'b', onclick: () => cargarEstandar(true) }, 'Cargar carpeta…'),
+            h('button', { class: 'b', onclick: () => cargarEstandar() }, 'Cargar estándar (PDF)'),
             h('button', { class: 'b', onclick: () => { if (!S.estandar.texto || confirm('Esto reemplaza los requisitos actuales por la base Fairfield CALA. ¿Continuar?')) { S.estandar.texto = ESTANDAR_BASE; S.estandar.nombre = 'Estándar Fairfield CALA (abril 2026)'; guardar(); BMS.rerender(); } } }, 'Usar la base Fairfield CALA'),
             h('button', { class: 'b', onclick: () => { validar(true); BMS.rerender(); } }, 'Revalidar'))),
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Comprobaciones del proyecto'), h('div', { class: 'fila' }, conteo(val.cuentaPr)),
