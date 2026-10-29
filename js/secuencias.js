@@ -90,13 +90,15 @@
     return { todo: BMS.norm(todo), propio: BMS.norm(propio), crudo: bl };
   }
 
+  const MAX_REQ = 600; /* tope de requisitos revisados, para que un estándar muy largo no deje la página lenta */
   function validar() {
     const E = BMS.estado, S = E.secuencias, P = E.proyecto, C = BMS.calc, res = C.todo(), mot = C.motor(res, P.marca);
     const doc = textoDelDocumento();
-    const reqs = analizarEstandar(S.estandar && S.estandar.texto).map((r) => {
-      const rs = raices(r.req), tdoc = new Set(raices(doc.todo));
+    const tdoc = new Set(raices(doc.todo)), compactoDoc = doc.todo.replace(/\s+/g, '').replace(/,/g, '.');
+    const reqs = analizarEstandar(S.estandar && S.estandar.texto).slice(0, MAX_REQ).map((r) => {
+      const rs = raices(r.req);
       const hit = rs.filter((x) => tdoc.has(x)), falt = rs.filter((x) => !tdoc.has(x));
-      const vals = valoresDe(r.req), compactoDoc = doc.todo.replace(/\s+/g, '').replace(/,/g, '.');
+      const vals = valoresDe(r.req);
       const sinVal = vals.filter((v) => !compactoDoc.includes((v.n + v.u).toLowerCase().replace(/\s/g, '')) && !compactoDoc.includes(v.n.toLowerCase()));
       const cob = rs.length ? hit.length / rs.length : 1;
       const estado = cob >= 0.6 && !sinVal.length ? 'ok' : cob >= 0.3 || (cob >= 0.6 && sinVal.length) ? 'parcial' : 'falta';
