@@ -75,14 +75,16 @@
   const PARADAS = new Set('para como cada debe deben desde sobre entre este esta estos estas cuando donde segun tiene tienen sera seran puede pueden todo toda todos todas otros otras mismo misma hacia hasta tambien solo solamente cualquier'.split(' '));
   const raices = (t) => [...new Set(BMS.norm(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 5 && !PARADAS.has(w)).map((w) => w.slice(0, 6)))];
   const valoresDe = (t) => [...String(t).matchAll(/(\d+(?:[.,]\d+)?)\s?(%|horas?|h\b|min\b|s\b|°c|pa\b|n\b|ppm|psi|gpm|kw|btu\/h|btu|hp|gb|aÃ±os?|año|años)/gi)].map((m) => ({ txt: m[0], n: m[1].replace(',', '.'), u: m[2].toLowerCase().replace(/^horas?$/, 'h') }));
-  const analizarEstandar = (texto) => String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l0, i) => {
-    let l = l0;
-    let ref = '', req;
-    if (BMS.trad && BMS.trad.esIngles(l)) l = BMS.trad.aEs(l);
-    req = l;
+  const partirRef = (l) => {
+    let ref = '', req = l;
     if (l.includes('|')) { const k = l.indexOf('|'); ref = l.slice(0, k).trim(); req = l.slice(k + 1).trim(); }
     else { const m = /^(§?\s*\d[\w.\-]*)\s+(.*)$/.exec(l); if (m) { ref = m[1]; req = m[2]; } }
-    return { n: i + 1, ref, req, orig: l0 };
+    return { ref, req };
+  };
+  /* req = texto como está en el estándar; reqM = versión en español (por glosario si sigue en inglés) que se usa solo para comparar con las secuencias */
+  const analizarEstandar = (texto) => String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l0, i) => {
+    const a = partirRef(l0), ing = BMS.trad && BMS.trad.esIngles(l0);
+    return { n: i + 1, ref: a.ref, req: a.req, reqM: ing ? partirRef(BMS.trad.aEs(l0)).req : a.req, orig: l0 };
   });
 
   function textoDelDocumento(dd = docActual()) {
@@ -98,11 +100,12 @@
   /* del estándar completo del hotel solo interesan los requisitos que tocan la operación y el control (secuencias, alarmas, horarios, setpoints, BMS…) */
   const TEMAS = ['secuenc', 'operaci', 'opera ', 'control', 'alarm', 'setpoint', 'set point', 'set-point', 'horari', 'bacnet', 'tendenc', 'reset', 'arranque', 'apagad', 'encendid', 'comando', 'retroaliment', 'monitor', 'bms', 'bas ', 'automatiz', 'ocupad', 'enclavamiento', 'interlock', 'prioridad', 'rearranque', 'modo ', 'sensor', 'calendario', 'deshabilit', 'habilit', 'supervis', 'grms', 'pms', 'lazo', 'pid', 'sequence', 'schedule', 'trend'];
   const VERBOS = /\b(debe|deben|deber[aá]|deber[aá]n|requiere|requieren|ser[aá]|ser[aá]n|se debe|shall|must|should|no podr[aá]|tendr[aá]|proveer|contar[aá]|permit)\b/i;
-  function soloOperacion(lineas) {
+  function indicesOperacion(lineas) {
     /* encabezados y pies de página (se repiten) y líneas duplicadas se descartan */
     const cuenta = new Map(); lineas.forEach((l) => { const k = l.replace(/\d+/g, '#'); cuenta.set(k, (cuenta.get(k) || 0) + 1); });
     const vistos = new Set();
-    return lineas.filter((l) => {
+    return lineas.map((_, i) => i).filter((i) => {
+      const l = lineas[i];
       const k = l.replace(/\d+/g, '#'); if ((cuenta.get(k) >= 3 && l.length < 90) || vistos.has(l)) return false; vistos.add(l);
       const n = ' ' + BMS.norm(l) + ' ';
       if (n.length < 60) return false;
@@ -110,6 +113,7 @@
       return t >= 3 || (t >= 1 && VERBOS.test(l));
     });
   }
+  const soloOperacion = (lineas) => indicesOperacion(lineas).map((i) => lineas[i]);
   /* el documento se separa en dos: secuencias del BMS y secuencias del sistema de alarma contra incendio */
   const ES_INC = /incend|facp|humo|presuriz|rociador|sprinkler|nfpa|escalera|detecci[o]n de/;
   const docDe = (h1) => (h1.doc === 'inc' || h1.doc === 'bms' ? h1.doc : (!/^\s*Anexo\b/i.test(h1.texto || '') && ES_INC.test(BMS.norm(h1.texto || '')) ? 'inc' : 'bms'));
@@ -141,15 +145,15 @@
     const doc = textoDelDocumento(dd), bl = bloquesDe(S.bloques, dd);
     const tdoc = new Set(raices(doc.todo)), compactoDoc = doc.todo.replace(/\s+/g, '').replace(/,/g, '.');
     const reqs = requisitosDe(S, dd).slice(0, MAX_REQ).map((r) => {
-      const rs = raices(r.req);
+      const rs = raices(r.reqM);
       const hit = rs.filter((x) => tdoc.has(x)), falt = rs.filter((x) => !tdoc.has(x));
-      const vals = valoresDe(r.req);
+      const vals = valoresDe(r.reqM);
       const UN = { h: ['h', 'hora', 'horas'], min: ['min', 'minuto', 'minutos'], 'año': ['ano', 'anos'], 'años': ['ano', 'anos'] };
       const hay = (v) => (UN[v.u] || [BMS.norm(v.u)]).some((u) => new RegExp('(?<![\d.])' + v.n.replace(/\./g, '\.') + u.replace(/[.*+?^${}()|[\]\\/]/g, '\$&')).test(compactoDoc));
       const sinVal = vals.filter((v) => !hay(v));
       const cob = rs.length ? hit.length / rs.length : 1;
       const estado = cob >= 0.6 && !sinVal.length ? 'ok' : cob >= 0.3 || (cob >= 0.6 && sinVal.length) ? 'parcial' : 'falta';
-      const palabras = falt.slice(0, 8).map((x) => { const w = BMS.norm(r.req).split(/[^a-z0-9]+/).find((y) => y.slice(0, 6) === x); return w || x; });
+      const palabras = falt.slice(0, 8).map((x) => { const w = BMS.norm(r.reqM).split(/[^a-z0-9]+/).find((y) => y.slice(0, 6) === x); return w || x; });
       const obs = estado === 'ok' ? 'Cubierto en las secuencias.' : [palabras.length ? 'Sin tratar en las secuencias: ' + palabras.join(', ') + '.' : '', sinVal.length ? 'No aparece el valor del estándar: ' + sinVal.map((v) => v.txt).join(', ') + '.' : ''].filter(Boolean).join(' ');
       return { ...r, estado, cob, obs };
     });
@@ -394,25 +398,37 @@
   /* un solo idioma en el documento: lo que esté en inglés se pasa a español (con la biblioteca de redacción o, si no hay tema, por glosario y en rojo);
      también se quitan los comentarios que dejaba una versión anterior de «Completar la secuencia» */
   const LIMPIAR = /\s*!!(?:No cubierto todavía\.|Cubierto en parte:)[^!]*!!/g;
-  function textoEnEspanol(t) {
+  const partesDe = (x) => String(x == null ? '' : x).replace(LIMPIAR, '').trim().split(/(?<=[.;])\s+/);
+  const sinMarcas = (q) => q.replace(/!!|\*\*|==/g, '');
+  function textoEnEspanol(t, mapa) {
     let x = String(t == null ? '' : t).replace(LIMPIAR, '').trim();
     if (!x || !BMS.trad) return x;
-    const marcado = /!!/.test(x);
     const partes = x.split(/(?<=[.;])\s+/);
-    const ing = partes.filter((q) => BMS.trad.esIngles(q.replace(/!!|\*\*|==/g, '')));
+    const ing = partes.filter((q) => BMS.trad.esIngles(sinMarcas(q)));
     if (!ing.length) return x;
+    const rojo = (q) => String(q).replace(BMS.trad.NUM_UN, (m) => '!!' + m + '!!');
+    if (mapa && ing.every((q) => mapa.has(sinMarcas(q)))) return partes.map((q) => (BMS.trad.esIngles(sinMarcas(q)) ? rojo(mapa.get(sinMarcas(q))) : q)).join(' ');
     if (ing.length >= partes.length / 2) {
-      const lim = x.replace(/!!|\*\*|==/g, '').replace(/^[a-z]\.\s+/i, '');
+      const lim = sinMarcas(x).replace(/^[a-z]\.\s+/i, '');
       const lib = redactarRequisito(BMS.trad.aEs(lim), lim);
       if (lib) return lib;
       return '!!' + BMS.trad.aEs(lim).replace(/\s+/g, ' ') + '!!';
     }
-    return partes.map((q) => (BMS.trad.esIngles(q.replace(/!!|\*\*|==/g, '')) ? '!!' + BMS.trad.aEs(q.replace(/!!|\*\*|==/g, '')) + '!!' : q)).join(' ');
+    return partes.map((q) => (BMS.trad.esIngles(sinMarcas(q)) ? '!!' + BMS.trad.aEs(sinMarcas(q)) + '!!' : q)).join(' ');
   }
-  function unificarEspanol(bl) {
+  /* un solo idioma: lo que esté en inglés se traduce con el traductor del navegador; si no hay, por biblioteca o glosario (en rojo) */
+  async function unificarEspanol(bl, tr) {
+    let mapa = null;
+    if (tr) {
+      const set = new Set();
+      const ver = (x) => partesDe(x).forEach((q) => { if (BMS.trad.esIngles(sinMarcas(q))) set.add(sinMarcas(q)); });
+      bl.forEach((b) => { if (b.t === 'tabla') b.filas.forEach((f) => f.forEach((c) => { if (String(c).split(/\s+/).length >= 5) ver(c); })); else if (b.texto != null && (b.t === 'p' || b.t === 'li' || b.t === 'h2')) ver(b.texto); });
+      const lista = [...set], tra = await BMS.trad.traducirLineas(tr, lista);
+      mapa = new Map(lista.map((q, i) => [q, tra[i]]));
+    }
     return bl.map((b) => {
-      if (b.t === 'tabla') return { ...b, filas: b.filas.map((f) => f.map((c) => (String(c).split(/\s+/).length >= 5 ? textoEnEspanol(c) : c))) };
-      if (b.texto != null && (b.t === 'p' || b.t === 'li' || b.t === 'h2')) return { ...b, texto: textoEnEspanol(b.texto) };
+      if (b.t === 'tabla') return { ...b, filas: b.filas.map((f) => f.map((c) => (String(c).split(/\s+/).length >= 5 ? textoEnEspanol(c, mapa) : c))) };
+      if (b.texto != null && (b.t === 'p' || b.t === 'li' || b.t === 'h2')) return { ...b, texto: textoEnEspanol(b.texto, mapa) };
       return b;
     });
   }
@@ -454,7 +470,7 @@
     pendientes.forEach((r) => {
       const rr = raices(r.req); let mejor = -1, pm = 0;
       titulos().forEach((x) => { if (/^\s*Anexo\b/i.test(x.b.texto) || /Requisitos del estándar por incorporar/i.test(x.b.texto)) return; const rs = raices(x.b.texto); const sc = rs.filter((q) => rr.includes(q)).length; if (sc > pm) { pm = sc; mejor = x.i; } });
-      const txt = redactarRequisito(r.req, r.orig) || ('!!' + redactar(r.req).replace(/!!/g, '') + '!!');
+      const txt = !BMS.trad.esIngles(r.req) ? redactar(r.req) : (redactarRequisito(r.reqM, r.orig) || ('!!' + redactar(r.reqM).replace(/!!/g, '') + '!!'));
       if (S.bloques.some((b) => b.texto === txt)) return;
       const li = { t: 'li', req: r.req, texto: txt };
       if (mejor >= 0) { let f = mejor + 1; while (f < S.bloques.length && S.bloques[f].t !== 'h1') f++; S.bloques.splice(f, 0, li); }
@@ -488,6 +504,7 @@
     const nObs = val.cuentaReqs.falta + val.cuentaReqs.parcial + val.pr.length;
 
     const exportar = async (doc = 'bms') => {
+      const pTrad = BMS.trad.crearTraductor((f) => { estado.textContent = 'Descargando el traductor del navegador… ' + Math.round(f * 100) + ' %'; });
       try {
         estado.textContent = 'Generando el documento' + (doc === 'bms' ? ' y los anexos…' : '…');
         const mios = bloquesDe(S.bloques, doc);
@@ -497,7 +514,7 @@
         if (doc === 'inc' && /^Secuencias de operación del BMS\/BAS$/i.test((portada[1] || '').trim())) portada[1] = 'Secuencias de operación del sistema de alarma contra incendio';
         const en = S.opciones.idioma === 'en';
         let titulo = doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación', bl = [...resolverBloques(mios), ...anexos];
-        if (S.opciones.idioma !== 'en') bl = unificarEspanol(bl);
+        if (S.opciones.idioma !== 'en') { estado.textContent = 'Unificando el idioma del documento…'; bl = await unificarEspanol(bl, await pTrad); }
         BMS.docxLang = en ? 'en' : 'es';
         if (en) { portada = portada.map((x) => BMS.trad.aEn(x)); bl = BMS.trad.bloques(bl); titulo = doc === 'inc' ? 'Fire alarm sequences' : 'Sequences of operation'; if (bl.pendientes) estado.textContent = bl.pendientes + ' texto(s) sin traducir quedaron en rojo en el Word…'; }
         const P = E.proyecto;
@@ -549,6 +566,7 @@
       return lineasExcel(buf);
     }
     function cargarEstandar() {
+      const pT = BMS.trad.crearTraductor((f) => { estado.textContent = 'Descargando el traductor del navegador… ' + Math.round(f * 100) + ' %'; });
       const inp = document.createElement('input'); inp.type = 'file';
       inp.accept = '.pdf,application/pdf';
       inp.addEventListener('change', async () => {
@@ -557,11 +575,18 @@
         const S = BMS.estado.secuencias, lineas = [], fallos = [];
         for (const f of fs) { try { const l = await lineasDe(f); lineas.push(...l); } catch (e) { fallos.push(f.name + ': ' + e.message); } }
         if (!lineas.length) { alert('No se pudo leer texto de los archivos.' + (fallos.length ? '\n' + fallos.join('\n') : '')); return; }
-        const total = lineas.length; lineas.splice(0, lineas.length, ...lineas.map((l) => (BMS.trad.esIngles(l) ? BMS.trad.aEs(l) : l)));
-        const utiles = soloOperacion(lineas);
-        if (!utiles.length) { alert('No se encontraron requisitos de operación y control en el PDF (' + total + ' líneas leídas). Pegue en el cuadro los requisitos que quiere validar.'); return; }
-        lineas.splice(0, lineas.length, ...utiles);
-        alert('Del PDF se tomaron ' + utiles.length + ' requisitos de operación y control (de ' + total + ' líneas leídas). Revise la lista y quite o agregue líneas en el cuadro si hace falta.');
+        const total = lineas.length, orig = lineas.slice();
+        const glos = orig.map((l) => (BMS.trad.esIngles(l) ? BMS.trad.aEs(l) : l));
+        const idx = indicesOperacion(glos);
+        if (!idx.length) { alert('No se encontraron requisitos de operación y control en el PDF (' + total + ' líneas leídas). Pegue en el cuadro los requisitos que quiere validar.'); return; }
+        let sel = idx.map((i) => orig[i]), nota = '';
+        if (sel.some((l) => BMS.trad.esIngles(l))) {
+          const tr = await pT;
+          if (tr) { sel = await BMS.trad.traducirLineas(tr, sel, (k, n) => { estado.textContent = 'Traduciendo al español… ' + k + ' de ' + n; }); estado.textContent = ''; nota = ' Se tradujeron al español con el traductor del navegador.'; }
+          else nota = ' Siguen en inglés: para traducirlos con buena calidad use Chrome 138 o superior (traductor integrado); mientras tanto se comparan con un glosario aproximado.';
+        }
+        lineas.splice(0, lineas.length, ...sel);
+        alert('Del PDF se tomaron ' + sel.length + ' requisitos de operación y control (de ' + total + ' líneas leídas).' + nota + ' Revise la lista y quite o agregue líneas en el cuadro si hace falta.');
         if (lineas.length > 600 && !confirm('El archivo tiene ' + lineas.length + ' líneas de texto. Para que la herramienta siga ágil solo se usarán las primeras 600 líneas. ¿Continuar?\n\nSi el estándar es largo, pegue en el cuadro solo los requisitos que quiere validar.')) return;
         lineas.splice(600);
         let agregar = false;
@@ -701,7 +726,7 @@
     S.estandar.texto = txt(S.estandar.texto); S.estandar.nombre = txt(S.estandar.nombre);
     /* un estándar largo guardado antes del filtro se reduce una vez a los requisitos de operación y control */
     const ls = S.estandar.texto.split(/\r?\n/).filter(Boolean);
-    if (!S.estandar.filtrado && ls.length > 60) { S.estandar.texto = soloOperacion(ls.map((l) => (BMS.trad.esIngles(l) ? BMS.trad.aEs(l) : l))).join('\n'); S.estandar.filtrado = true; BMS.touch(); }
+    if (!S.estandar.filtrado && ls.length > 60) { S.estandar.texto = indicesOperacion(ls.map((l) => (BMS.trad.esIngles(l) ? BMS.trad.aEs(l) : l))).map((i) => ls[i]).join('\n'); S.estandar.filtrado = true; BMS.touch(); }
   }
   BMS.pSecuencias = (root) => {
     try { sanear(BMS.estado); return pagina(root); } catch (e) {

@@ -242,5 +242,28 @@
   /* palabras en inglés que quedan sin traducir (para marcar la redacción como pendiente de revisión) */
   const inglesResidual = (t) => (String(t).match(/(?<![\p{L}])[a-z]{3,}(?![\p{L}])/gu) || []).filter((w) => /^(the|and|shall|that|with|from|this|when|which|their|also|have|into|only|than|such|each|for|are|will)$/.test(w)).length;
 
-  BMS.trad = { aEn, aEs, esIngles, inglesResidual, NUM_UN, bloques, nombre };
+
+  /* ---------- traductor integrado del navegador (Chrome 138 o superior): traduce en el equipo, sin enviar el texto a terceros ---------- */
+  async function crearTraductor(prog) {
+    try {
+      if (!('Translator' in self)) return null;
+      const av = await self.Translator.availability({ sourceLanguage: 'en', targetLanguage: 'es' });
+      if (av === 'unavailable') return null;
+      /* la primera vez el navegador descarga el modelo de idioma (se hace una sola vez); si tarda demasiado se sigue con el glosario */
+      const crear = self.Translator.create({ sourceLanguage: 'en', targetLanguage: 'es', monitor: (m) => { if (prog) m.addEventListener('downloadprogress', (e) => prog(e.loaded)); } });
+      return await Promise.race([crear, new Promise((ok) => setTimeout(() => ok(null), 240000))]);
+    } catch (e) { return null; }
+  }
+  async function traducirLineas(tr, lineas, prog) {
+    const out = [];
+    for (let i = 0; i < lineas.length; i++) {
+      const l = lineas[i];
+      if (!esIngles(l)) out.push(l);
+      else { try { out.push(String(await tr.translate(l)).replace(/\s+/g, ' ').trim()); } catch (e) { out.push(l); } }
+      if (prog) prog(i + 1, lineas.length);
+    }
+    return out;
+  }
+
+  BMS.trad = { crearTraductor, traducirLineas, aEn, aEs, esIngles, inglesResidual, NUM_UN, bloques, nombre };
 })();
