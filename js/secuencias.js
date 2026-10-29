@@ -90,6 +90,21 @@
     return { todo: BMS.norm(todo), propio: BMS.norm(propio), crudo: bl };
   }
 
+  /* del estándar completo del hotel solo interesan los requisitos que tocan la operación y el control (secuencias, alarmas, horarios, setpoints, BMS…) */
+  const TEMAS = ['secuenc', 'operaci', 'opera ', 'control', 'alarm', 'setpoint', 'set point', 'set-point', 'horari', 'bacnet', 'tendenc', 'reset', 'arranque', 'apagad', 'encendid', 'comando', 'retroaliment', 'monitor', 'bms', 'bas ', 'automatiz', 'ocupad', 'enclavamiento', 'interlock', 'prioridad', 'rearranque', 'modo ', 'sensor', 'calendario', 'deshabilit', 'habilit', 'supervis', 'grms', 'pms', 'lazo', 'pid', 'sequence', 'schedule', 'trend'];
+  const VERBOS = /\b(debe|deben|deber[aá]|deber[aá]n|requiere|requieren|ser[aá]|ser[aá]n|se debe|shall|must|should|no podr[aá]|tendr[aá]|proveer|contar[aá]|permit)\b/i;
+  function soloOperacion(lineas) {
+    /* encabezados y pies de página (se repiten) y líneas duplicadas se descartan */
+    const cuenta = new Map(); lineas.forEach((l) => { const k = l.replace(/\d+/g, '#'); cuenta.set(k, (cuenta.get(k) || 0) + 1); });
+    const vistos = new Set();
+    return lineas.filter((l) => {
+      const k = l.replace(/\d+/g, '#'); if ((cuenta.get(k) >= 3 && l.length < 90) || vistos.has(l)) return false; vistos.add(l);
+      const n = ' ' + BMS.norm(l) + ' ';
+      if (n.length < 60) return false;
+      const t = TEMAS.filter((k) => n.includes(k)).length;
+      return t >= 3 || (t >= 1 && VERBOS.test(l));
+    });
+  }
   const MAX_REQ = 600; /* tope de requisitos revisados, para que un estándar muy largo no deje la página lenta */
   function validarCalc() {
     const E = BMS.estado, S = E.secuencias, P = E.proyecto, C = BMS.calc, res = C.todo(), mot = C.motor(res, P.marca);
@@ -345,21 +360,6 @@
       }));
       return out;
     }
-    /* del estándar completo del hotel solo interesan los requisitos que tocan la operación y el control (secuencias, alarmas, horarios, setpoints, BMS…) */
-    const TEMAS = ['secuenc', 'operaci', 'opera ', 'control', 'alarm', 'setpoint', 'set point', 'set-point', 'horari', 'bacnet', 'tendenc', 'reset', 'arranque', 'apagad', 'encendid', 'comando', 'retroaliment', 'monitor', 'bms', 'bas ', 'automatiz', 'ocupad', 'enclavamiento', 'interlock', 'prioridad', 'rearranque', 'modo ', 'sensor', 'calendario', 'deshabilit', 'habilit', 'supervis', 'grms', 'pms', 'lazo', 'pid', 'sequence', 'schedule', 'trend'];
-    const VERBOS = /\b(debe|deben|deber[aá]|deber[aá]n|requiere|requieren|ser[aá]|ser[aá]n|se debe|shall|must|should|no podr[aá]|tendr[aá]|proveer|contar[aá]|permit)\b/i;
-    function soloOperacion(lineas) {
-      /* encabezados y pies de página (se repiten) y líneas duplicadas se descartan */
-      const cuenta = new Map(); lineas.forEach((l) => { const k = l.replace(/\d+/g, '#'); cuenta.set(k, (cuenta.get(k) || 0) + 1); });
-      const vistos = new Set();
-      return lineas.filter((l) => {
-        const k = l.replace(/\d+/g, '#'); if (cuenta.get(k) >= 3 || vistos.has(l)) return false; vistos.add(l);
-        const n = ' ' + BMS.norm(l) + ' ';
-        if (n.length < 45) return false;
-        const t = TEMAS.filter((k) => n.includes(k)).length;
-        return t >= 2 || (t >= 1 && VERBOS.test(l));
-      });
-    }
     async function lineasDe(f) {
       if (/\.(txt|md|csv)$/i.test(f.name)) return (await f.text()).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       const buf = await leerBuf(f);
@@ -385,7 +385,7 @@
         let agregar = false;
         if ((S.estandar.texto || '').trim()) agregar = !confirm('Ya hay requisitos cargados.\n\nAceptar = reemplazarlos con ' + fs.length + ' archivo(s).\nCancelar = agregar al final.');
         S.estandar.texto = (agregar ? S.estandar.texto.replace(/\s+$/, '') + '\n' : '') + lineas.join('\n');
-        S.estandar.texto = S.estandar.texto.slice(0, 60000);
+        S.estandar.texto = S.estandar.texto.slice(0, 60000); S.estandar.filtrado = true;
         const nom = fs[0].name.replace(/\.\w+$/, '');
         if (!agregar || !S.estandar.nombre) S.estandar.nombre = nom;
         guardar(); BMS.rerender();
@@ -428,7 +428,7 @@
         h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Estándar del hotel'),
           h('p', { class: 'hint' }, 'Pegue los requisitos del estándar del hotel, o cárguelos desde un PDF, uno por línea (opcional: "referencia | requisito"). La herramienta revisa en vivo si las secuencias los tratan y con qué valores, y señala lo que falta. Se preasigna una base de requisitos Fairfield CALA tomada del documento de secuencias; reemplácela por el texto del estándar.'),
           h('label', { class: 'f' }, 'Nombre del estándar', h('input', { class: 'in', value: S.estandar.nombre || '', onchange: (e) => { S.estandar.nombre = e.target.value; guardar(); } })),
-          h('label', { class: 'f', style: { marginTop: '8px' } }, 'Requisitos (uno por línea)', h('textarea', { class: 'in', rows: 12, style: { width: '100%' }, value: S.estandar.texto || '', onchange: (e) => { S.estandar.texto = e.target.value; guardar(); BMS.rerender(); } })),
+          h('label', { class: 'f', style: { marginTop: '8px' } }, 'Requisitos (uno por línea)', h('textarea', { class: 'in', rows: 12, style: { width: '100%' }, value: S.estandar.texto || '', onchange: (e) => { S.estandar.texto = e.target.value; S.estandar.filtrado = true; guardar(); BMS.rerender(); } })),
           h('div', { class: 'fila' },
             h('button', { class: 'b', onclick: () => cargarEstandar() }, 'Cargar estándar (PDF)'),
             h('button', { class: 'b', onclick: () => { if (!S.estandar.texto || confirm('Esto reemplaza los requisitos actuales por la base Fairfield CALA. ¿Continuar?')) { S.estandar.texto = ESTANDAR_BASE; S.estandar.nombre = 'Estándar Fairfield CALA (abril 2026)'; guardar(); BMS.rerender(); } } }, 'Usar la base Fairfield CALA'),
@@ -500,6 +500,9 @@
     });
     if (!S.estandar || typeof S.estandar !== 'object') S.estandar = { nombre: 'Estándar del hotel', texto: txt(S.estandar) };
     S.estandar.texto = txt(S.estandar.texto); S.estandar.nombre = txt(S.estandar.nombre);
+    /* un estándar largo guardado antes del filtro se reduce una vez a los requisitos de operación y control */
+    const ls = S.estandar.texto.split(/\r?\n/).filter(Boolean);
+    if (!S.estandar.filtrado && ls.length > 60) { S.estandar.texto = soloOperacion(ls).join('\n'); S.estandar.filtrado = true; BMS.touch(); }
   }
   BMS.pSecuencias = (root) => {
     try { sanear(BMS.estado); return pagina(root); } catch (e) {
