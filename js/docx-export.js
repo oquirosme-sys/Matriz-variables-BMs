@@ -240,20 +240,45 @@
       s = m.map((c) => { let x = c.t.trim(); if (!x) return c.t; if (c.h) x = '==' + x + '=='; if (c.r) x = '!!' + x + '!!'; if (c.b && !todoNegrita) x = '**' + x + '**'; return (/^\s/.test(c.t) ? ' ' : '') + x + (/\s$/.test(c.t) ? ' ' : ''); }).join('');
       return s.replace(/\s+/g, ' ').trim();
     };
-    const cuerpo = hijos(dom.getElementsByTagNameNS(W, 'body')[0], 'p').length ? dom.getElementsByTagNameNS(W, 'body')[0] : null;
-    if (!cuerpo) throw new Error('El archivo no parece un documento de Word válido.');
-    const portada = [], bloques = [];
-    let visto = false;
-    [...cuerpo.childNodes].forEach((el) => {
+    const body = dom.getElementsByTagNameNS(W, 'body')[0];
+    if (!body) throw new Error('El archivo no parece un documento de Word válido.');
+    /* estilos: el nombre del estilo (Título 1, Heading 1, etc.) decide el nivel aunque Word le haya cambiado el identificador */
+    const nivelEstilo = {};
+    try {
+      const sx = zip.file('word/styles.xml');
+      if (sx) {
+        const sd = new DOMParser().parseFromString(await sx.async('string'), 'application/xml');
+        [...sd.getElementsByTagNameNS(W, 'style')].forEach((st) => {
+          const id = st.getAttributeNS(W, 'styleId'), nm = hijos(st, 'name')[0], n = nm ? (nm.getAttributeNS(W, 'val') || '') : '';
+          const m = /^(?:heading|t[ií]tulo|titulo)\s*(\d)$/i.exec(n.trim()) || /^(?:Heading|Ttulo|Titulo)(\d)$/i.exec(id);
+          const ol = hijos(st, 'pPr')[0] ? hijos(hijos(st, 'pPr')[0], 'outlineLvl')[0] : null;
+          if (m) nivelEstilo[id] = Number(m[1]); else if (ol && /^\d$/.test(ol.getAttributeNS(W, 'val') || '')) nivelEstilo[id] = Number(ol.getAttributeNS(W, 'val')) + 1;
+        });
+      }
+    } catch (e) { /* sin estilos: se usan los identificadores */ }
+    /* los controles de contenido (sdt) y los cambios registrados envuelven párrafos: se aplanan */
+    const elementos = [];
+    const aplanar = (n) => [...n.childNodes].forEach((el) => {
       if (el.namespaceURI !== W) return;
+      if (['sdt', 'sdtContent', 'ins', 'customXml', 'smartTag'].includes(el.localName)) aplanar(el); else elementos.push(el);
+    });
+    aplanar(body);
+    const portada = [], bloques = [];
+    const OMITIR = /^(control de revisiones|contenido|[ií]ndice( de tablas)?|tabla de contenido|table of contents|contents)$/i;
+    let visto = false;
+    elementos.forEach((el) => {
       if (el.localName === 'p') {
         const ppr = hijos(el, 'pPr')[0]; const est = ppr ? hijos(ppr, 'pStyle')[0] : null; const id = est ? est.getAttributeNS(W, 'val') : '';
         const num = !!(ppr && hijos(ppr, 'numPr')[0]);
+        const ol = ppr ? hijos(ppr, 'outlineLvl')[0] : null;
+        let nivel = nivelEstilo[id] || (ol && /^\d$/.test(ol.getAttributeNS(W, 'val') || '') ? Number(ol.getAttributeNS(W, 'val')) + 1 : 0);
+        if (/^TOC/i.test(id) || /^(TtuloTDC|TOCHeading)/i.test(id)) return;
         const t = texto(el); if (!t) return;
-        if (/^Heading1$/i.test(id)) { visto = true; bloques.push({ t: 'h1', texto: t.replace(/\*\*/g, '') }); }
-        else if (/^Heading2$/i.test(id) || /^Heading3$/i.test(id)) { visto = true; bloques.push({ t: 'h2', texto: t.replace(/\*\*/g, '') }); }
-        else if (!visto) portada.push(t.replace(/\*\*/g, ''));
-        else if (id === 'ListParagraph' || num) bloques.push({ t: 'li', texto: t });
+        if (nivel && OMITIR.test(t.replace(/\*\*/g, ''))) return;
+        if (nivel === 1 || (nivel === 0 && /^Heading1$/i.test(id))) { visto = true; bloques.push({ t: 'h1', texto: t.replace(/\*\*/g, '') }); }
+        else if (nivel >= 2 || /^Heading[23]$/i.test(id)) { visto = true; bloques.push({ t: 'h2', texto: t.replace(/\*\*/g, '') }); }
+        else if (!visto) { if (!OMITIR.test(t.replace(/\*\*|!!|==/g, '')) && portada.length < 8) portada.push(t.replace(/\*\*/g, '')); }
+        else if (id === 'ListParagraph' || /^(Prrafodelista|Listaconvietas|ListBullet|ListNumber)/i.test(id) || num) bloques.push({ t: 'li', texto: t });
         else bloques.push({ t: 'p', texto: t });
       } else if (el.localName === 'tbl' && visto) {
         const filas = hijos(el, 'tr').map((tr) => hijos(tr, 'tc').map((tc) => hijos(tc, 'p').map((p) => texto(p).replace(/\*\*/g, '')).filter(Boolean).join(' / ')));

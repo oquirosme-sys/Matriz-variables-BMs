@@ -615,8 +615,13 @@
       h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
         try {
           const r = await BMS.leerSecuenciasDocx(buf);
+          if (!r.bloques.length) { alert('El Word se abrió pero no se encontraron secciones de secuencias' + (r.descartados ? ' (solo había ' + r.descartados + ' bloques de anexos generados, que se vuelven a generar al exportar)' : '') + '. Se buscan los títulos con estilo «Título 1» / «Título 2» (Heading 1 / 2). Revise que las secciones tengan esos estilos y vuelva a importar.'); return; }
           if (S.bloques.length && !confirm('Se leyeron ' + r.bloques.length + ' bloques' + (r.descartados ? ' (se descartaron ' + r.descartados + ' de anexos generados, que se vuelven a generar al exportar)' : '') + '. Esto reemplaza las secuencias actuales. Su texto queda protegido (no se traduce ni se redacta encima) y los anexos se vuelven a generar con los datos del proyecto al exportar; los cambios hechos a mano dentro de los anexos no se conservan. ¿Continuar?')) return;
-          S.portada = r.portada; S.bloques = r.bloques.map((b) => ({ ...b, fijo: true })); BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
+          S.portada = r.portada; S.bloques = r.bloques.map((b) => ({ ...b, fijo: true })); BMS.ui.secSel = 0; BMS.touch();
+          const val = validar(true, DOC), nSec = r.bloques.filter((b) => b.t === 'h1').length;
+          const hayEst = ((DOC === 'inc' ? S.estandarInc : S.estandar) || {}).texto;
+          BMS.ui.secSel = hayEst ? -2 : 0; BMS.rerender();
+          setTimeout(() => alert('Se importaron ' + r.bloques.length + ' bloques en ' + nSec + ' sección(es).' + (hayEst ? ' Validación contra el estándar de «' + DOCS[DOC] + '»: ' + val.cuentaReqs.falta + ' requisito(s) sin cubrir, ' + val.cuentaReqs.parcial + ' parcial(es) y ' + val.pr.length + ' observación(es) del proyecto. Se muestra en «Validación con el estándar».' : ' Todavía no hay estándar del hotel cargado para «' + DOCS[DOC] + '», por eso no hay validación: use «Subir estándar del hotel (PDF)» y se valida sola.')), 50);
         } catch (e) { alert('No se pudo importar: ' + e.message); }
       }) }, 'Importar desde Word'),
       h('button', { class: 'b', title: 'Agrega las secciones SOO-n, subsecciones y bloques ligados en vivo que falten, sin tocar lo ya escrito', onclick: () => {
