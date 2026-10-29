@@ -392,6 +392,7 @@
         const c = complementar(S); BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
         if (!vacio) setTimeout(() => alert('Se complementaron las secuencias: ' + c.secciones + ' sección(es) nueva(s), ' + c.subsecciones + ' subsección(es) y ' + c.vivos + ' bloque(s) ligado(s) agregados. Lo ya escrito no se modificó.'), 50);
       } }, 'Cargar estructura base del proyecto'),
+      h('button', { class: 'b', title: 'Sube el PDF del estándar del hotel para validar las secuencias', onclick: () => { BMS.ui.secSel = -2; cargarEstandar(); } }, 'Subir estándar del hotel (PDF)'),
       h('button', { class: 'b x', onclick: () => { if (confirm('¿Vaciar las secuencias de operación? (el estándar del hotel se conserva)')) { const est = S.estandar; E.secuencias = inicial(); E.secuencias.estandar = est; BMS.ui.secSel = -1; BMS.touch(); BMS.rerender(); } } }, 'Vaciar'), estado);
 
     const lista = h('div', { class: 'lista' }, h('div', { class: 'grp' }, 'Documento'),
