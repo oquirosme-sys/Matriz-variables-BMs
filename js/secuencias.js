@@ -417,8 +417,11 @@
     return partes.map((q) => (BMS.trad.esIngles(sinMarcas(q)) ? '!!' + BMS.trad.aEs(sinMarcas(q)) + '!!' : q)).join(' ');
   }
   /* un solo idioma: lo que esté en inglés se traduce con el traductor del navegador; si no hay, por biblioteca o glosario (en rojo) */
-  async function unificarEspanol(bl, tr) {
-    let mapa = null;
+  const esperar = (p, ms) => Promise.race([Promise.resolve(p), new Promise((ok) => setTimeout(() => ok(null), ms))]);
+  async function unificarEspanol(bl, trP) {
+    let mapa = null, tr = null;
+    const hayIngles = bl.some((b) => !b.fijo && (b.t === 'tabla' ? b.filas.some((f) => f.some((c) => String(c).split(/\s+/).length >= 5 && partesDe(c).some((q) => BMS.trad.esIngles(sinMarcas(q))))) : (b.t === 'p' || b.t === 'li' || b.t === 'h2') && b.texto != null && partesDe(b.texto).some((q) => BMS.trad.esIngles(sinMarcas(q)))));
+    if (hayIngles && trP) tr = await esperar(trP, 20000);
     if (tr) {
       const set = new Set();
       const ver = (x) => partesDe(x).forEach((q) => { if (BMS.trad.esIngles(sinMarcas(q))) set.add(sinMarcas(q)); });
@@ -515,7 +518,7 @@
         if (doc === 'inc' && /^Secuencias de operación del BMS\/BAS$/i.test((portada[1] || '').trim())) portada[1] = 'Secuencias de operación del sistema de alarma contra incendio';
         const en = S.opciones.idioma === 'en';
         let titulo = doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación', bl = [...resolverBloques(mios), ...anexos];
-        if (S.opciones.idioma !== 'en') { estado.textContent = 'Unificando el idioma del documento…'; bl = await unificarEspanol(bl, await pTrad); }
+        if (S.opciones.idioma !== 'en') { estado.textContent = 'Unificando el idioma del documento…'; bl = await unificarEspanol(bl, pTrad); }
         BMS.docxLang = en ? 'en' : 'es';
         if (en) { portada = portada.map((x) => BMS.trad.aEn(x)); bl = BMS.trad.bloques(bl); titulo = doc === 'inc' ? 'Fire alarm sequences' : 'Sequences of operation'; if (bl.pendientes) estado.textContent = bl.pendientes + ' texto(s) sin traducir quedaron en rojo en el Word…'; }
         const P = E.proyecto;
@@ -582,7 +585,7 @@
         if (!idx.length) { alert('No se encontraron requisitos de operación y control en el PDF (' + total + ' líneas leídas). Pegue en el cuadro los requisitos que quiere validar.'); return; }
         let sel = idx.map((i) => orig[i]), nota = '';
         if (sel.some((l) => BMS.trad.esIngles(l))) {
-          const tr = await pT;
+          const tr = await esperar(pT, 90000);
           if (tr) { sel = await BMS.trad.traducirLineas(tr, sel, (k, n) => { estado.textContent = 'Traduciendo al español… ' + k + ' de ' + n; }); estado.textContent = ''; nota = ' Se tradujeron al español con el traductor del navegador.'; }
           else nota = ' Siguen en inglés: para traducirlos con buena calidad use Chrome 138 o superior (traductor integrado); mientras tanto se comparan con un glosario aproximado.';
         }

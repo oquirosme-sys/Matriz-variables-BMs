@@ -35,7 +35,7 @@
   const SALTO = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
   const campoSeq = (nombre, n) => '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> SEQ ' + nombre + ' \\* ARABIC </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>' + n + '</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>';
   const SECT = (apaisado, conRefs) => '<w:sectPr>' + (conRefs ? '<w:headerReference w:type="default" r:id="rId7"/><w:footerReference w:type="default" r:id="rId8"/>' : '') +
-    (apaisado ? '<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>' : '<w:pgSz w:w="12240" w:h="15840"/>') + '<w:pgMar w:top="1417" w:right="1701" w:bottom="1417" w:left="1701" w:header="708" w:footer="1134" w:gutter="0"/><w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr>';
+    (apaisado ? '<w:pgSz w:w="15840" w:h="12240" w:orient="landscape"/>' : '<w:pgSz w:w="12240" w:h="15840"/>') + '<w:pgMar w:top="1417" w:right="1701" w:bottom="1417" w:left="1701" w:header="708" w:footer="850" w:gutter="0"/><w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr>';
 
   /* Tabla Sinergia: reglas horizontales, encabezado que se repite, anchos fijos, cifras a la derecha y celdas sin dato con raya. */
   function tabla(b, ancho, ctx) {
@@ -178,7 +178,7 @@
     zip.file('word/document.xml', doc.slice(0, ini) + cuerpo + '</w:body></w:document>');
     /* pie: nombre del documento en una sola línea */
     let pie = await zip.file('word/footer1.xml').async('string');
-    pie = pie.replace('Nombre Documento', esc(String(titulo || 'Secuencias de operación').slice(0, 34)));
+    pie = pie.replace('Nombre Documento · Página', esc(String(titulo || 'Secuencias de operación').slice(0, 40)) + (BMS.docxLang === 'en' ? ' · Page' : ' · Página'));
     zip.file('word/footer1.xml', pie);
     /* estilos del índice y actualización de campos al abrir */
     let est = await zip.file('word/styles.xml').async('string');
