@@ -157,7 +157,7 @@
       h('div', { class: 'fila noprint' }, selAgregar, selCopiar, h('button', { class: 'b', onclick: copiar }, 'Copiar')),
       h('div', { class: 'scroll' }, h('table', { class: 't' },
         h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Cant.', 'Comunicación', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),
-      h('div', { class: 'fila noprint' }, h('button', { class: 'b p', onclick: () => BMS.ir('resumen') }, 'Siguiente: resumen →')))));
+      h('div', { class: 'fila noprint' }, h('button', { class: 'b', title: 'Una pestaña por disciplina en el formato BMS Point Schedule (nivel, tag y controlador de cada equipo) y la tabla Equipos_por_nivel', onclick: () => BMS.exportarEquiposXlsx() }, 'Exportar equipos a Excel (por disciplina)'), h('button', { class: 'b p', onclick: () => BMS.ir('resumen') }, 'Siguiente: resumen →')))));
     pintaFilas(); actualizar();
   };
 })();

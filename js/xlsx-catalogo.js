@@ -18,6 +18,7 @@
   const letra = (n) => String.fromCharCode(64 + n);
   const MAXC = 12; // A..L
 
+  BMS.xlDisc = DISC;
   BMS.exportarCatalogoXlsx = async (soloBuffer) => {
     if (!window.ExcelJS) { alert('No se pudo cargar la librería de Excel (se necesita internet). Use "Exportar catálogo (JSON)".'); return; }
     const CAT = BMS.catEq, P = BMS.estado.proyecto;

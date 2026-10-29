@@ -45,7 +45,7 @@
     root.append(h('h2', null, 'Resumen de variables'),
       h('p', { class: 'hint' }, 'AI/AO = entradas/salidas analógicas, DI/DO = digitales, INT = puntos por integración (gateway, no consumen canales del controlador). La reserva (' + P.reserva + ' %) se aplica a cada tipo de canal cableado.'),
       h('div', { class: 'kpis' }, [['Equipos', tot.eq], ['AI', tot.ai], ['AO', tot.ao], ['DI', tot.di], ['DO', tot.do], ['INT', tot.int], ['Cableados', tot.cab], ['Cableados con reserva', tot.res]].map(([n, v]) => h('div', { class: 'kpi' }, h('b', null, v), h('span', null, n)))),
-      h('div', { class: 'fila noprint' }, h('button', { class: 'b p', onclick: exportarXlsx }, 'Exportar a Excel (resumen + matriz)'), h('button', { class: 'b', onclick: () => window.print() }, 'Imprimir')));
+      h('div', { class: 'fila noprint' }, h('button', { class: 'b p', title: 'Una pestaña por disciplina en el formato BMS Point Schedule (con nivel, tag y controlador) y una tabla de Excel por pestaña: Resumen_Nivel, Resumen_Controlador, Nivel_x_Controlador y Resumen_Sistema', onclick: () => (window.ExcelJS ? BMS.exportarResumenXlsx() : exportarXlsx()) }, 'Exportar a Excel (formato por disciplina)'), h('button', { class: 'b', title: 'Formato anterior: resumen y matriz en hojas planas', onclick: exportarXlsx }, 'Excel simple'), h('button', { class: 'b', onclick: () => window.print() }, 'Imprimir')));
     if (res.sin.filas) root.append(h('div', { class: 'warnbox' }, '⚠ Hay ' + res.sin.filas + ' filas de equipos sin controlador (' + C.cable(res.sin) + ' puntos cableados + ' + res.sin.int + ' INT). Cree controladores en el nivel correspondiente o asígnelos manualmente.'));
 
     /* Por nivel */
