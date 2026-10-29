@@ -349,6 +349,21 @@
       }));
       return out;
     }
+    /* del estándar completo del hotel solo interesan los requisitos que tocan la operación y el control (secuencias, alarmas, horarios, setpoints, BMS…) */
+    const TEMAS = ['secuenc', 'operaci', 'opera ', 'control', 'alarm', 'setpoint', 'set point', 'set-point', 'horari', 'bacnet', 'tendenc', 'reset', 'arranque', 'apagad', 'encendid', 'comando', 'retroaliment', 'monitor', 'bms', 'bas ', 'automatiz', 'ocupad', 'enclavamiento', 'interlock', 'prioridad', 'rearranque', 'modo ', 'sensor', 'calendario', 'deshabilit', 'habilit', 'supervis', 'grms', 'pms', 'lazo', 'pid', 'sequence', 'schedule', 'trend'];
+    const VERBOS = /\b(debe|deben|deber[aá]|deber[aá]n|requiere|requieren|ser[aá]|ser[aá]n|se debe|shall|must|should|no podr[aá]|tendr[aá]|proveer|contar[aá]|permit)\b/i;
+    function soloOperacion(lineas) {
+      /* encabezados y pies de página (se repiten) y líneas duplicadas se descartan */
+      const cuenta = new Map(); lineas.forEach((l) => { const k = l.replace(/\d+/g, '#'); cuenta.set(k, (cuenta.get(k) || 0) + 1); });
+      const vistos = new Set();
+      return lineas.filter((l) => {
+        const k = l.replace(/\d+/g, '#'); if (cuenta.get(k) >= 3 || vistos.has(l)) return false; vistos.add(l);
+        const n = ' ' + BMS.norm(l) + ' ';
+        if (n.length < 45) return false;
+        const t = TEMAS.filter((k) => n.includes(k)).length;
+        return t >= 2 || (t >= 1 && VERBOS.test(l));
+      });
+    }
     async function lineasDe(f) {
       if (/\.(txt|md|csv)$/i.test(f.name)) return (await f.text()).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       const buf = await leerBuf(f);
@@ -365,6 +380,10 @@
         const S = BMS.estado.secuencias, lineas = [], fallos = [];
         for (const f of fs) { try { const l = await lineasDe(f); lineas.push(...l); } catch (e) { fallos.push(f.name + ': ' + e.message); } }
         if (!lineas.length) { alert('No se pudo leer texto de los archivos.' + (fallos.length ? '\n' + fallos.join('\n') : '')); return; }
+        const total = lineas.length, utiles = soloOperacion(lineas);
+        if (!utiles.length) { alert('No se encontraron requisitos de operación y control en el PDF (' + total + ' líneas leídas). Pegue en el cuadro los requisitos que quiere validar.'); return; }
+        lineas.splice(0, lineas.length, ...utiles);
+        alert('Del PDF se tomaron ' + utiles.length + ' requisitos de operación y control (de ' + total + ' líneas leídas). Revise la lista y quite o agregue líneas en el cuadro si hace falta.');
         if (lineas.length > 600 && !confirm('El archivo tiene ' + lineas.length + ' líneas de texto. Para que la herramienta siga ágil solo se usarán las primeras 600 líneas. ¿Continuar?\n\nSi el estándar es largo, pegue en el cuadro solo los requisitos que quiere validar.')) return;
         lineas.splice(600);
         let agregar = false;
