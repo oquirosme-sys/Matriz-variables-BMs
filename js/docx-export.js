@@ -12,15 +12,16 @@
   const ALTO_H = 6600;                                 // alto máximo de una figura en hoja apaisada (twips), dejando lugar al título y al pie
   const esc = (t) => String(t == null ? '' : t).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  const run = (t, o = {}) => '<w:r>' + (o.b || o.i || o.color || o.hl ? '<w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.color ? '<w:color w:val="' + o.color + '"/>' : '') + (o.hl ? '<w:highlight w:val="yellow"/>' : '') + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(t) + '</w:t></w:r>';
-  /* **negrita**, ==resaltado amarillo== (lo que hay que arreglar o actualizar); lo que va entre [corchetes] se resalta solo */
+  const run = (t, o = {}) => '<w:r>' + (o.b || o.i || o.color || o.hl || o.rojo ? '<w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.rojo ? '<w:color w:val="C00000"/>' : o.color ? '<w:color w:val="' + o.color + '"/>' : '') + (o.hl ? '<w:highlight w:val="yellow"/>' : '') + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + esc(t) + '</w:t></w:r>';
+  /* **negrita**, ==resaltado amarillo== (por validar), !!rojo!! (lo que debe modificarse); lo que va entre [corchetes] se resalta solo */
   const runs = (texto, o = {}) => {
-    let b = false, hl = false, out = '';
-    String(texto == null ? '' : texto).split(/(\*\*|==)/).forEach((s) => {
+    let b = false, hl = false, rojo = false, out = '';
+    String(texto == null ? '' : texto).split(/(\*\*|==|!!)/).forEach((s) => {
       if (s === '**') { b = !b; return; }
       if (s === '==') { hl = !hl; return; }
+      if (s === '!!') { rojo = !rojo; return; }
       if (!s) return;
-      s.split(/(\[[^\]\n]{1,120}\])/).forEach((q) => { if (q) out += run(q, { ...o, b: o.b || b, hl: o.hl || hl || /^\[[^\]]+\]$/.test(q) }); });
+      s.split(/(\[[^\]\n]{1,120}\])/).forEach((q) => { if (q) out += run(q, { ...o, b: o.b || b, rojo: o.rojo || rojo, hl: o.hl || hl || /^\[[^\]]+\]$/.test(q) }); });
     });
     return out;
   };
@@ -173,14 +174,16 @@
           [...c.childNodes].forEach((x) => { if (x.localName === 't') t += x.textContent; else if (x.localName === 'tab') t += ' '; else if (x.localName === 'br') t += ' '; });
           const hi = rpr ? hijos(rpr, 'highlight')[0] : null, sh = rpr ? hijos(rpr, 'shd')[0] : null;
           const resaltado = (!!hi && hi.getAttributeNS(W, 'val') !== 'none') || (!!sh && /^(FFFF00|FFF2CC|FFFF99|FFEB9C|FFD966)$/i.test(sh.getAttributeNS(W, 'fill') || ''));
-          if (t) corridas.push({ t, b: negrita, h: resaltado });
+          const co = rpr ? hijos(rpr, 'color')[0] : null, cv = co ? (co.getAttributeNS(W, 'val') || '') : '';
+          const rojo = /^(FF0000|C00000|CC0000|E00000|FF1111|D00000)$/i.test(cv);
+          if (t) corridas.push({ t, b: negrita, h: resaltado, r: rojo });
         } else if (['hyperlink', 'ins', 'smartTag', 'sdt', 'sdtContent'].includes(c.localName)) rec(c);
       });
       rec(p);
       /* une corridas contiguas con el mismo formato y marca la negrita con ** */
-      const m = []; corridas.forEach((c) => { const u = m[m.length - 1]; if (u && u.b === c.b && u.h === c.h) u.t += c.t; else m.push({ ...c }); });
+      const m = []; corridas.forEach((c) => { const u = m[m.length - 1]; if (u && u.b === c.b && u.h === c.h && u.r === c.r) u.t += c.t; else m.push({ ...c }); });
       const todoNegrita = m.length && m.every((c) => c.b);
-      s = m.map((c) => { let x = c.t.trim(); if (!x) return c.t; if (c.h) x = '==' + x + '=='; if (c.b && !todoNegrita) x = '**' + x + '**'; return (/^\s/.test(c.t) ? ' ' : '') + x + (/\s$/.test(c.t) ? ' ' : ''); }).join('');
+      s = m.map((c) => { let x = c.t.trim(); if (!x) return c.t; if (c.h) x = '==' + x + '=='; if (c.r) x = '!!' + x + '!!'; if (c.b && !todoNegrita) x = '**' + x + '**'; return (/^\s/.test(c.t) ? ' ' : '') + x + (/\s$/.test(c.t) ? ' ' : ''); }).join('');
       return s.replace(/\s+/g, ' ').trim();
     };
     const cuerpo = hijos(dom.getElementsByTagNameNS(W, 'body')[0], 'p').length ? dom.getElementsByTagNameNS(W, 'body')[0] : null;

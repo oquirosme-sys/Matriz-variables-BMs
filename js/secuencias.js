@@ -125,12 +125,7 @@
     if (sinEstado.length) add('parcial', 'Comandos sin retroalimentación', 'Cada comando debe tener un estado (15A.15.B.2.c). Equipos con comando y sin estado: ' + sinEstado.slice(0, 10).map((t) => corto(t.nombre)).join('; ') + '.');
     const corchetes = []; S.bloques.forEach((b) => { const t = b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || ''; (t.match(/\[[^\]]{1,60}\]/g) || []).forEach((m) => corchetes.push(m)); });
     if (corchetes.length) add('parcial', 'Valores propuestos por validar', corchetes.length + ' valores entre corchetes [ ] pendientes de validar por el diseñador (por ejemplo ' + [...new Set(corchetes)].slice(0, 5).join(', ') + ').');
-    const mal = mot.detalle.filter((d) => C.cable(d.t) && !d.ev.ok);
-    if (mal.length) add('falta', 'Controladores que no cubren sus puntos', mal.map((d) => C.nombreCtrl(d.c)).join(', ') + '.');
-    if (res.sin.filas) add('falta', 'Equipos sin controlador', res.sin.filas + ' filas de equipos (' + C.cable(res.sin) + ' puntos) no tienen controlador asignado.');
-    const vacios = mot.detalle.filter((d) => d.c.tipo === 'CS' && !C.cable(d.t));
-    if (vacios.length) add('parcial', 'Controladores sin puntos cableados', vacios.map((d) => C.nombreCtrl(d.c)).join(', ') + ' no tienen puntos cableados; confirme si se instalan.');
-    if (mot.excede) add('falta', 'Motor de red', 'Los dispositivos (' + mot.disp + ') exceden el máximo del motor de red seleccionado.');
+    /* la validación se limita a temas de secuencias de operación; el dimensionamiento de controladores se revisa en la pestaña Controladores */
     if (!S.bloques.length) add('falta', 'Secuencias vacías', 'Todavía no hay secuencias redactadas.');
     const cuenta = (a) => a.reduce((x, r) => { x[r.estado || r.nivel] = (x[r.estado || r.nivel] || 0) + 1; return x; }, { ok: 0, parcial: 0, falta: 0 });
     return { reqs, pr, cuentaReqs: cuenta(reqs), cuentaPr: cuenta(pr) };
@@ -232,9 +227,10 @@
     if (op.f) {
       const v = validar(), S = E.secuencias;
       anexo('Validación contra el estándar del hotel', 'Revisión de las secuencias y del proyecto contra «' + ((S.estandar && S.estandar.nombre) || 'el estándar del hotel') + '». La revisión de requisitos compara términos y valores del estándar con el texto de las secuencias; no reemplaza la validación del diseñador. Cumple: ' + v.cuentaReqs.ok + ' · Parcial: ' + v.cuentaReqs.parcial + ' · No cumple o falta: ' + v.cuentaReqs.falta + '.');
-      const nom = (e) => (e === 'ok' ? 'Cumple' : '==' + (e === 'parcial' ? 'Parcial' : 'No cumple / falta') + '==');
-      if (v.reqs.length) out.push({ t: 'tabla', titulo: 'Requisitos del estándar frente a las secuencias', cols: [1.4, 6, 1.4, 6], filas: [['Referencia', 'Requisito del estándar', 'Estado', 'Observación'], ...v.reqs.map((r) => [r.ref || '—', r.req, nom(r.estado), r.obs])] });
-      out.push({ t: 'tabla', titulo: 'Comprobaciones del proyecto', cols: [4, 1.4, 9], filas: [['Tema', 'Estado', 'Observación'], ...(v.pr.length ? v.pr.map((r) => [r.tema, nom(r.nivel), r.obs]) : [['Sin observaciones', 'Cumple', 'No se encontraron diferencias.']])] });
+      const nom = (e) => (e === 'ok' ? 'Cumple' : '!!' + (e === 'parcial' ? 'Parcial' : 'No cumple / falta') + '!!');
+      const rojo = (e, t) => (e === 'ok' || !t ? t : '!!' + t + '!!');
+      if (v.reqs.length) out.push({ t: 'tabla', titulo: 'Requisitos del estándar frente a las secuencias', cols: [1.4, 6, 1.4, 6], filas: [['Referencia', 'Requisito del estándar', 'Estado', 'Observación'], ...v.reqs.map((r) => [r.ref || '—', r.req, nom(r.estado), rojo(r.estado, r.obs)])] });
+      out.push({ t: 'tabla', titulo: 'Comprobaciones del proyecto', cols: [4, 1.4, 9], filas: [['Tema', 'Estado', 'Observación'], ...(v.pr.length ? v.pr.map((r) => [r.tema, nom(r.nivel), rojo(r.nivel, r.obs)]) : [['Sin observaciones', 'Cumple', 'No se encontraron diferencias.']])] });
     }
     return out;
   }
