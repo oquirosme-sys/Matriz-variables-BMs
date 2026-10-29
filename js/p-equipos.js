@@ -88,13 +88,18 @@
           h('td', { class: 'c' }, h('button', { class: 'b s', title: 'Ver variables', onclick: () => { abierto ? BMS.ui.abiertos.delete(eq.id) : BMS.ui.abiertos.add(eq.id); BMS.rerender(); } }, abierto ? '▾' : '▸')),
           h('td', null, selTipo),
           h('td', null, h('input', { class: 'in', style: { width: '120px' }, value: eq.tag || '', placeholder: 'Tag(s)', onchange: (e) => { eq.tag = e.target.value; BMS.touch(); } })),
+          h('td', null, h('select', { class: 'in', style: { width: '78px' }, value: eq.nivel, title: 'Nivel del equipo. Cámbielo si el equipo se pasó a otro nivel: se mueve con sus variables y el controlador se reasigna.', onchange: (e) => {
+            const ant = eq.ctrl && eq.ctrl !== 'auto' && E.controladores.find((x) => x.id === eq.ctrl);
+            if (ant && ant.nivel === eq.nivel) eq.ctrl = 'auto';
+            eq.nivel = e.target.value; BMS.touch(); BMS.rerender();
+          } }, E.niveles.map((n) => h('option', { value: n.id }, n.codigo)))),
           h('td', null, h('input', { class: 'in n', type: 'number', min: 0, step: 1, value: eq.qty, disabled: C.porHabCant(eq), title: C.porHabCant(eq) ? 'La cantidad es el número de habitaciones del nivel (pestaña 1, Niveles).' : '', onchange: (e) => { eq.qty = Math.max(0, Math.round(num(e.target.value))); e.target.value = eq.qty; BMS.touch(); actualizar(); } })),
           ipCell, ctlCell, c('ai'), c('ao'), c('di'), c('do'), c('int'), c('tot'),
           h('td', null, h('input', { class: 'in', style: { width: '160px' }, value: eq.obs || '', placeholder: 'Observación', onchange: (e) => { eq.obs = e.target.value; BMS.touch(); } })),
           h('td', { class: 'c' }, h('button', { class: 'b x', title: 'Quitar', onclick: () => { E.equipos.splice(E.equipos.indexOf(eq), 1); BMS.ui.abiertos.delete(eq.id); BMS.touch(); BMS.rerender(); } }, '✕'))));
         if (abierto && tipo) {
           const pc = (pt, k) => { const e = h('td', { class: 'r calc' }); pcel[eq.id + ':' + pt.p.id + ':' + k] = e; return e; };
-          cuerpo.append(h('tr', { class: 'det' }, h('td', { colspan: 14 },
+          cuerpo.append(h('tr', { class: 'det' }, h('td', { colspan: 15 },
             tipo.nota ? h('div', { class: 'mute', style: { padding: '4px 2px', fontSize: '12px' } }, 'Origen: ' + tipo.nota) : null,
             h('table', { class: 't' }, h('thead', null, h('tr', null, ['Incl.', 'Descripción / punto', 'Qty', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total AI', 'Total AO', 'Total DI', 'Total DO', 'Total INT', 'Total puntos', 'Alarma', 'Tendencia', 'Interfaz'].map((x) => h('th', null, x)))),
               h('tbody', null, f.puntos.map((pt) => h('tr', null,
@@ -105,7 +110,7 @@
                 h('td', { class: 'c' }, pt.p.alm || '—'), h('td', { class: 'c' }, pt.p.tend || '—'), h('td', null, pt.p.ifc))))))));
         }
       });
-      if (!filasNivel().length) cuerpo.append(h('tr', null, h('td', { colspan: 14, class: 'mute', style: { padding: '14px' } }, 'Sin equipos en este nivel. Use "Agregar equipo" o copie los de otro nivel.')));
+      if (!filasNivel().length) cuerpo.append(h('tr', null, h('td', { colspan: 15, class: 'mute', style: { padding: '14px' } }, 'Sin equipos en este nivel. Use "Agregar equipo" o copie los de otro nivel.')));
     };
 
     /* Actualiza solo los números (no reconstruye los campos para no perder el foco). */
@@ -156,7 +161,7 @@
       h('div', { class: 'fila noprint' }, buscador),
       h('div', { class: 'fila noprint' }, selAgregar, selCopiar, h('button', { class: 'b', onclick: copiar }, 'Copiar')),
       h('div', { class: 'scroll' }, h('table', { class: 't' },
-        h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Cant.', 'Comunicación', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),
+        h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Nivel', 'Cant.', 'Comunicación', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),
       h('div', { class: 'fila noprint' }, h('button', { class: 'b', title: 'Una pestaña por disciplina en el formato BMS Point Schedule (nivel, tag y controlador de cada equipo) y la tabla Equipos_por_nivel', onclick: () => BMS.exportarEquiposXlsx() }, 'Exportar equipos a Excel (por disciplina)'), h('button', { class: 'b p', onclick: () => BMS.ir('resumen') }, 'Siguiente: resumen →')))));
     pintaFilas(); actualizar();
   };
