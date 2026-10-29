@@ -1,0 +1,386 @@
+/* Pestaña 6: secuencias de operación. Documento editable (portada + bloques) ligado en vivo al proyecto, exportable a Word en formato
+   Sinergia con anexos generados desde el proyecto, importable desde Word, y validado contra el estándar del hotel. */
+(function () {
+  const { h, cut } = BMS;
+  const num = (n) => Number(n || 0).toLocaleString('en-US');
+  const NOMRED = { A: 'BACnet/IP', B: 'BACnet MS/TP', C: 'Modbus RTU', E: 'Modbus TCP/IP', D: 'Señales cableadas' };
+  const TIPOS = [['h1', 'Título 1'], ['h2', 'Título 2'], ['p', 'Párrafo'], ['li', 'Viñeta'], ['tabla', 'Tabla'], ['vivo', 'En vivo (proyecto)']];
+  const VIVOS = [['equipos', 'Lista de equipos del sistema'], ['puntos', 'Totales de puntos del sistema'], ['tabla', 'Tabla de equipos y puntos del sistema']];
+  const ANEXOS = /^Anexo [A-Z]\.\s*(Diagrama unifilar|Resumen de variables|Lista de controladores|Variables por controlador|Validación contra el estándar)/i;
+  BMS.esAnexoGenerado = (t) => ANEXOS.test(String(t).trim());
+
+  /* Requisitos base del estándar Fairfield CALA, tomados del documento de secuencias. Reemplácelos por el texto del estándar del hotel. */
+  const ESTANDAR_BASE = [
+    '15A.15.A | El BAS es obligatorio si hay una planta central o VRF que atienda más de tres zonas con 300 000 Btu/h (50 t) o más, o sistemas con más de tres zonas y ventiladores de 10 hp o más',
+    '15A.15 | Red BACnet/IP sobre Ethernet entre servidor, controladores y gateways; cliente web con usuario y contraseña por nivel de acceso y cierre automático de sesión por inactividad',
+    '15A.15 | Servidor central con gráficos a color: una pantalla por equipo o zona, resumen por piso con color según la desviación de la temperatura respecto del setpoint',
+    '15A.15 | Puerto de conexión para laptop en cada tablero de controladores para ajustar setpoints localmente',
+    '15A.15 | UPS con 4 horas de respaldo para el servidor y los controladores, y 10 % de capacidad de reserva en puntos',
+    '15A.15 | Todos los controladores, estaciones y componentes BACnet deben estar listados por BACnet Testing Laboratories (BTL)',
+    '15A.15 | Servidor con procesador de cuatro núcleos, 6 GB de RAM y disco de 500 GB, capaz de guardar un año de tendencias',
+    '15A.15 | Todo punto, horario, setpoint, tendencia y alarma se expone como objeto BACnet',
+    '15A.15.B.1 | Lógica de demanda y reset: el BMS monitorea la demanda de zona y de sistema, detecta zonas que fuerzan el reset y permite al operador retirarlas del algoritmo',
+    '15A.15.B.2.c | Cada comando tiene al menos un estado de retroalimentación',
+    '15A.15.B.3.a | Cada entrada analógica tiene al menos una alarma alta y una baja; reserva de 10 % de puntos',
+    '15A.15.B.3.b | Tendencias con retención de un año',
+    '15A.15 | Alarmas con prioridad y reconocimiento: nivel, hora, usuario que reconoce y comentario obligatorio para el cierre',
+    '15A.15 | Horarios semanales y calendario de excepciones, editables desde la interfaz web',
+    '15A.15 | Pérdida de comunicación o de energía: puntos no confiables, alarma mayor y rearranque escalonado',
+    '15A.16 | Pruebas de aceptación por un tercero según ASHRAE Guideline 202: todo el equipo central y una muestra estadística de las unidades terminales',
+    '15A.9.G.8 | DOAS de 100 % aire exterior con recuperador de energía y ventiladores de velocidad variable; mantener el espacio a 24 °C y 50 % HR',
+    '15A.9.K | GRMS: setpoints de habitación desocupada, cierre de compuertas de ventilación a los 20 min de desocupación e integración con el PMS',
+    '15A.12.C | Tanque de combustible: nivel remoto, detección de fugas, monitoreo intersticial y protección contra sobrellenado; dimensionado para 8 horas a plena carga',
+    '14.7 | Control de humo y presurización de escaleras: mínimo 12.5 Pa y fuerza de apertura de puertas no mayor a 133 N',
+    '14.5 | Alarma de incendio: el BMS recibe las señales del FACP y no puede silenciarlas; las funciones de seguridad de vida las ejecuta el FACP',
+    '15B.4 | Medición de agua: caudal y totalizador cada hora y alarma de fuga',
+    '15A | Submedición eléctrica por tableros: HVAC, iluminación, fuerza, cocina y lavandería'
+  ].join('\n');
+
+  const inicial = () => ({ portada: ['', 'Secuencias de operación del BMS/BAS', '', '', ''], bloques: [], opciones: { b: true, c: true, d: true, e: true, f: true, detalle: false }, estandar: { nombre: 'Estándar Fairfield CALA (abril 2026)', texto: ESTANDAR_BASE } });
+
+  /* ---------- ligado en vivo con el proyecto ---------- */
+  const catDe = (id) => BMS.catEq.categorias.find((c) => c.id === id);
+  const corto = (t) => String(t).replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+  const sumaPuntos = (t) => `AI ${num(t.ai)}, AO ${num(t.ao)}, DI ${num(t.di)}, DO ${num(t.do)} e INT ${num(t.int)}`;
+  function resolverTexto(txt) {
+    if (txt == null || String(txt).indexOf('{{') < 0) return txt;
+    const E = BMS.estado, P = E.proyecto, res = BMS.calc.todo();
+    const mapa = { proyecto: P.nombre || 'el proyecto', ubicacion: P.ubicacion || '', marca: P.marca, reserva: P.reserva, niveles: E.niveles.length, controladores: E.controladores.length, equipos: res.total.eq, puntos: sumaPuntos(res.total), propietario: P.propietario || '' };
+    return String(txt).replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in mapa ? mapa[k] : m));
+  }
+  function resolverVivo(b) {
+    const C = BMS.calc, res = C.todo(), cat = catDe(b.cat), nom = cat ? cat.nombre : 'sistema';
+    const filas = res.filas.filter((f) => f.tipo && f.tipo.cat === b.cat && f.eq.qty > 0);
+    if (!filas.length) return [{ t: 'p', texto: b.fuente === 'equipos' ? '**Equipos:** ningún equipo cargado todavía en «' + nom + '».' : 'Sin equipos cargados en «' + nom + '».' }];
+    if (b.fuente === 'equipos') {
+      const g = new Map(); filas.forEach((f) => { const o = g.get(f.tipo.id) || { t: f.tipo, qty: 0, tags: [] }; o.qty += f.eq.qty; if (f.eq.tag && !/-$/.test(f.eq.tag)) o.tags.push(f.eq.tag); g.set(f.tipo.id, o); });
+      return [{ t: 'p', texto: '**Equipos:** ' + [...g.values()].map((o) => corto(o.t.nombre) + (o.tags.length ? ' (' + o.tags.slice(0, 3).join(', ') + ')' : '') + (o.qty > 1 ? ' ×' + o.qty : '')).join('; ') + '.' }];
+    }
+    const t = filas.reduce((a, f) => { ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (a[k] += f.t[k])); return a; }, C.vacio());
+    if (b.fuente === 'puntos') return [{ t: 'p', texto: '**Puntos del sistema:** ' + sumaPuntos(t) + ' (' + num(C.cable(t) + t.int) + ' en total).' }];
+    const g = new Map(); filas.forEach((f) => { const o = g.get(f.tipo.id) || { t: f.tipo, qty: 0, c: C.vacio(), tags: [] }; o.qty += f.eq.qty; ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (o.c[k] += f.t[k])); if (f.eq.tag && !/-$/.test(f.eq.tag)) o.tags.push(f.eq.tag); g.set(f.tipo.id, o); });
+    return [{ t: 'p', texto: 'Tabla No. 0' }, { t: 'p', texto: 'Equipos y variables — ' + nom }, { t: 'tabla', total: true, cols: [6, 2, 1, 1, 1, 1, 1, 1], filas: [['Equipo', 'Tag(s)', 'Cant.', 'AI', 'AO', 'DI', 'DO', 'INT'], ...[...g.values()].map((o) => [corto(o.t.nombre), o.tags.slice(0, 3).join(', ') || '—', num(o.qty), num(o.c.ai), num(o.c.ao), num(o.c.di), num(o.c.do), num(o.c.int)]), ['Total', '—', num([...g.values()].reduce((a, o) => a + o.qty, 0)), num(t.ai), num(t.ao), num(t.di), num(t.do), num(t.int)]] }];
+  }
+  function resolverBloques(bloques) {
+    const out = [];
+    bloques.forEach((b) => {
+      if (b.t === 'vivo') out.push(...resolverVivo(b));
+      else if (b.t === 'tabla') out.push({ ...b, filas: b.filas.map((f) => f.map((c) => resolverTexto(c))) });
+      else out.push({ ...b, texto: resolverTexto(b.texto) });
+    });
+    return out;
+  }
+
+  /* ---------- validación contra el estándar del hotel ---------- */
+  const PARADAS = new Set('para como cada debe deben desde sobre entre este esta estos estas cuando donde segun tiene tienen sera seran puede pueden todo toda todos todas otros otras mismo misma hacia hasta tambien solo solamente cualquier'.split(' '));
+  const raices = (t) => [...new Set(BMS.norm(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 5 && !PARADAS.has(w)).map((w) => w.slice(0, 6)))];
+  const valoresDe = (t) => [...String(t).matchAll(/(\d+(?:[.,]\d+)?)\s?(%|horas?|h\b|min\b|s\b|°c|pa\b|n\b|ppm|psi|gpm|kw|btu\/h|btu|hp|gb|aÃ±os?|año|años)/gi)].map((m) => ({ txt: m[0], n: m[1].replace(',', '.'), u: m[2].toLowerCase().replace(/^horas?$/, 'h') }));
+  const analizarEstandar = (texto) => String(texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l, i) => {
+    let ref = '', req = l;
+    if (l.includes('|')) { const k = l.indexOf('|'); ref = l.slice(0, k).trim(); req = l.slice(k + 1).trim(); }
+    else { const m = /^(§?\s*\d[\w.\-]*)\s+(.*)$/.exec(l); if (m) { ref = m[1]; req = m[2]; } }
+    return { n: i + 1, ref, req };
+  });
+
+  function textoDelDocumento() {
+    const S = BMS.estado.secuencias;
+    const bl = resolverBloques(S.bloques);
+    const propio = S.bloques.filter((b) => b.t !== 'vivo').map((b) => (b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || '')).join(' \n ');
+    const todo = bl.map((b) => (b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || '')).join(' \n ');
+    return { todo: BMS.norm(todo), propio: BMS.norm(propio), crudo: bl };
+  }
+
+  function validar() {
+    const E = BMS.estado, S = E.secuencias, P = E.proyecto, C = BMS.calc, res = C.todo(), mot = C.motor(res, P.marca);
+    const doc = textoDelDocumento();
+    const reqs = analizarEstandar(S.estandar && S.estandar.texto).map((r) => {
+      const rs = raices(r.req), tdoc = new Set(raices(doc.todo));
+      const hit = rs.filter((x) => tdoc.has(x)), falt = rs.filter((x) => !tdoc.has(x));
+      const vals = valoresDe(r.req), compactoDoc = doc.todo.replace(/\s+/g, '').replace(/,/g, '.');
+      const sinVal = vals.filter((v) => !compactoDoc.includes((v.n + v.u).toLowerCase().replace(/\s/g, '')) && !compactoDoc.includes(v.n.toLowerCase()));
+      const cob = rs.length ? hit.length / rs.length : 1;
+      const estado = cob >= 0.6 && !sinVal.length ? 'ok' : cob >= 0.3 || (cob >= 0.6 && sinVal.length) ? 'parcial' : 'falta';
+      const palabras = falt.slice(0, 8).map((x) => { const w = BMS.norm(r.req).split(/[^a-z0-9]+/).find((y) => y.slice(0, 6) === x); return w || x; });
+      const obs = estado === 'ok' ? 'Cubierto en las secuencias.' : [palabras.length ? 'Sin tratar en las secuencias: ' + palabras.join(', ') + '.' : '', sinVal.length ? 'No aparece el valor del estándar: ' + sinVal.map((v) => v.txt).join(', ') + '.' : ''].filter(Boolean).join(' ');
+      return { ...r, estado, cob, obs };
+    });
+    /* comprobaciones del proyecto */
+    const pr = [];
+    const add = (nivel, tema, obs) => pr.push({ nivel, tema, obs });
+    if (Number(P.reserva) < 10) add('falta', 'Reserva de puntos', 'La reserva configurada es ' + P.reserva + ' % y el estándar pide 10 % (15A.15.B.3.a).');
+    const sistemasConEq = BMS.catEq.categorias.filter((c) => res.filas.some((f) => f.tipo && f.tipo.cat === c.id && f.eq.qty > 0));
+    sistemasConEq.forEach((c) => {
+      const ras = raices(c.nombre).slice(0, 3);
+      const titulos = BMS.norm(S.bloques.filter((b) => b.t === 'h1' || b.t === 'h2').map((b) => b.texto || '').join(' '));
+      if (!ras.some((x) => titulos.includes(x))) add('falta', 'Sistema sin secuencia', 'El proyecto tiene equipos en «' + c.nombre + '» pero no hay una sección de secuencia con ese tema.');
+    });
+    const tipos = new Map(); res.filas.filter((f) => f.tipo && f.eq.qty > 0).forEach((f) => tipos.set(f.tipo.id, f.tipo));
+    const sinDescribir = [...tipos.values()].filter((t) => { const ras = raices(corto(t.nombre)).slice(0, 2); return ras.length && !ras.some((x) => doc.propio.includes(x)); });
+    if (sinDescribir.length) add('parcial', 'Equipos sin secuencia descrita', 'No se menciona en el texto de las secuencias: ' + sinDescribir.slice(0, 14).map((t) => corto(t.nombre)).join('; ') + (sinDescribir.length > 14 ? '; y ' + (sinDescribir.length - 14) + ' más' : '') + '.');
+    const aiSinAlarma = [...tipos.values()].filter((t) => t.pts.some((p) => p.ai > 0 && !p.alm && !t.ip));
+    if (aiSinAlarma.length) add('parcial', 'Entradas analógicas sin alarma', 'Cada entrada analógica debe tener alarma alta y baja (15A.15.B.3.a). Tipos con variables analógicas sin alarma definida: ' + aiSinAlarma.slice(0, 10).map((t) => corto(t.nombre)).join('; ') + (aiSinAlarma.length > 10 ? '; y ' + (aiSinAlarma.length - 10) + ' más' : '') + '.');
+    const sinEstado = [...tipos.values()].filter((t) => t.pts.some((p) => p.do > 0) && !t.pts.some((p) => p.di > 0 || p.ai > 0 || p.int > 0));
+    if (sinEstado.length) add('parcial', 'Comandos sin retroalimentación', 'Cada comando debe tener un estado (15A.15.B.2.c). Equipos con comando y sin estado: ' + sinEstado.slice(0, 10).map((t) => corto(t.nombre)).join('; ') + '.');
+    const corchetes = []; S.bloques.forEach((b) => { const t = b.t === 'tabla' ? b.filas.flat().join(' ') : b.texto || ''; (t.match(/\[[^\]]{1,60}\]/g) || []).forEach((m) => corchetes.push(m)); });
+    if (corchetes.length) add('parcial', 'Valores propuestos por validar', corchetes.length + ' valores entre corchetes [ ] pendientes de validar por el diseñador (por ejemplo ' + [...new Set(corchetes)].slice(0, 5).join(', ') + ').');
+    const mal = mot.detalle.filter((d) => C.cable(d.t) && !d.ev.ok);
+    if (mal.length) add('falta', 'Controladores que no cubren sus puntos', mal.map((d) => C.nombreCtrl(d.c)).join(', ') + '.');
+    if (res.sin.filas) add('falta', 'Equipos sin controlador', res.sin.filas + ' filas de equipos (' + C.cable(res.sin) + ' puntos) no tienen controlador asignado.');
+    const vacios = mot.detalle.filter((d) => d.c.tipo === 'CS' && !C.cable(d.t));
+    if (vacios.length) add('parcial', 'Controladores sin puntos cableados', vacios.map((d) => C.nombreCtrl(d.c)).join(', ') + ' no tienen puntos cableados; confirme si se instalan.');
+    if (mot.excede) add('falta', 'Motor de red', 'Los dispositivos (' + mot.disp + ') exceden el máximo del motor de red seleccionado.');
+    if (!S.bloques.length) add('falta', 'Secuencias vacías', 'Todavía no hay secuencias redactadas.');
+    const cuenta = (a) => a.reduce((x, r) => { x[r.estado || r.nivel] = (x[r.estado || r.nivel] || 0) + 1; return x; }, { ok: 0, parcial: 0, falta: 0 });
+    return { reqs, pr, cuentaReqs: cuenta(reqs), cuentaPr: cuenta(pr) };
+  }
+  const chipDe = (e) => h('span', { class: 'chip ' + (e === 'ok' ? 'ok' : e === 'parcial' ? 'warn' : 'bad') }, e === 'ok' ? 'Cumple' : e === 'parcial' ? 'Parcial' : 'No cumple / falta');
+
+  /* ---------- anexos generados desde el proyecto ---------- */
+  const svgAPartes = (svg, escala) => new Promise((resolve, reject) => {
+    const vb = svg.viewBox.baseVal, W = vb.width, H = vb.height;
+    svg.setAttribute('width', W * escala); svg.setAttribute('height', H * escala);
+    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' }));
+    const img = new Image();
+    img.onload = async () => {
+      try {
+        const n = Math.max(1, Math.ceil(H / (W * 0.62))), sliceH = Math.ceil(H / n), partes = [];
+        for (let i = 0; i < n; i++) {
+          const y0 = i * sliceH, hh = Math.min(sliceH, H - y0);
+          const c = document.createElement('canvas'); c.width = W * escala; c.height = Math.round(hh * escala);
+          const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+          g.drawImage(img, 0, y0 * escala, W * escala, hh * escala, 0, 0, W * escala, hh * escala);
+          const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+          partes.push({ png: new Uint8Array(await blob.arrayBuffer()), w: c.width, h: c.height });
+        }
+        URL.revokeObjectURL(url); resolve(partes);
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => reject(new Error('No se pudo convertir el diagrama a imagen.'));
+    img.src = url;
+  });
+
+  async function generarAnexos(op, letra0) {
+    const E = BMS.estado, P = E.proyecto, C = BMS.calc;
+    const res = C.todo(), mot = C.motor(res, P.marca), M = BMS.catCt.marcas[P.marca];
+    const out = [{ t: 'horizontal' }]; let L = letra0, primero = true;
+    const anexo = (titulo, intro) => { if (!primero) out.push({ t: 'salto' }); primero = false; out.push({ t: 'h1', texto: 'Anexo ' + String.fromCharCode(65 + L++) + '. ' + titulo }); if (intro) out.push({ t: 'p', texto: intro }); };
+    const cab = ['AI', 'AO', 'DI', 'DO', 'INT'];
+    const fila5 = (t) => [t.ai, t.ao, t.di, t.do, t.int].map(num);
+    const totalizar = (ts) => ts.reduce((a, t) => { ['ai', 'ao', 'di', 'do', 'int', 'eq'].forEach((k) => (a[k] += t[k])); return a; }, C.vacio());
+    const detMap = Object.fromEntries(mot.detalle.map((x) => [x.c.id, x]));
+
+    if (op.b) {
+      anexo('Diagrama unifilar del sistema de monitoreo y control', 'Lámina generada con los niveles, controladores, equipos y comunicaciones del proyecto. Se presenta en partes a ancho de hoja para su lectura; el archivo editable (SVG y DXF) se obtiene en la herramienta de la matriz de puntos.');
+      const partes = await svgAPartes(BMS.diag.construir(), 2);
+      partes.forEach((p, i) => { if (i) out.push({ t: 'salto' }); out.push({ t: 'imagen', ...p, pie: 'Figura No. ' + (i + 1) + ' — Diagrama unifilar del BMS, parte ' + (i + 1) + ' de ' + partes.length }); });
+    }
+    if (op.c) {
+      anexo('Resumen de variables y totales por nivel', 'Las cantidades corresponden a la Matriz de Puntos del proyecto. AI y AO son entradas y salidas analógicas, DI y DO son digitales; INT son puntos que llegan por integración de red o gateway y no ocupan canales del controlador. La reserva aplicada a los puntos cableados es del ' + P.reserva + ' %.');
+      const cats = BMS.catEq.categorias.filter((c) => res.porCat[c.id] && res.porCat[c.id].filas);
+      const tc = totalizar(cats.map((c) => res.porCat[c.id]));
+      out.push({ t: 'tabla', titulo: 'Resumen de variables por sistema', cols: [5, 1, 1, 1, 1, 1, 1, 1.2], filas: [['Sistema', 'Equipos', ...cab, 'Total'], ...cats.map((c) => { const t = res.porCat[c.id]; return [c.nombre, num(t.eq), ...fila5(t), num(C.cable(t) + t.int)]; }), ['Total del proyecto', num(tc.eq), ...fila5(tc), num(C.cable(tc) + tc.int)]], total: true });
+      const lv = E.niveles.filter((n) => res.porNivel[n.id] && res.porNivel[n.id].filas);
+      const tl = totalizar(lv.map((n) => res.porNivel[n.id]));
+      out.push({ t: 'tabla', titulo: 'Totales de variables por nivel', nota: 'Nota: "Cableados" suma AI, AO, DI y DO; "Con reserva" aplica el ' + P.reserva + ' % de reserva a cada tipo de canal.', cols: [4, 1, 1, 1, 1, 1, 1, 1.4, 1.4], filas: [['Nivel', 'Equipos', ...cab, 'Cableados', 'Con reserva'], ...lv.map((n) => { const t = res.porNivel[n.id]; return [n.codigo + ' — ' + n.nombre, num(t.eq), ...fila5(t), num(C.cable(t)), num(C.cable(C.conReserva(t, P.reserva)))]; }), ['Total', num(tl.eq), ...fila5(tl), num(C.cable(tl)), num(C.cable(C.conReserva(tl, P.reserva)))]], total: true });
+      const porTipo = new Map();
+      res.filas.filter((f) => f.tipo && f.eq.qty > 0).forEach((f) => { const o = porTipo.get(f.tipo.id) || { tipo: f.tipo, t: C.vacio(), qty: 0 }; o.qty += f.eq.qty; ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (o.t[k] += f.t[k])); porTipo.set(f.tipo.id, o); });
+      const lt = [...porTipo.values()].sort((a, b) => a.tipo.nombre.localeCompare(b.tipo.nombre, 'es'));
+      const tt = totalizar(lt.map((o) => ({ ...o.t, eq: o.qty })));
+      out.push({ t: 'tabla', titulo: 'Lista de variables resumida por tipo de equipo', cols: [6, 1, 1, 1, 1, 1, 1, 1.2], filas: [['Equipo', 'Cant.', ...cab, 'Total'], ...lt.map((o) => [o.tipo.nombre, num(o.qty), ...fila5(o.t), num(C.cable(o.t) + o.t.int)]), ['Total', num(tt.eq), ...fila5(tt), num(C.cable(tt) + tt.int)]], total: true });
+    }
+    if (op.d) {
+      anexo('Lista de controladores y dispositivos', 'Controladores con el modelo seleccionado para la marca ' + P.marca + ', dispositivos de red e integraciones, y lista de materiales de controladores y módulos. Los modelos se validan con el integrador antes de emitir.');
+      const resumenCfg = (cfg) => (cfg.base ? cfg.baseQty + '× ' + cfg.base + Object.keys(cfg.modulos || {}).filter((k) => cfg.modulos[k]).map((k) => ' + ' + cfg.modulos[k] + '× ' + k).join('') : 'Sin hardware (solo integración)');
+      out.push({ t: 'tabla', titulo: 'Controladores del sistema', cols: [2.2, 1, 1.2, 2.2, 1.6, 4.4, 1.2, 1.2], filas: [['Controlador', 'Tipo', 'Nivel', 'Cuarto / ubicación', 'Panel', 'Modelo y módulos', 'Cableados', 'Con reserva'],
+        ...mot.detalle.map((d) => { const n = C.nivelDe(d.c.nivel); return [C.nombreCtrl(d.c), d.c.tipo === 'CP' ? 'Principal' : 'Secundario', n ? n.codigo : '—', d.c.ubicacion || '—', (E.gabDim && E.gabDim[d.c.gab || d.c.id]) || C.panelSugerido(C.unidadesPanel(d.c, detMap)), resumenCfg(d.cfg), num(C.cable(d.t)), num(C.cable(d.req))]; })] });
+      const disp = [];
+      if (mot.motor) disp.push([mot.motor.cod + ' — ' + (mot.motor.desc || 'motor de red'), 'Motor de red / supervisor', '1', '—', '—']);
+      BMS.diag.gateways(res, C.nivelDe).forEach((g) => disp.push([g.gw + ' (' + g.items.map((i) => corto(i.tipo.nombre)).join(', ') + ')', 'Gateway ' + NOMRED[g.clave], '1', [...new Set(g.items.flatMap((i) => [...i.niv]))].join(', ') || '—', num(g.items.reduce((a, i) => a + i.ints, 0))]));
+      BMS.diag.paneles(res, C.nivelDe).forEach((p) => disp.push([corto(p.tipo.nombre) + (p.tags.length ? ' (' + p.tags.slice(0, 3).join(', ') + ')' : ''), 'Equipo de red ' + NOMRED[p.clave], num(p.qty), [...p.niv].join(', ') || '—', num(p.int)]));
+      out.push({ t: 'tabla', titulo: 'Dispositivos de red e integraciones', cols: [6, 3, 1, 2, 1.4], filas: [['Dispositivo', 'Tipo y protocolo', 'Cant.', 'Niveles', 'Puntos INT'], ...(disp.length ? disp : [['—', '—', '—', '—', '—']])] });
+      const bom = Object.keys(mot.bom || {}).map((cod) => { const m = M && (M.bases.find((x) => x.cod === cod) || M.modulos.find((x) => x.cod === cod)); return [cod, m ? m.desc.replace(/\s*\[.*?\]/g, '') : '—', M && M.bases.some((x) => x.cod === cod) ? 'Controlador' : 'Módulo', num(mot.bom[cod])]; });
+      if (mot.motor) bom.push([mot.motor.cod, mot.motor.desc || '—', 'Motor de red', '1']);
+      out.push({ t: 'tabla', titulo: 'Lista de controladores y módulos', cols: [3, 7, 2, 1], filas: [['Código', 'Descripción', 'Tipo', 'Cant.'], ...(bom.length ? bom : [['—', '—', '—', '—']])] });
+    }
+    if (op.e) {
+      anexo('Variables por controlador', 'Equipos y variables asignados a cada controlador. Los equipos marcados como "(red)" se conectan por BACnet, Modbus o gateway: sus variables son internas del equipo y se cuentan como INT.');
+      mot.detalle.forEach((d) => {
+        const filas = res.filas.filter((f) => f.ctrlId === d.c.id && f.tipo && f.eq.qty > 0);
+        if (!filas.length) return;
+        const n = C.nivelDe(d.c.nivel);
+        out.push({ t: 'h2', texto: C.nombreCtrl(d.c) + ' — ' + (n ? n.codigo + ' · ' + n.nombre : '') });
+        const tt = totalizar(filas.map((f) => f.t));
+        out.push({ t: 'tabla', titulo: 'Equipos y puntos de ' + C.nombreCtrl(d.c), cols: [6, 2, 1, 1, 1, 1, 1, 1], filas: [['Equipo', 'Tag(s)', 'Cant.', ...cab], ...filas.map((f) => [corto(f.tipo.nombre) + (f.ip || f.tipo.gw ? ' (red)' : ''), f.eq.tag || '—', num(f.eq.qty), ...fila5(f.t)]), ['Total', '—', num(tt.eq), ...fila5(tt)]], total: true });
+        if (op.detalle) {
+          const rows = [];
+          filas.forEach((f) => f.puntos.filter((p) => p.incl).forEach((p) => ['ai', 'ao', 'di', 'do', 'int'].forEach((k, ki) => { if (p[k] > 0) rows.push([corto(f.tipo.nombre) + (f.eq.tag ? ' ' + f.eq.tag : ''), p.p.n, cab[ki], num(p[k])]); })));
+          if (rows.length) out.push({ t: 'tabla', titulo: 'Variables de ' + C.nombreCtrl(d.c), cols: [4, 6, 1, 1], filas: [['Equipo', 'Variable', 'Clase', 'Cant.'], ...rows] });
+        }
+      });
+    }
+    if (op.f) {
+      const v = validar(), S = E.secuencias;
+      anexo('Validación contra el estándar del hotel', 'Revisión de las secuencias y del proyecto contra «' + ((S.estandar && S.estandar.nombre) || 'el estándar del hotel') + '». La revisión de requisitos compara términos y valores del estándar con el texto de las secuencias; no reemplaza la validación del diseñador. Cumple: ' + v.cuentaReqs.ok + ' · Parcial: ' + v.cuentaReqs.parcial + ' · No cumple o falta: ' + v.cuentaReqs.falta + '.');
+      const nom = (e) => (e === 'ok' ? 'Cumple' : e === 'parcial' ? 'Parcial' : 'No cumple / falta');
+      if (v.reqs.length) out.push({ t: 'tabla', titulo: 'Requisitos del estándar frente a las secuencias', cols: [1.4, 6, 1.4, 6], filas: [['Referencia', 'Requisito del estándar', 'Estado', 'Observación'], ...v.reqs.map((r) => [r.ref || '—', r.req, nom(r.estado), r.obs])] });
+      out.push({ t: 'tabla', titulo: 'Comprobaciones del proyecto', cols: [4, 1.4, 9], filas: [['Tema', 'Estado', 'Observación'], ...(v.pr.length ? v.pr.map((r) => [r.tema, nom(r.nivel), r.obs]) : [['Sin observaciones', 'Cumple', 'No se encontraron diferencias.']])] });
+    }
+    return out;
+  }
+  const letraSiguiente = (bloques) => { let m = 0; bloques.forEach((b) => { const x = b.t === 'h1' ? /^Anexo ([A-Z])\./i.exec(b.texto) : null; if (x) m = Math.max(m, x[1].toUpperCase().charCodeAt(0) - 64); }); return m; };
+
+  /* ---------- estructura base desde el proyecto (con bloques en vivo) ---------- */
+  function estructuraBase() {
+    const E = BMS.estado, P = E.proyecto, res = BMS.calc.todo();
+    const b = [];
+    const portada = ['{{proyecto}} — {{ubicacion}}', 'Secuencias de operación del BMS/BAS', 'Documento complementario a la Matriz de Puntos', [P.preparado || 'Sinergia Ingeniería', P.fecha, P.estado].filter(Boolean).join(' · '), 'Los valores entre corchetes [ ] son propuestas iniciales que debe validar el diseñador mecánico o eléctrico antes de emitir.'];
+    b.push({ t: 'h1', texto: '0. Alcance, referencias y arquitectura' }, { t: 'h2', texto: '0.1 Alcance' }, { t: 'p', texto: 'Este documento describe cómo opera cada sistema monitoreado o controlado por el BMS de {{proyecto}}: {{equipos}} equipos con {{puntos}}. Los números de punto corresponden a la Matriz de Puntos y cada sección lleva su referencia SOO-n.' });
+    b.push({ t: 'h2', texto: '0.2 Referencias' }, { t: 'li', texto: '[Estándar del propietario, edición]' }, { t: 'li', texto: 'ASHRAE 135 (BACnet) y ASHRAE Guideline 36.' });
+    b.push({ t: 'h2', texto: '0.3 Arquitectura general' }, { t: 'li', texto: 'Red BACnet/IP sobre Ethernet entre servidor, controlador principal y gateways; troncal BACnet MS/TP entre controladores. {{controladores}} controladores en {{niveles}} niveles; marca {{marca}}.' }, { t: 'li', texto: 'UPS con 4 horas de respaldo para el servidor y los controladores, y {{reserva}} % de capacidad de reserva en puntos.' });
+    b.push({ t: 'h2', texto: '0.4 Prioridad de comandos' }, { t: 'p', texto: 'De mayor a menor: (1) seguridad de vida desde el FACP, (2) selector HOA local en el equipo, (3) protecciones del equipo, (4) modo emergencia del BMS, (5) comandos manuales del operador, (6) horarios y lazos automáticos. Un nivel superior siempre anula al inferior.' });
+    b.push({ t: 'h2', texto: '0.5 Criterios generales de alarma y tendencia' }, { t: 'li', texto: 'Cada entrada analógica tiene al menos una alarma alta y una baja; cada comando tiene al menos un estado de retroalimentación.' }, { t: 'li', texto: 'Alarmas en tres niveles: crítica, mayor y aviso.' }, { t: 'li', texto: 'Tendencias: 15 min para temperaturas y humedades, 1 h para medición y filtros, y por cambio de valor para estados; retención de un año.' });
+    let n = 0;
+    BMS.catEq.categorias.forEach((cat) => {
+      if (!res.filas.some((x) => x.tipo && x.tipo.cat === cat.id && x.eq.qty > 0)) return;
+      n++;
+      b.push({ t: 'h1', texto: 'SOO-' + n + '. ' + cat.nombre }, { t: 'vivo', fuente: 'equipos', cat: cat.id }, { t: 'vivo', fuente: 'puntos', cat: cat.id },
+        { t: 'li', texto: '**Habilitación y horario:** [por definir].' }, { t: 'li', texto: '**Control:** [por definir].' }, { t: 'li', texto: '**Alarmas:** [por definir].' });
+    });
+    b.push({ t: 'h1', texto: 'Anexo A. Parámetros por confirmar' }, { t: 'p', texto: 'Tabla No. 1' }, { t: 'p', texto: 'Parámetros por confirmar antes de emitir' }, { t: 'tabla', filas: [['Parámetro', 'Valor propuesto', 'Quien valida'], ['—', '—', '—']] });
+    return { portada, bloques: b };
+  }
+
+  BMS.seq = { generarAnexos, resolverBloques, resolverTexto, validar, letraSiguiente, estructuraBase };
+
+  /* ---------- página ---------- */
+  BMS.pSecuencias = (root) => {
+    const E = BMS.estado;
+    E.secuencias = E.secuencias || inicial();
+    const S = E.secuencias; S.opciones = Object.assign({ b: true, c: true, d: true, e: true, f: true, detalle: false }, S.opciones || {});
+    S.estandar = S.estandar || { nombre: 'Estándar del hotel', texto: '' };
+    const ini = S.bloques.map((x, i) => (x.t === 'h1' ? i : -1)).filter((i) => i >= 0);
+    if (BMS.ui.secSel == null || BMS.ui.secSel >= ini.length) BMS.ui.secSel = ini.length ? 0 : -1;
+    const sel = BMS.ui.secSel;
+    const estado = h('span', { class: 'mute' });
+    const guardar = () => BMS.touch();
+    const nuevoTipo = (tipo) => (tipo === 'tabla' ? { t: 'tabla', filas: [['Columna 1', 'Columna 2'], ['', '']] } : tipo === 'vivo' ? { t: 'vivo', fuente: 'equipos', cat: (BMS.catEq.categorias[0] || {}).id } : { t: tipo, texto: '' });
+    const val = validar();
+    const nObs = val.cuentaReqs.falta + val.cuentaReqs.parcial + val.pr.length;
+
+    const exportar = async () => {
+      try {
+        estado.textContent = 'Generando el documento y los anexos…';
+        const letra0 = letraSiguiente(S.bloques);
+        const anexos = ['b', 'c', 'd', 'e', 'f'].some((k) => S.opciones[k]) ? await generarAnexos(S.opciones, letra0) : [];
+        const portada = S.portada.map((x) => resolverTexto(x));
+        const blob = await BMS.exportarSecuenciasDocx('Secuencias de operación', portada, [...resolverBloques(S.bloques), ...anexos]);
+        BMS.descargar('Secuencias_de_operacion_' + (E.proyecto.nombre || 'BMS').replace(/[^\w\-]+/g, '_') + '.docx', blob);
+        estado.textContent = 'Documento exportado (' + Math.round(blob.size / 1024) + ' KB).';
+      } catch (e) { estado.textContent = ''; alert('No se pudo exportar: ' + e.message); }
+    };
+    const archivo = (accept, alLeer, comoTexto) => {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = accept;
+      inp.addEventListener('change', () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => alLeer(rd.result, f); comoTexto ? rd.readAsText(f) : rd.readAsArrayBuffer(f); });
+      inp.click();
+    };
+    const barra = h('div', { class: 'fila noprint' },
+      h('button', { class: 'b p', onclick: exportar }, 'Exportar a Word'),
+      h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
+        try {
+          const r = await BMS.leerSecuenciasDocx(buf);
+          if (S.bloques.length && !confirm('Se leyeron ' + r.bloques.length + ' bloques' + (r.descartados ? ' (se descartaron ' + r.descartados + ' de anexos generados, que se vuelven a generar al exportar)' : '') + '. Esto reemplaza las secuencias actuales. ¿Continuar?')) return;
+          S.portada = r.portada; S.bloques = r.bloques; BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
+        } catch (e) { alert('No se pudo importar: ' + e.message); }
+      }) }, 'Importar desde Word'),
+      h('button', { class: 'b', title: 'Crea secciones SOO-n por sistema con listas de equipos y totales ligados en vivo al proyecto', onclick: () => {
+        if (S.bloques.length && !confirm('Esto reemplaza las secuencias actuales. ¿Continuar?')) return;
+        const r = estructuraBase(); S.portada = r.portada; S.bloques = r.bloques; BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
+      } }, 'Cargar estructura base del proyecto'),
+      h('button', { class: 'b x', onclick: () => { if (confirm('¿Vaciar las secuencias de operación? (el estándar del hotel se conserva)')) { const est = S.estandar; E.secuencias = inicial(); E.secuencias.estandar = est; BMS.ui.secSel = -1; BMS.touch(); BMS.rerender(); } } }, 'Vaciar'), estado);
+
+    const lista = h('div', { class: 'lista' }, h('div', { class: 'grp' }, 'Documento'),
+      h('div', { class: 'it' + (sel === -1 ? ' on' : ''), onclick: () => { BMS.ui.secSel = -1; BMS.rerender(); } }, h('span', null, 'Portada y anexos')),
+      h('div', { class: 'it' + (sel === -2 ? ' on' : ''), onclick: () => { BMS.ui.secSel = -2; BMS.rerender(); } }, h('span', null, 'Validación con el estándar'), h('span', { class: 'badge', style: nObs ? { color: 'var(--bad)' } : null }, nObs)),
+      h('div', { class: 'grp' }, 'Secciones'));
+    ini.forEach((bi, k) => {
+      const fin = k + 1 < ini.length ? ini[k + 1] : S.bloques.length;
+      lista.append(h('div', { class: 'it' + (sel === k ? ' on' : ''), onclick: () => { BMS.ui.secSel = k; BMS.rerender(); } }, h('span', null, cut(S.bloques[bi].texto, 44)), h('span', { class: 'badge' }, fin - bi - 1)));
+    });
+    lista.append(h('div', { class: 'it', style: { color: 'var(--accent)' }, onclick: () => { S.bloques.push({ t: 'h1', texto: 'Nueva sección' }); BMS.ui.secSel = ini.length; guardar(); BMS.rerender(); } }, h('span', null, '+ Agregar sección')));
+
+    let derecha;
+    if (sel === -2) {
+      /* validación con el estándar del hotel */
+      const conteo = (c) => h('span', null, h('span', { class: 'chip ok' }, c.ok + ' cumplen'), ' ', h('span', { class: 'chip warn' }, c.parcial + ' parciales'), ' ', h('span', { class: 'chip bad' }, c.falta + ' no cumplen'));
+      derecha = h('div', null,
+        h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Estándar del hotel'),
+          h('p', { class: 'hint' }, 'Pegue o cargue los requisitos del estándar del hotel, uno por línea (opcional: "referencia | requisito"). La herramienta revisa en vivo si las secuencias los tratan y con qué valores, y señala lo que falta. Se preasigna una base de requisitos Fairfield CALA tomada del documento de secuencias; reemplácela por el texto del estándar.'),
+          h('label', { class: 'f' }, 'Nombre del estándar', h('input', { class: 'in', value: S.estandar.nombre || '', onchange: (e) => { S.estandar.nombre = e.target.value; guardar(); } })),
+          h('label', { class: 'f', style: { marginTop: '8px' } }, 'Requisitos (uno por línea)', h('textarea', { class: 'in', rows: 12, style: { width: '100%' }, value: S.estandar.texto || '', onchange: (e) => { S.estandar.texto = e.target.value; guardar(); BMS.rerender(); } })),
+          h('div', { class: 'fila' },
+            h('button', { class: 'b', onclick: () => archivo('.txt,.docx', async (dato, f) => {
+              try {
+                let t = dato;
+                if (/\.docx$/i.test(f.name)) { const r = await BMS.lineasDocx(dato); t = r.join('\n'); }
+                if (S.estandar.texto && !confirm('Esto reemplaza los requisitos actuales. ¿Continuar?')) return;
+                S.estandar.texto = t; S.estandar.nombre = S.estandar.nombre || f.name.replace(/\.\w+$/, ''); guardar(); BMS.rerender();
+              } catch (e) { alert('No se pudo leer el archivo: ' + e.message); }
+            }, true) }, 'Cargar desde archivo (.txt o .docx)'),
+            h('button', { class: 'b', onclick: () => { if (!S.estandar.texto || confirm('Esto reemplaza los requisitos actuales por la base Fairfield CALA. ¿Continuar?')) { S.estandar.texto = ESTANDAR_BASE; S.estandar.nombre = 'Estándar Fairfield CALA (abril 2026)'; guardar(); BMS.rerender(); } } }, 'Usar la base Fairfield CALA'),
+            h('button', { class: 'b', onclick: () => BMS.rerender() }, 'Revalidar'))),
+        h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Comprobaciones del proyecto'), h('div', { class: 'fila' }, conteo(val.cuentaPr)),
+          val.pr.length ? h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tema', 'Estado', 'Observación'].map((x) => h('th', null, x)))), h('tbody', null, val.pr.map((r) => h('tr', null, h('td', { style: { fontWeight: 600 } }, r.tema), h('td', { class: 'c' }, chipDe(r.nivel)), h('td', null, r.obs))))) : h('p', { class: 'hint' }, 'Sin observaciones.')),
+        h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Requisitos del estándar frente a las secuencias'), h('div', { class: 'fila' }, conteo(val.cuentaReqs)),
+          val.reqs.length ? h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Ref.', 'Requisito', 'Estado', 'Observación'].map((x) => h('th', null, x)))), h('tbody', null, val.reqs.map((r) => h('tr', null, h('td', { class: 'c' }, r.ref || '—'), h('td', { style: { maxWidth: '420px' } }, r.req), h('td', { class: 'c' }, chipDe(r.estado)), h('td', { style: { maxWidth: '380px' } }, r.obs)))))) : h('p', { class: 'hint' }, 'Cargue los requisitos del estándar para validar.')));
+    } else if (sel === -1) {
+      const campo = (rot, i, ph) => h('label', { class: 'f' }, rot, h('input', { class: 'in', placeholder: ph || '', value: S.portada[i] || '', onchange: (e) => { S.portada[i] = e.target.value; guardar(); } }));
+      const casilla = (rot, k) => h('label', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, h('input', { type: 'checkbox', checked: !!S.opciones[k], onchange: (e) => { S.opciones[k] = e.target.checked; guardar(); } }), rot);
+      derecha = h('div', null,
+        h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Portada'), h('p', { class: 'hint' }, 'Puede usar marcadores ligados en vivo al proyecto: {{proyecto}}, {{ubicacion}}, {{marca}}, {{reserva}}, {{niveles}}, {{controladores}}, {{equipos}} y {{puntos}}; funcionan también en cualquier párrafo, viñeta o tabla.'), h('div', { class: 'grid' },
+          campo('Proyecto y ubicación', 0, '{{proyecto}} — {{ubicacion}}'), campo('Título del documento', 1), campo('Entregable / referencia', 2, 'Entregable 60 % — Comentario #…'), campo('Autor · fecha · estado', 3, 'Sinergia Ingeniería · fecha · Borrador'), campo('Nota inicial', 4, 'Aclaración sobre valores entre corchetes'))),
+        h('div', { class: 'card' }, h('h3', { style: { marginTop: 0 } }, 'Anexos generados al exportar'),
+          h('p', { class: 'hint' }, 'Se generan con los datos actuales del proyecto (niveles, controladores, equipos, marca y reserva) y siguen la letra del último anexo del documento. Van en hojas apaisadas.'),
+          h('div', { style: { display: 'grid', gap: '6px' } }, casilla('Diagrama unifilar (imagen en partes a ancho de hoja)', 'b'), casilla('Resumen de variables por sistema y por tipo de equipo, y totales por nivel', 'c'), casilla('Lista de controladores, dispositivos de red y materiales', 'd'), casilla('Variables por controlador (equipos y puntos)', 'e'), casilla('   … detallando cada variable por controlador (documento más largo)', 'detalle'), casilla('Validación contra el estándar del hotel (observaciones)', 'f'))));
+    } else {
+      const bi = ini[sel], fin = sel + 1 < ini.length ? ini[sel + 1] : S.bloques.length;
+      const filas = [];
+      for (let i = bi; i < fin; i++) {
+        const b = S.bloques[i];
+        const mover = (d) => { const j = i + d; if (j < 0 || j >= S.bloques.length) return; [S.bloques[i], S.bloques[j]] = [S.bloques[j], S.bloques[i]]; guardar(); BMS.rerender(); };
+        const ctrl = h('div', { style: { display: 'flex', gap: '4px', alignItems: 'flex-start' } },
+          h('select', { class: 'in', style: { width: '120px' }, value: b.t, onchange: (e) => { const t = e.target.value; if (t === b.t) return; if (t === 'tabla' || t === 'vivo') S.bloques[i] = nuevoTipo(t); else if (b.t === 'tabla' || b.t === 'vivo') S.bloques[i] = { t, texto: '' }; else b.t = t; guardar(); BMS.rerender(); } }, TIPOS.map(([v, tx]) => h('option', { value: v }, tx))),
+          h('button', { class: 'b s', title: 'Subir', onclick: () => mover(-1) }, '↑'), h('button', { class: 'b s', title: 'Bajar', onclick: () => mover(1) }, '↓'),
+          h('button', { class: 'b s', title: 'Agregar un párrafo debajo', onclick: () => { S.bloques.splice(i + 1, 0, nuevoTipo('p')); guardar(); BMS.rerender(); } }, '＋'),
+          h('button', { class: 'b x', title: 'Eliminar', onclick: () => { if (b.t === 'h1' && !confirm('Es el título de la sección; se elimina solo el título y su contenido pasa a la sección anterior. ¿Continuar?')) return; S.bloques.splice(i, 1); guardar(); BMS.rerender(); } }, '✕'));
+        let cont;
+        if (b.t === 'vivo') {
+          const prev = resolverVivo(b).filter((x) => x.t === 'p' && !/^Tabla No/.test(x.texto)).map((x) => x.texto.replace(/\*\*/g, '')).join(' ') || (b.fuente === 'tabla' ? 'Tabla de equipos y puntos (se arma al exportar).' : '');
+          cont = h('div', null, h('div', { class: 'fila', style: { margin: 0 } },
+            h('select', { class: 'in', value: b.fuente, onchange: (e) => { b.fuente = e.target.value; guardar(); BMS.rerender(); } }, VIVOS.map(([v, tx]) => h('option', { value: v }, tx))),
+            h('select', { class: 'in', value: b.cat, onchange: (e) => { b.cat = e.target.value; guardar(); BMS.rerender(); } }, BMS.catEq.categorias.map((c) => h('option', { value: c.id }, c.nombre))),
+            h('span', { class: 'chip gw' }, 'ligado en vivo')),
+            h('div', { class: 'mute', style: { fontSize: '12px', marginTop: '4px' } }, cut(prev, 600)));
+        } else if (b.t === 'tabla') {
+          const t = b.filas;
+          cont = h('div', { style: { overflowX: 'auto' } }, h('table', { class: 't', style: { width: 'auto' } }, h('tbody', null, t.map((fl, r) => h('tr', null, fl.map((c, k) => h('td', { style: { padding: '1px' } }, h('input', { class: 'in', style: { width: '150px', fontWeight: r === 0 ? 700 : 400 }, value: c, onchange: (e) => { t[r][k] = e.target.value; guardar(); } }))), h('td', null, h('button', { class: 'b x s', title: 'Quitar fila', onclick: () => { t.splice(r, 1); if (!t.length) t.push(['', '']); guardar(); BMS.rerender(); } }, '✕')))))),
+            h('div', { class: 'fila' },
+              h('button', { class: 'b s', onclick: () => { t.push(Array(Math.max(...t.map((x) => x.length))).fill('')); guardar(); BMS.rerender(); } }, '+ Fila'),
+              h('button', { class: 'b s', onclick: () => { t.forEach((x) => x.push('')); guardar(); BMS.rerender(); } }, '+ Columna'),
+              h('button', { class: 'b s', onclick: () => { if (t[0].length > 1) { t.forEach((x) => x.pop()); guardar(); BMS.rerender(); } } }, '− Columna'),
+              h('span', { class: 'mute', style: { fontSize: '12px' } }, 'La primera fila es el encabezado. Antes de la tabla agregue un párrafo "Tabla No. n" y otro con el nombre de la tabla.')));
+        } else {
+          const raw = b.texto || '';
+          cont = h('div', null, h('textarea', { class: 'in', style: { width: '100%', fontWeight: b.t === 'h1' || b.t === 'h2' ? 700 : 400 }, rows: b.t === 'h1' || b.t === 'h2' ? 1 : Math.max(2, Math.ceil(raw.length / 105)), value: raw, onchange: (e) => { b.texto = e.target.value; guardar(); BMS.rerender(); } }),
+            raw.indexOf('{{') >= 0 ? h('div', { class: 'mute', style: { fontSize: '12px' } }, 'Vista en vivo: ' + resolverTexto(raw)) : null);
+        }
+        filas.push(h('div', { style: { display: 'grid', gridTemplateColumns: '250px 1fr', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--line)', alignItems: 'start' } }, ctrl, cont));
+      }
+      derecha = h('div', null, h('div', { class: 'card' }, ...filas,
+        h('div', { class: 'fila' }, ...[['p', '+ Párrafo'], ['li', '+ Viñeta'], ['h2', '+ Subtítulo'], ['tabla', '+ Tabla'], ['vivo', '+ Bloque en vivo']].map(([t, tx]) => h('button', { class: 'b', onclick: () => { S.bloques.splice(fin, 0, nuevoTipo(t)); guardar(); BMS.rerender(); } }, tx)))));
+    }
+
+    root.append(h('h2', null, 'Secuencias de operación'),
+      h('p', { class: 'hint' }, 'Documento de secuencias del BMS en formato Sinergia, ligado en vivo al proyecto: las listas de equipos, los totales, los marcadores {{…}} y los anexos se actualizan con lo que se va llenando. Se exporta a Word con anexos (diagrama, variables y totales por nivel, controladores y dispositivos, variables por controlador, validación), se puede importar de nuevo, y se valida contra el estándar del hotel. Los valores entre corchetes [ ] son propuestas por validar.'),
+      barra, h('div', { class: 'split' }, lista, derecha));
+  };
+})();

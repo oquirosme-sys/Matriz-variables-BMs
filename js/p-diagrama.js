@@ -379,6 +379,12 @@
     });
   }
 
+  /* Datos y dibujo del diagrama para otros módulos (anexos del Word de secuencias) */
+  BMS.diag = {
+    construir: () => { const E = BMS.estado; E.diagrama = Object.assign({ lamina: 'BMS-01', awg: '16', licencias: true, colores: true, paneles: true, troncal: 'auto', notas: '', mv: {} }, E.diagrama || {}); return construir(); },
+    gateways, paneles, itemsCtrl
+  };
+
   BMS.pDiagrama = (root) => {
     const E = BMS.estado;
     E.diagrama = Object.assign({ lamina: 'BMS-01', awg: '16', licencias: true, colores: true, paneles: true, troncal: 'auto', notas: '', mv: {} }, E.diagrama || {});

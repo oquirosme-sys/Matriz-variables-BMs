@@ -9,6 +9,7 @@ Abrir `index.html` (o publicar la carpeta en GitHub Pages). Los datos se guardan
 3. **Equipos por nivel**: se escoge el equipo del catálogo y la cantidad; se cargan sus variables. Controlador automático o manual.
 4. **Resumen**: AI/AO/DI/DO/INT por nivel, controlador, sistema y matriz nivel × controlador; exporta a Excel.
 5. **Controladores**: selección automática (con ajuste manual) para JCI u Honeywell, lista de materiales y motor de red.
+6. **Secuencias**: secuencias de operación ligadas en vivo al proyecto, con exportación e importación en Word (formato Sinergia), anexos generados (diagrama, resúmenes y totales por nivel, controladores y dispositivos, variables por controlador) y validación contra el estándar del hotel.
 - **Catálogo de variables**: variables por tipo de equipo (sin equipos repetidos), editable.
 - **Catálogo de controladores**: modelos, canales y motores de red por marca, editable. Los datos de Honeywell son de referencia, por confirmar.
 

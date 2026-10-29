@@ -7,6 +7,7 @@
     { id: 'equipos', n: '3 · Equipos por nivel', fn: () => BMS.pEquipos },
     { id: 'resumen', n: '4 · Resumen', fn: () => BMS.pResumen },
     { id: 'controladores', n: '5 · Controladores', fn: () => BMS.pControladores },
+    { id: 'secuencias', n: '6 · Secuencias', fn: () => BMS.pSecuencias },
     { id: 'catalogo', sep: true, n: 'Catálogo de variables', fn: () => BMS.pCatalogo },
     { id: 'catctrl', n: 'Catálogo de controladores', fn: () => BMS.pCatCtrl }
   ];
