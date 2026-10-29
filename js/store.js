@@ -68,7 +68,7 @@
     BMS.estado = p && p.niveles ? p : BMS.proyectoNuevo();
     /* un estándar del hotel enorme (cargado de archivos grandes) hace lenta toda la herramienta: se recorta */
     const est = BMS.estado.secuencias && BMS.estado.secuencias.estandar;
-    if (est && typeof est.texto === 'string' && est.texto.length > 150000) { est.texto = est.texto.split(/\r?\n/).slice(0, 600).join('\n'); BMS.guardar(); }
+    if (est && typeof est.texto === 'string' && est.texto.length > 60000) { est.texto = est.texto.split(/\r?\n/).slice(0, 600).join('\n').slice(0, 60000); BMS.guardar(); }
     BMS.catEq = ce && ce.tipos ? ce : clone(window.BMS_CATALOGO_EQUIPOS);
     /* Migración del catálogo de equipos: agrega categorías y tipos nuevos y reemplaza los corregidos; respeta el resto de lo editado. */
     const base = window.BMS_CATALOGO_EQUIPOS;

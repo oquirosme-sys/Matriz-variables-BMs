@@ -365,9 +365,12 @@
         const S = BMS.estado.secuencias, lineas = [], fallos = [];
         for (const f of fs) { try { const l = await lineasDe(f); lineas.push(...l); } catch (e) { fallos.push(f.name + ': ' + e.message); } }
         if (!lineas.length) { alert('No se pudo leer texto de los archivos.' + (fallos.length ? '\n' + fallos.join('\n') : '')); return; }
+        if (lineas.length > 600 && !confirm('El archivo tiene ' + lineas.length + ' líneas de texto. Para que la herramienta siga ágil solo se usarán las primeras 600 líneas. ¿Continuar?\n\nSi el estándar es largo, pegue en el cuadro solo los requisitos que quiere validar.')) return;
+        lineas.splice(600);
         let agregar = false;
         if ((S.estandar.texto || '').trim()) agregar = !confirm('Ya hay requisitos cargados.\n\nAceptar = reemplazarlos con ' + fs.length + ' archivo(s).\nCancelar = agregar al final.');
         S.estandar.texto = (agregar ? S.estandar.texto.replace(/\s+$/, '') + '\n' : '') + lineas.join('\n');
+        S.estandar.texto = S.estandar.texto.slice(0, 60000);
         const nom = fs[0].name.replace(/\.\w+$/, '');
         if (!agregar || !S.estandar.nombre) S.estandar.nombre = nom;
         guardar(); BMS.rerender();
