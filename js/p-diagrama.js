@@ -220,10 +220,15 @@
       'Cantidades según matriz de puntos del proyecto. Los puntos por gateway (INT) no ocupan canales del controlador.',
       'Total del proyecto: AI ' + tTot.ai + ' · AO ' + tTot.ao + ' · DI ' + tTot.di + ' · DO ' + tTot.do + ' (' + C.cable(tTot) + ' cableados, ' + C.cable(rv) + ' con reserva) · INT ' + tTot.int + '.',
       'Marca de controladores: ' + P.marca + '. Selección de modelos según pestaña 5; validar con el integrador.',
-      'Se debe suministrar un gabinete para cada controlador o grupo de controladores y gateways del mismo cuarto.'];
+      'Se debe suministrar un gabinete para cada controlador o grupo de controladores y gateways del mismo cuarto.',
+      'Todos los cables UTP se conectan en el rack del nivel.', 'Todos los cables 5302FE se conectan en el controlador en el nivel.',
+      'Las canastas reflejadas en estos planos son las mismas del sistema de telecomunicaciones.'];
+    /* simbología de canalizaciones y cableado (cables por canalización y caja de registro) */
+    const CAN_H = 104, canalH = 14 + CAN_H;
+    const cablesCan = [['A', '1x UN CABLE UTP', '13'], ['B', '2x UN CABLE UTP', '19'], ['C', '1x BELDEN 5302FE', '13'], ['D', '2x BELDEN 5302FE', '19'], ['E', '3x BELDEN 5302FE', '19'], ['F', '4x BELDEN 5302FE', '19'], ['G', '5x BELDEN 5302FE', '19'], ['H', '6x BELDEN 5302FE', '25']];
     const hNotas = notas.reduce((a, t) => a + wrap(t, 64).length * 10.5 + 7, 24);
     const sum = (L) => L.reduce((a, b) => a + b, 0);
-    const legH = Math.max(52 + sum(hProt), 36 + sum(hSimbI), 36 + sum(hSimbD), hNotas);
+    const legH = Math.max(52 + sum(hProt) + canalH, 36 + sum(hSimbI), 36 + sum(hSimbD), hNotas);
     const yLeyenda = y + 10, H = Math.max(1100, Math.round(yLeyenda + legH + 150));
 
     const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, xmlns: NS, role: 'img', 'aria-label': 'Diagrama unifilar del sistema de monitoreo y control (BMS)', 'font-family': 'Arial Narrow, Arial, Helvetica, sans-serif' });
@@ -382,6 +387,15 @@
       py += hProt[i];
     });
     line(g, cx1, L0 + 34, cx1, py); line(g, cx2, L0 + 34, cx2, py);
+
+    /* ---- simbología de canalizaciones y cableado ---- */
+    const CY = py + 14;
+    rect(g, PX, CY, PW, CAN_H);
+    txt(g, PX + PW / 2, CY + 24, 'Sistema de BMS: simbología de canalizaciones y cableado', { size: 13, anchor: 'middle' });
+    line(g, PX, CY + 34, PX + PW, CY + 34);
+    cablesCan.forEach(([k, t, d], i) => { const cx = PX + 14 + (i < 4 ? 0 : 190), cy = CY + 52 + (i % 4) * 15; txt(g, cx, cy, k, { size: 9, bold: true }); txt(g, cx + 14, cy, t + '  ' + d + ' Φ', { size: 9 }); });
+    equipoX(g, PX + 398, CY + 46, 22);
+    txt(g, PX + 430, CY + 56, 'Caja de registro', { size: 9 }); txt(g, PX + 430, CY + 70, '10x10 cm (4"x4")', { size: 9 });
 
     /* ---- simbología de sistema de monitoreo y control, con los modelos de la marca (dos tablas lado a lado) ---- */
     const tablaSimb = (SX, filasS, hs, titulo) => {
