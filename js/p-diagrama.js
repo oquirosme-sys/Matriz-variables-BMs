@@ -124,6 +124,7 @@
     const out = [];
     res.filas.filter((f) => f.ip && f.tipo && f.eq.qty > 0).forEach((f) => {
       const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q), n = nivelDe(f.eq.nivel), pts = f.puntos.filter((p) => p.incl).map((p) => p.p.n);
+      if (porHab(f.tipo)) { out.push({ k: 'panel', clave: f.com, tipo: f.tipo, qty: nHab(f, q), tags: [tagHab(f.eq.tag)].filter(Boolean), niv: new Set(n ? [n.codigo] : []), int: Math.round(f.t.int), pts }); return; }
       for (let i = 0; i < q; i++) out.push({ k: 'panel', clave: f.com, tipo: f.tipo, qty: 1, tags: tags[i] && !/-$/.test(tags[i]) ? [tags[i]] : [], niv: new Set(n ? [n.codigo] : []), int: Math.round(f.t.int / q), pts });
     });
     return out;
