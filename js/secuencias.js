@@ -586,11 +586,28 @@
         const indice = toc.map(([n, t, id]) => '<div style="margin-left:' + (n === 2 ? 20 : 0) + 'px;"><a href="#' + id + '" style="color:inherit;">' + esc(String(t).replace(/\*\*|==|!!/g, '')) + '</a></div>').join('');
         const portadaHtml = portada.filter((x) => String(x).trim()).map((x, i) => '<div style="' + (i === 1 ? 'font-size:22px;font-weight:700;margin:6px 0;' : i === 0 ? 'font-size:15px;color:#385623;' : 'font-size:13px;color:#555;') + '">' + inline(x) + '</div>').join('');
         const cierra = () => { urls.forEach((u) => URL.revokeObjectURL(u)); fondo.remove(); document.removeEventListener('keydown', tecla); };
-        const pdf = () => {
-          const ant = document.title; document.title = (portada[2] && String(portada[2]).trim()) || (doc === 'inc' ? 'Secuencias alarma contra incendio' : 'Secuencias BMS');
+        /* PDF con el formato del Word: carta, membrete con logo y datos de la empresa arriba, contacto y «documento · Página N» abajo (cajas de margen de @page; Chrome/Edge recientes) */
+        const pdf = async () => {
+          const ant = document.title, nombre = String(doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación').slice(0, 40);
+          document.title = (portada[2] && String(portada[2]).trim()) || nombre;
+          let logo = '';
+          try {
+            const z = await JSZip.loadAsync(window.BMS_DOCX_BASE, { base64: true });
+            const b64 = await z.file('word/media/image2.png').async('base64');
+            const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="215" height="77" viewBox="0 0 215 77"><image width="215" height="77" href="data:image/png;base64,' + b64 + '"/></svg>';
+            logo = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg).replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29') + '")';
+          } catch (e) { /* sin logo */ }
+          const cad = (t) => '"' + String(t).replace(/[\\"]/g, (m) => '\\' + m).replace(/\n/g, ' ') + '"';
+          const st = document.createElement('style');
+          st.textContent = '@page { size: letter; margin: 34mm 13.5mm 26mm 13.5mm;' +
+            ' @top-left { content: ' + (logo || '""') + '; vertical-align: top; padding-top: 8.5mm; }' +
+            ' @top-right { content: "Sinergia Consultoría Mecánica y Eléctrica S.A\\A Oficentro Plaza Roble, Edificio Pórtico, Escazú"; white-space: pre; text-align: right; vertical-align: top; padding: 9mm 16.5mm 0 0; font: 8pt Calibri, Arial, sans-serif; color: #000; }' +
+            ' @bottom-left { content: "www.sinergia.co.cr     info@sinergia.co.cr     Tel: 2215-3865"; width: 62%; text-align: left; vertical-align: top; padding: 4mm 0 0 16.5mm; font: 9pt "Yu Gothic UI Semibold", "Yu Gothic UI", Montserrat, Arial, sans-serif; color: #385623; white-space: nowrap; }' +
+            ' @bottom-right { content: ' + cad(nombre + ' · Página ') + ' counter(page); width: 38%; text-align: right; vertical-align: top; padding: 4.6mm 16.5mm 0 0; font: 8pt Montserrat, Arial, sans-serif; color: #808080; white-space: nowrap; overflow: hidden; } }';
+          document.head.append(st);
           document.body.classList.add('vp-imprime');
-          const fin = () => { document.body.classList.remove('vp-imprime'); document.title = ant; window.removeEventListener('afterprint', fin); };
-          window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 100);
+          const fin = () => { document.body.classList.remove('vp-imprime'); document.title = ant; st.remove(); window.removeEventListener('afterprint', fin); };
+          window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 150);
         };
         const tecla = (e) => { if (e.key === 'Escape') cierra(); };
         const hoja = h('div', { class: 'vp-hoja', style: { background: '#fff', color: '#111', width: 'min(960px, 100%)', margin: '0 auto', padding: '40px 48px', boxShadow: '0 2px 14px rgba(0,0,0,.35)', fontFamily: 'Montserrat, Arial, sans-serif', fontSize: '13px', lineHeight: '1.5' } });
