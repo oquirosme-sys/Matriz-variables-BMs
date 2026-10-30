@@ -76,6 +76,7 @@
           h('td', null, conAsa(h('input', { class: 'in', style: { width: '80px' }, value: n.codigo, onchange: (e) => {
             const v = e.target.value.trim().toUpperCase().replace(/\s+/g, '');
             if (!v || E.niveles.some((x) => x !== n && x.codigo === v)) { alert('El código de nivel está vacío o repetido.'); e.target.value = n.codigo; return; }
+            E.equipos.filter((q) => q.nivel === n.id).forEach((q) => (q.tag = BMS.calc.tagConNivel(q.tag, n.codigo, v)));
             n.codigo = v; e.target.value = v; BMS.touch(); BMS.rerender();
           } }), 'codigo', i)),
           h('td', null, conAsa(h('input', { class: 'in', style: { width: '100%' }, value: n.nombre, onchange: (e) => { n.nombre = e.target.value; BMS.touch(); } }), 'nombre', i)),

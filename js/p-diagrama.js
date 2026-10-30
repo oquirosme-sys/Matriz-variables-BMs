@@ -60,10 +60,12 @@
   const tagUtil = (it, nom) => { const t = (it.tags[0] || '').trim(); if (!t || /-$/.test(t)) return ''; const w = nom.toUpperCase().split(' ')[0]; return t.toUpperCase().startsWith(w) || nom.toUpperCase().includes(t.toUpperCase()) ? '' : t; };
 
   /* Etiquetas individuales de un renglón de equipos: «EX-S1» ×3 → EX-S1, EX-S2, EX-S3; «UE-1…5» → UE-1 … UE-5; prefijo «BP-» → BP-1, BP-2… */
-  function etiquetas(tag, qty) {
+  function etiquetas(tag, qty, nivelId) {
     const t = String(tag || '').trim();
     if (qty <= 1) return [t];
     if (!t) return Array(qty).fill('');
+    /* un tag que termina en el código del nivel (GW-N2) no se numera sumando: sería el nivel siguiente */
+    if (nivelId && tagNivel(t, nivelId)) return Array.from({ length: qty }, (_, i) => t + '-' + (i + 1));
     const pad = (n, ref) => String(n).padStart(String(ref).length > 1 && /^0/.test(String(ref)) ? String(ref).length : 0, '0');
     if (/-$/.test(t)) return Array.from({ length: qty }, (_, i) => t + (i + 1));
     let m = /^(.*?)(\d+)\s*(?:…|\.{2,3}|–|\/)\s*(\d+)$/.exec(t);
@@ -82,6 +84,9 @@
   const POR_HAB = new Set(['fcu', 'fcu_simple', 'grms_n']);
   const nHab = (f, q) => BMS.calc.habsDe(f.eq.nivel) || q;
   const porHab = (tipo) => tipo.hab === true || POR_HAB.has(tipo.id);
+  const tagNivel = (tag, nivelId) => { const n = BMS.calc.nivelDe(nivelId); return !!(n && n.codigo && new RegExp('(^|[-_\\s])' + n.codigo + '$', 'i').test(String(tag || '').trim())); };
+  /* una sola caja con «TAG ×N»: equipos por habitación, o varios iguales con tag de nivel (GW-N2 ×2) */
+  const agrupa = (f, q) => porHab(f.tipo) || (q > 1 && tagNivel(f.eq.tag, f.eq.nivel));
   const nomHab = (it) => etiqueta(it).replace(/ por nivel$/i, '').replace(/ de habitaciones/i, '') + (it.qty > 1 ? ' ×' + it.qty + ' hab.' : '');
   const tagHab = (tag) => { const t = String(tag || '').trim(); return /-$/.test(t) ? '' : t.replace(/\s*\d+\s*(?:…|\.{2,3}|–|\/).*$/, ''); };
 
@@ -89,7 +94,7 @@
   function itemsCtrl(res, cid) {
     const out = [];
     res.filas.filter((f) => f.ctrlId === cid && f.tipo && f.eq.qty > 0 && !f.tipo.gw && !f.ip).forEach((f) => {
-      const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q);
+      const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q, f.eq.nivel);
       if (porHab(f.tipo)) { const t = BMS.calc.vacio(); ['ai', 'ao', 'di', 'do', 'int'].forEach((k) => (t[k] = Math.round(f.t[k]))); out.push({ tipo: f.tipo, qty: nHab(f, q), hab: true, tags: [tagHab(f.eq.tag)], t, idx: 1, de: 1 }); return; }
       for (let i = 0; i < q; i++) {
         const t = BMS.calc.vacio();
@@ -107,8 +112,8 @@
       if (f.tipo.gw === 'GW-MODBUS') k = /RTU|Modbus \/ BACnet/i.test(f.tipo.pts.map((p) => p.ifc).join(' ')) ? 'C' : 'E';
       const id = f.tipo.gw + '|' + k;
       const o = out.get(id) || { gw: f.tipo.gw, clave: k, items: [], host: {} };
-      const q = Math.max(1, Math.round(f.eq.qty)), tg = etiquetas(f.eq.tag, q), nv = nivelDe(f.eq.nivel);
-      if (porHab(f.tipo)) o.items.push({ tipo: f.tipo, qty: nHab(f, q), hab: true, tags: [tagHab(f.eq.tag)], ints: Math.round(f.t.int), niv: new Set(nv ? [nv.codigo] : []), idx: 1, de: 1 });
+      const q = Math.max(1, Math.round(f.eq.qty)), tg = etiquetas(f.eq.tag, q, f.eq.nivel), nv = nivelDe(f.eq.nivel);
+      if (agrupa(f, q)) o.items.push({ tipo: f.tipo, qty: porHab(f.tipo) ? nHab(f, q) : q, hab: porHab(f.tipo), tags: [tagHab(f.eq.tag)], ints: Math.round(f.t.int), niv: new Set(nv ? [nv.codigo] : []), idx: 1, de: 1 });
       else for (let i = 0; i < q; i++) o.items.push({ tipo: f.tipo, qty: 1, tags: [tg[i] && !/-$/.test(tg[i]) ? tg[i] : ''], ints: Math.round(f.t.int / q), niv: new Set(nv ? [nv.codigo] : []), idx: i + 1, de: q });
       if (f.ctrlId) o.host[f.ctrlId] = (o.host[f.ctrlId] || 0) + f.t.int;
       out.set(id, o);
@@ -123,8 +128,8 @@
   function paneles(res, nivelDe) {
     const out = [];
     res.filas.filter((f) => f.ip && f.tipo && f.eq.qty > 0).forEach((f) => {
-      const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q), n = nivelDe(f.eq.nivel), pts = f.puntos.filter((p) => p.incl).map((p) => p.p.n);
-      if (porHab(f.tipo)) { out.push({ k: 'panel', clave: f.com, tipo: f.tipo, qty: nHab(f, q), tags: [tagHab(f.eq.tag)].filter(Boolean), niv: new Set(n ? [n.codigo] : []), int: Math.round(f.t.int), pts }); return; }
+      const q = Math.max(1, Math.round(f.eq.qty)), tags = etiquetas(f.eq.tag, q, f.eq.nivel), n = nivelDe(f.eq.nivel), pts = f.puntos.filter((p) => p.incl).map((p) => p.p.n);
+      if (agrupa(f, q)) { out.push({ k: 'panel', clave: f.com, tipo: f.tipo, qty: porHab(f.tipo) ? nHab(f, q) : q, tags: [tagHab(f.eq.tag)].filter(Boolean), niv: new Set(n ? [n.codigo] : []), int: Math.round(f.t.int), pts }); return; }
       for (let i = 0; i < q; i++) out.push({ k: 'panel', clave: f.com, tipo: f.tipo, qty: 1, tags: tags[i] && !/-$/.test(tags[i]) ? [tags[i]] : [], niv: new Set(n ? [n.codigo] : []), int: Math.round(f.t.int / q), pts });
     });
     return out;
@@ -337,7 +342,7 @@
             const yy = busY + 196 + q * 36;
             simOtros(g, cx - 92, yy, 56);
             mv(g, kid + ':i' + q, (sg) => {
-              txt(sg, cx - 30, yy + 9, cut(it.hab ? nomHab(it) : etiqueta(it) + (it.tags && it.tags[0] ? ' ' + it.tags[0] : (it.de > 1 ? ' ' + it.idx : '')), 27), { size: 8.5 });
+              txt(sg, cx - 30, yy + 9, cut(it.hab ? nomHab(it) : etiqueta(it) + (it.tags && it.tags[0] ? ' ' + it.tags[0] : (it.de > 1 ? ' ' + it.idx : '')) + (it.qty > 1 ? ' ×' + it.qty : ''), 27), { size: 8.5 });
               txt(sg, cx - 30, yy + 20, `INT ${it.ints}` + (it.niv.size ? ' · ' + [...it.niv].join(', ') : ''), { size: 7.5, fill: GRIS });
             });
           });

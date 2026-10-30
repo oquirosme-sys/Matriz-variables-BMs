@@ -91,6 +91,8 @@
           h('td', null, h('select', { class: 'in', style: { width: '78px' }, value: eq.nivel, title: 'Nivel del equipo. Cámbielo si el equipo se pasó a otro nivel: se mueve con sus variables y el controlador se reasigna.', onchange: (e) => {
             const ant = eq.ctrl && eq.ctrl !== 'auto' && E.controladores.find((x) => x.id === eq.ctrl);
             if (ant && ant.nivel === eq.nivel) eq.ctrl = 'auto';
+            const a = C.nivelDe(eq.nivel), b = C.nivelDe(e.target.value);
+            if (a && b) eq.tag = C.tagConNivel(eq.tag, a.codigo, b.codigo);
             eq.nivel = e.target.value; BMS.touch(); BMS.rerender();
           } }, E.niveles.map((n) => h('option', { value: n.id }, n.codigo)))),
           h('td', null, h('input', { class: 'in n', type: 'number', min: 0, step: 1, value: eq.qty, disabled: C.porHabCant(eq), title: C.porHabCant(eq) ? 'La cantidad es el número de habitaciones del nivel (pestaña 1, Niveles).' : '', onchange: (e) => { eq.qty = Math.max(0, Math.round(num(e.target.value))); e.target.value = eq.qty; BMS.touch(); actualizar(); } })),
