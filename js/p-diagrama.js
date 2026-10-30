@@ -393,7 +393,7 @@
     rect(g, PX, CY, PW, CAN_H);
     txt(g, PX + PW / 2, CY + 24, 'Sistema de BMS: simbología de canalizaciones y cableado', { size: 13, anchor: 'middle' });
     line(g, PX, CY + 34, PX + PW, CY + 34);
-    cablesCan.forEach(([k, t, d], i) => { const cx = PX + 14 + (i < 4 ? 0 : 190), cy = CY + 52 + (i % 4) * 15; txt(g, cx, cy, k, { size: 9, bold: true }); txt(g, cx + 14, cy, t + '  ' + d + ' mm Φ', { size: 9 }); });
+    cablesCan.forEach(([k, t, d], i) => { const cx = PX + 14 + (i < 4 ? 0 : 190), cy = CY + 52 + (i % 4) * 15; txt(g, cx, cy, k, { size: 9, bold: true }); txt(g, cx + 14, cy, t + '  ' + d + ' mm', { size: 9 }); });
     equipoX(g, PX + 398, CY + 46, 22);
     txt(g, PX + 430, CY + 56, 'Caja de registro', { size: 9 }); txt(g, PX + 430, CY + 70, '10x10 cm (4"x4")', { size: 9 });
 
