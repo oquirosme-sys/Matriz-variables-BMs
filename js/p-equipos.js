@@ -153,15 +153,28 @@
     const copiar = () => {
       const o = selCopiar.value; if (!o) return;
       if (filasNivel().length && !confirm('Este nivel ya tiene equipos; se agregarán los del otro nivel. ¿Continuar?')) return;
-      E.equipos.filter((q) => q.nivel === o).forEach((q) => E.equipos.push({ ...BMS.clone(q), id: uid(), nivel: nivel.id, ctrl: 'auto' }));
+      const orig = E.niveles.find((x) => x.id === o);
+      /* el tag con código de nivel (FCU-HAB-N2) se copia con el del nivel de destino (FCU-HAB-N3) */
+      E.equipos.filter((q) => q.nivel === o).forEach((q) => E.equipos.push({ ...BMS.clone(q), id: uid(), nivel: nivel.id, ctrl: 'auto', tag: orig ? C.tagConNivel(q.tag, orig.codigo, nivel.codigo) : q.tag }));
       BMS.touch(); BMS.rerender();
+    };
+    /* corrige tags ya copiados que quedaron con el código de otro nivel */
+    const ajustarTags = () => {
+      let n = 0;
+      E.equipos.filter((q) => q.nivel === nivel.id).forEach((q) => E.niveles.forEach((x) => {
+        if (x.id === nivel.id) return;
+        const t = C.tagConNivel(q.tag, x.codigo, nivel.codigo);
+        if (t !== q.tag) { q.tag = t; n++; }
+      }));
+      alert(n ? 'Se ajustaron ' + n + ' tags al código ' + nivel.codigo + '.' : 'Ningún tag de este nivel tiene el código de otro nivel.');
+      if (n) { BMS.touch(); BMS.rerender(); }
     };
 
     root.append(h('div', { class: 'split' }, lista, h('div', null,
       h('h3', { style: { marginTop: 0 } }, 'Nivel ' + nivel.codigo + ' — ' + nivel.nombre),
       resumenEl,
       h('div', { class: 'fila noprint' }, buscador),
-      h('div', { class: 'fila noprint' }, selAgregar, selCopiar, h('button', { class: 'b', onclick: copiar }, 'Copiar')),
+      h('div', { class: 'fila noprint' }, selAgregar, selCopiar, h('button', { class: 'b', onclick: copiar }, 'Copiar'), h('button', { class: 'b', title: 'Cambia el código de otro nivel que quedó en los tags de este nivel (p. ej. FCU-HAB-N2 → FCU-HAB-N3)', onclick: ajustarTags }, 'Ajustar tags al nivel')),
       h('div', { class: 'scroll' }, h('table', { class: 't' },
         h('thead', null, h('tr', null, ['', 'Equipo (catálogo)', 'Tag(s)', 'Nivel', 'Cant.', 'Comunicación', 'Controlador', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total', 'Observación', ''].map((x) => h('th', null, x)))), cuerpo)),
       h('div', { class: 'fila noprint' }, h('button', { class: 'b', title: 'Una pestaña por disciplina en el formato BMS Point Schedule (nivel, tag y controlador de cada equipo) y la tabla Equipos_por_nivel', onclick: () => BMS.exportarEquiposXlsx() }, 'Exportar equipos a Excel (por disciplina)'), h('button', { class: 'b p', onclick: () => BMS.ir('resumen') }, 'Siguiente: resumen →')))));
