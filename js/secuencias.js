@@ -201,8 +201,16 @@
     img.onload = async () => {
       try {
         /* a todo el ancho útil de la hoja: la primera parte comparte página con el título (0.52 del ancho), las demás ocupan la página (0.68) */
-        const h1 = Math.min(H, Math.round(W * 0.52)), resto = Math.max(0, H - h1), nr = resto ? Math.ceil(resto / (W * 0.68)) : 0, hr = nr ? Math.ceil(resto / nr) : 0;
-        const cortes = [[0, h1]]; for (let i = 0; i < nr; i++) cortes.push([h1 + i * hr, Math.min(hr, H - h1 - i * hr)]);
+        /* se corta entre lazos (límites que informa el diagrama); si un lazo es más alto que la hoja, se corta donde toque */
+        const lim = JSON.parse(svg.getAttribute('data-cortes') || '[]').filter((v) => v > 0 && v < H), cortes = [];
+        let y0 = 0;
+        while (H - y0 > 1) {
+          const tope = Math.round(W * (cortes.length ? 0.68 : 0.52));
+          let fin;
+          if (H - y0 <= tope) fin = H;
+          else { const c = lim.filter((v) => v > y0 + tope * 0.3 && v <= y0 + tope); fin = c.length ? Math.max(...c) : y0 + tope; }
+          cortes.push([y0, fin - y0]); y0 = fin;
+        }
         const partes = [];
         for (let i = 0; i < cortes.length; i++) {
           const y0 = cortes[i][0], hh = cortes[i][1];

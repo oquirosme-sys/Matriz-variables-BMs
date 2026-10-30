@@ -227,6 +227,8 @@
     const yLeyenda = y + 10, H = Math.max(1100, Math.round(yLeyenda + legH + 150));
 
     const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, xmlns: NS, role: 'img', 'aria-label': 'Diagrama unifilar del sistema de monitoreo y control (BMS)', 'font-family': 'Arial Narrow, Arial, Helvetica, sans-serif' });
+    /* límites entre lazos: la exportación a Word corta la lámina solo por aquí, para no partir un lazo */
+    svg.setAttribute('data-cortes', JSON.stringify([...pos.slice(1).map((r) => r.busY - 50), y].map(Math.round)));
     svg.append(s('rect', { width: W, height: H, fill: '#fff' }));
     const g = s('g'); svg.append(g);
     rect(g, 12, 12, W - 24, H - 24, { w: 0.6 });
