@@ -151,7 +151,15 @@
       return { g: g.concat(), k, i };
     });
     con.sort((a, b) => a.k - b.k || a.i - b.i);
-    return pre.concat(...con.map((x) => x.g));
+    const orden = con.map((x) => x.g);
+    /* las secciones SOO-n se numeran seguidas (1, 2, 3…) y las referencias «SOO-n» del texto siguen a su sección */
+    const mapa = {}; let sig = 0, cambia = false;
+    orden.forEach((g) => { const m = /^SOO-(\d+)/i.exec(String(g[0].texto || '').trim()); if (m) { sig++; mapa[m[1]] = sig; if (Number(m[1]) !== sig) cambia = true; } });
+    if (cambia) {
+      const rn = (t) => (typeof t === 'string' ? t.replace(/\bSOO-(\d+)\b/g, (x, d) => (mapa[d] ? 'SOO-' + mapa[d] : x)) : t);
+      orden.forEach((g, i) => { orden[i] = g.map((b) => { if (b.t === 'vivo') return b; const c = { ...b }; if ('texto' in c) c.texto = rn(c.texto); if ('titulo' in c) c.titulo = rn(c.titulo); if ('nota' in c) c.nota = rn(c.nota); if (Array.isArray(c.filas)) c.filas = c.filas.map((f) => (Array.isArray(f) ? f.map(rn) : f)); return c; }); });
+    }
+    return pre.concat(...orden);
   }
   const ordenarDoc = (S) => { S.bloques = [...ordenarSecciones(bloquesDe(S.bloques, 'bms')), ...ordenarSecciones(bloquesDe(S.bloques, 'inc'))]; };
   function bloquesDe(bl, doc) {
@@ -538,6 +546,58 @@
     const val = validar(false, DOC);
     const nObs = val.cuentaReqs.falta + val.cuentaReqs.parcial + val.pr.length;
 
+    /* Vista previa: el mismo contenido que saldrá en el Word (secciones en orden, bloques ligados resueltos y anexos), en una hoja dentro de la herramienta */
+    const vistaPrevia = async (doc = 'bms') => {
+      const urls = [];
+      try {
+        estado.textContent = 'Preparando la vista previa…';
+        const mios = ordenarSecciones(bloquesDe(S.bloques, doc));
+        const anexos = doc === 'bms' && ['b', 'c', 'd', 'e', 'f'].some((k) => S.opciones[k]) ? await generarAnexos(S.opciones, letraSiguiente(mios)) : [];
+        const portada = S.portada.map((x) => resolverTexto(x));
+        const bl = [...resolverBloques(mios), ...anexos];
+        const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const inline = (t) => {
+          let neg = false, hl = false, rojo = false, out = '';
+          String(t == null ? '' : t).split(/(\*\*|==|!!)/).forEach((x) => {
+            if (x === '**') { neg = !neg; return; } if (x === '==') { hl = !hl; return; } if (x === '!!') { rojo = !rojo; return; }
+            esc(x).split(/(\[[^\]]*\])/).forEach((y) => {
+              if (!y) return; const r = rojo || /^\[.*\]$/.test(y);
+              out += '<span style="' + (neg ? 'font-weight:700;' : '') + (hl ? 'background:#fff2a8;' : '') + (r ? 'color:#c00000;' : '') + '">' + y + '</span>';
+            });
+          });
+          return out;
+        };
+        let k = 0; const toc = [];
+        const html = bl.map((b) => {
+          if (b.t === 'h1') { const id = 'vp' + (k++); toc.push([1, b.texto, id]); return '<h2 id="' + id + '" style="font-size:19px;margin:26px 0 8px;">' + inline(b.texto) + '</h2>'; }
+          if (b.t === 'h2') { const id = 'vp' + (k++); toc.push([2, b.texto, id]); return '<h3 id="' + id + '" style="font-size:15px;margin:18px 0 6px;">' + inline(b.texto) + '</h3>'; }
+          if (b.t === 'li') return '<div style="margin:2px 0 2px 22px;text-indent:-14px;">• ' + inline(b.texto) + '</div>';
+          if (b.t === 'sub') return '<p style="margin:10px 0 4px;font-weight:700;">' + inline(b.texto) + '</p>';
+          if (b.t === 'salto' || b.t === 'horizontal') return '<hr style="border:0;border-top:1px dashed #bbb;margin:22px 0;">';
+          if (b.t === 'imagen') { const u = URL.createObjectURL(new Blob([b.png], { type: 'image/png' })); urls.push(u); return '<figure style="margin:12px 0;text-align:center;"><img src="' + u + '" style="max-width:100%;border:1px solid #ddd;"><figcaption style="font-size:12px;color:#555;margin-top:4px;">' + esc(b.pie || '') + '</figcaption></figure>'; }
+          if (b.t === 'tabla') {
+            const al = b.align || [];
+            return '<div style="margin:12px 0;overflow-x:auto;">' + (b.titulo ? '<div style="text-align:center;font-weight:700;margin-bottom:4px;">' + inline(b.titulo) + '</div>' : '') +
+              '<table style="border-collapse:collapse;width:100%;font-size:12px;">' + (b.filas || []).map((f, i) => '<tr>' + f.map((cel, j) => '<' + (i ? 'td' : 'th') + ' style="border-top:' + (i ? '0.5px solid #bbb' : '1.5px solid #000') + ';' + (i === 0 ? 'border-bottom:1.5px solid #000;' : '') + 'padding:3px 6px;text-align:' + (al[j] === 'r' ? 'right' : 'left') + ';vertical-align:top;">' + inline(cel) + '</' + (i ? 'td' : 'th') + '>').join('') + '</tr>').join('') + '</table>' +
+              (b.nota ? '<div style="font-size:11px;color:#555;margin-top:3px;">' + inline(b.nota) + '</div>' : '') + '</div>';
+          }
+          return '<p style="margin:6px 0;text-align:justify;">' + inline(b.texto) + '</p>';
+        }).join('');
+        const indice = toc.map(([n, t, id]) => '<div style="margin-left:' + (n === 2 ? 20 : 0) + 'px;"><a href="#' + id + '" style="color:inherit;">' + esc(String(t).replace(/\*\*|==|!!/g, '')) + '</a></div>').join('');
+        const portadaHtml = portada.filter((x) => String(x).trim()).map((x, i) => '<div style="' + (i === 1 ? 'font-size:22px;font-weight:700;margin:6px 0;' : i === 0 ? 'font-size:15px;color:#385623;' : 'font-size:13px;color:#555;') + '">' + inline(x) + '</div>').join('');
+        const cierra = () => { urls.forEach((u) => URL.revokeObjectURL(u)); fondo.remove(); document.removeEventListener('keydown', tecla); };
+        const tecla = (e) => { if (e.key === 'Escape') cierra(); };
+        const hoja = h('div', { style: { background: '#fff', color: '#111', width: 'min(960px, 100%)', margin: '0 auto', padding: '40px 48px', boxShadow: '0 2px 14px rgba(0,0,0,.35)', fontFamily: 'Montserrat, Arial, sans-serif', fontSize: '13px', lineHeight: '1.5' } });
+        hoja.innerHTML = '<div style="margin-bottom:26px;">' + portadaHtml + '</div><h2 style="font-size:19px;margin:20px 0 8px;">Contenido</h2>' + indice + html;
+        const fondo = h('div', { style: { position: 'fixed', inset: '0', background: 'rgba(0,0,0,.55)', zIndex: '1000', overflow: 'auto', padding: '16px' } },
+          h('div', { style: { position: 'sticky', top: '0', display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', marginBottom: '10px' } },
+            h('span', { style: { color: '#fff', fontWeight: '600' } }, 'Vista previa — ' + (doc === 'inc' ? 'Alarma contra incendio' : 'BMS') + ' (sin traducción; el Word puede variar en paginación)'),
+            h('button', { class: 'b p', onclick: () => { cierra(); exportar(doc); } }, 'Exportar Word'), h('button', { class: 'b', onclick: cierra }, 'Cerrar')),
+          hoja);
+        document.addEventListener('keydown', tecla); document.body.append(fondo);
+        estado.textContent = '';
+      } catch (e) { estado.textContent = ''; alert('No se pudo generar la vista previa: ' + e.message); }
+    };
     const exportar = async (doc = 'bms') => {
       const pTrad = BMS.trad.crearTraductor((f) => { estado.textContent = 'Descargando el traductor del navegador… ' + Math.round(f * 100) + ' %'; });
       try {
@@ -639,6 +699,7 @@
     const cabSistema = () => h('div', { class: 'card', style: { display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' } }, h('b', null, 'Sistema:'), selSistema(), h('span', { class: 'mute' }, 'Las secciones, los hallazgos, «Completar la secuencia» y el Word se limitan al sistema escogido.'));
     const barra = h('div', { class: 'fila noprint' },
       selSistema(),
+      h('button', { class: 'b', title: 'Muestra en pantalla cómo quedará el documento, sin descargarlo', onclick: () => vistaPrevia(DOC) }, 'Vista previa'),
       h('button', { class: 'b p', title: 'Genera el Word de este sistema', onclick: () => exportar(DOC) }, 'Exportar Word — ' + (DOC === 'inc' ? 'Alarma contra incendio' : 'BMS')),
       h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
         try {
