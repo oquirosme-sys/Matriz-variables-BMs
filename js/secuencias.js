@@ -547,7 +547,7 @@
     const nObs = val.cuentaReqs.falta + val.cuentaReqs.parcial + val.pr.length;
 
     /* Vista previa: el mismo contenido que saldrá en el Word (secciones en orden, bloques ligados resueltos y anexos), en una hoja dentro de la herramienta */
-    const vistaPrevia = async (doc = 'bms') => {
+    const vistaPrevia = async (doc = 'bms', imprimir = false) => {
       const urls = [];
       try {
         estado.textContent = 'Preparando la vista previa…';
@@ -586,16 +586,23 @@
         const indice = toc.map(([n, t, id]) => '<div style="margin-left:' + (n === 2 ? 20 : 0) + 'px;"><a href="#' + id + '" style="color:inherit;">' + esc(String(t).replace(/\*\*|==|!!/g, '')) + '</a></div>').join('');
         const portadaHtml = portada.filter((x) => String(x).trim()).map((x, i) => '<div style="' + (i === 1 ? 'font-size:22px;font-weight:700;margin:6px 0;' : i === 0 ? 'font-size:15px;color:#385623;' : 'font-size:13px;color:#555;') + '">' + inline(x) + '</div>').join('');
         const cierra = () => { urls.forEach((u) => URL.revokeObjectURL(u)); fondo.remove(); document.removeEventListener('keydown', tecla); };
+        const pdf = () => {
+          const ant = document.title; document.title = (portada[2] && String(portada[2]).trim()) || (doc === 'inc' ? 'Secuencias alarma contra incendio' : 'Secuencias BMS');
+          document.body.classList.add('vp-imprime');
+          const fin = () => { document.body.classList.remove('vp-imprime'); document.title = ant; window.removeEventListener('afterprint', fin); };
+          window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 100);
+        };
         const tecla = (e) => { if (e.key === 'Escape') cierra(); };
-        const hoja = h('div', { style: { background: '#fff', color: '#111', width: 'min(960px, 100%)', margin: '0 auto', padding: '40px 48px', boxShadow: '0 2px 14px rgba(0,0,0,.35)', fontFamily: 'Montserrat, Arial, sans-serif', fontSize: '13px', lineHeight: '1.5' } });
+        const hoja = h('div', { class: 'vp-hoja', style: { background: '#fff', color: '#111', width: 'min(960px, 100%)', margin: '0 auto', padding: '40px 48px', boxShadow: '0 2px 14px rgba(0,0,0,.35)', fontFamily: 'Montserrat, Arial, sans-serif', fontSize: '13px', lineHeight: '1.5' } });
         hoja.innerHTML = '<div style="margin-bottom:26px;">' + portadaHtml + '</div><h2 style="font-size:19px;margin:20px 0 8px;">Contenido</h2>' + indice + html;
-        const fondo = h('div', { style: { position: 'fixed', inset: '0', background: 'rgba(0,0,0,.55)', zIndex: '1000', overflow: 'auto', padding: '16px' } },
-          h('div', { style: { position: 'sticky', top: '0', display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', marginBottom: '10px' } },
+        const fondo = h('div', { class: 'vp-fondo', style: { position: 'fixed', inset: '0', background: 'rgba(0,0,0,.55)', zIndex: '1000', overflow: 'auto', padding: '16px' } },
+          h('div', { class: 'vp-barra', style: { position: 'sticky', top: '0', display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', marginBottom: '10px' } },
             h('span', { style: { color: '#fff', fontWeight: '600' } }, 'Vista previa — ' + (doc === 'inc' ? 'Alarma contra incendio' : 'BMS') + ' (sin traducción; el Word puede variar en paginación)'),
-            h('button', { class: 'b p', onclick: () => { cierra(); exportar(doc); } }, 'Exportar Word'), h('button', { class: 'b', onclick: cierra }, 'Cerrar')),
+            h('button', { class: 'b p', title: 'Se abre el cuadro de impresión: elija «Guardar como PDF» como impresora', onclick: () => pdf() }, 'Exportar PDF'), h('button', { class: 'b', onclick: () => { cierra(); exportar(doc); } }, 'Exportar Word'), h('button', { class: 'b', onclick: cierra }, 'Cerrar')),
           hoja);
         document.addEventListener('keydown', tecla); document.body.append(fondo);
         estado.textContent = '';
+        if (imprimir) pdf();
       } catch (e) { estado.textContent = ''; alert('No se pudo generar la vista previa: ' + e.message); }
     };
     const exportar = async (doc = 'bms') => {
@@ -700,6 +707,7 @@
     const barra = h('div', { class: 'fila noprint' },
       selSistema(),
       h('button', { class: 'b', title: 'Muestra en pantalla cómo quedará el documento, sin descargarlo', onclick: () => vistaPrevia(DOC) }, 'Vista previa'),
+      h('button', { class: 'b', title: 'Abre el cuadro de impresión: elija «Guardar como PDF»', onclick: () => vistaPrevia(DOC, true) }, 'Exportar PDF'),
       h('button', { class: 'b p', title: 'Genera el Word de este sistema', onclick: () => exportar(DOC) }, 'Exportar Word — ' + (DOC === 'inc' ? 'Alarma contra incendio' : 'BMS')),
       h('button', { class: 'b', title: 'Lee un Word con el formato de las secuencias (Título 1 = sección, Título 2 = subsección, viñetas y tablas)', onclick: () => archivo('.docx', async (buf) => {
         try {

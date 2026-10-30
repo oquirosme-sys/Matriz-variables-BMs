@@ -91,6 +91,14 @@ table.t td.nm { max-width: 460px; }
 .mute { color: var(--mute); }
 @media (max-width: 800px) { .split { grid-template-columns: 1fr; } .lista { max-height: 220px; } }
 @media print {
+  @page { size: letter; margin: 18mm 16mm; }
+  body.vp-imprime > *:not(.vp-fondo) { display: none !important; }
+  body.vp-imprime .vp-fondo { position: static !important; overflow: visible !important; background: #fff !important; padding: 0 !important; }
+  body.vp-imprime .vp-barra { display: none !important; }
+  body.vp-imprime .vp-hoja { width: 100% !important; box-shadow: none !important; padding: 0 !important; }
+  body.vp-imprime .vp-hoja h2, body.vp-imprime .vp-hoja h3, body.vp-imprime .vp-hoja figure, body.vp-imprime .vp-hoja tr { break-inside: avoid; page-break-inside: avoid; }
+  body.vp-imprime .vp-hoja h2, body.vp-imprime .vp-hoja h3 { break-after: avoid; }
+  body.vp-imprime .vp-hoja * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   header.top, nav.tabs, .noprint { display: none !important; }
   body { background: #fff; } .diag { border: 0; height: auto; overflow: visible; } .diag svg { width: 100% !important; height: auto !important; min-width: 0 !important; } main { padding: 0; max-width: none; }
 }
