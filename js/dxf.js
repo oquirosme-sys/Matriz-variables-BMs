@@ -48,7 +48,7 @@
 
     const poly = (pts, cerrado, capa, ancho, punteada) => {
       if (pts.length < 2) return;
-      g(0, 'POLYLINE'); g(8, capa); if (punteada) g(6, 'DASHED'); g(66, 1); g(70, cerrado ? 1 : 0);
+      g(0, 'POLYLINE'); g(8, capa); if (punteada) { g(6, 'DEMOLISHED'); g(48, 0.001); } g(66, 1); g(70, cerrado ? 1 : 0);
       g(10, 0); g(20, 0); g(30, 0);
       if (ancho) { g(40, f(ancho)); g(41, f(ancho)); }
       pts.forEach(([x, y]) => { g(0, 'VERTEX'); g(8, capa); g(10, x); g(20, y); g(30, 0); });
@@ -59,7 +59,7 @@
     };
     const lineaSimple = (x1, y1, x2, y2, capa, ancho, punteada) => {
       if (ancho >= 1.6) { poly([[x1, y1], [x2, y2]], false, capa, ancho * MM * 0.5, punteada); return; }
-      g(0, 'LINE'); g(8, capa); if (punteada) g(6, 'DASHED'); g(10, x1); g(20, y1); g(30, 0); g(11, x2); g(21, y2); g(31, 0);
+      g(0, 'LINE'); g(8, capa); if (punteada) { g(6, 'DEMOLISHED'); g(48, 0.001); } g(10, x1); g(20, y1); g(30, 0); g(11, x2); g(21, y2); g(31, 0);
     };
 
     function recorrer(nodo, dx, dy) {
@@ -124,7 +124,7 @@
     c(0, 'SECTION'); c(2, 'TABLES');
     c(0, 'TABLE'); c(2, 'LTYPE'); c(70, 2);
     c(0, 'LTYPE'); c(2, 'CONTINUOUS'); c(70, 0); c(3, 'Solid line'); c(72, 65); c(73, 0); c(40, 0);
-    c(0, 'LTYPE'); c(2, 'DASHED'); c(70, 0); c(3, 'Dashed'); c(72, 65); c(73, 2); c(40, 3.81); c(49, 2.54); c(49, -1.27);
+    c(0, 'LTYPE'); c(2, 'DEMOLISHED'); c(70, 0); c(3, 'Demolished'); c(72, 65); c(73, 2); c(40, 3810); c(49, 2540); c(49, -1270);
     c(0, 'ENDTAB');
     c(0, 'TABLE'); c(2, 'LAYER'); c(70, Object.keys(CAPAS).length);
     Object.entries(CAPAS).forEach(([n, color]) => { c(0, 'LAYER'); c(2, n); c(70, 0); c(62, color); c(6, 'CONTINUOUS'); });
