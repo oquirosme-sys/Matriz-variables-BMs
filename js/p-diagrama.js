@@ -149,7 +149,10 @@
     const nodosC = resto.map((c) => ({ k: 'ctrl', c, gab: C.gabDe(c), its: itemsCtrl(res, c.id) }));
     const gws = gateways(res, C.nivelDe).map((g, i) => ({ ...g, n: i + 1 }));
     const nodosT = [...nodosC, ...gws.filter((g) => g.clave === 'C')];
-    const nodosIP = [...gws.filter((g) => g.clave !== 'C'), ...paneles(res, C.nivelDe)];
+    /* redes IP ordenadas por nivel (de abajo hacia arriba, como los controladores); un gateway con equipos en varios niveles va con el más bajo */
+    const idxCod = (cod) => { const i = E.niveles.findIndex((n) => n.codigo === cod); return i < 0 ? 99 : i; };
+    const nivNodo = (n) => Math.min(99, ...[...(n.k === 'gw' ? n.items.flatMap((i) => [...i.niv]) : [...n.niv])].map(idxCod));
+    const nodosIP = [...gws.filter((g) => g.clave !== 'C'), ...paneles(res, C.nivelDe)].map((n, i) => ({ n, i, v: nivNodo(n) })).sort((a, b) => a.v - b.v || a.i - b.i).map((x) => { x.n.lvl = x.v; return x.n; });
     const itsP = principal ? itemsCtrl(res, principal.id) : [];
     const kmax = (n) => Math.min(n, MAXIT + 1);
     /* controlador con muchos equipos: se reparten en dos columnas, una a cada lado de la línea (espejo) */
@@ -167,7 +170,17 @@
     grupos.forEach((gr) => { const wgr = gr.reduce((a, n) => a + COLW + lw(n), 0); if (cur.length && curW + wgr > PORFILA * COLW + 1) { filas.push({ nodes: cur }); cur = []; curW = 0; } cur.push(...gr); curW += wgr; });
     if (cur.length || !filas.length) filas.push({ nodes: cur });
     /* Redes IP separadas por protocolo: BACnet/IP (A) y Modbus TCP (E), cada una en su propia línea */
-    ['A', 'E', 'B', 'C'].forEach((k) => { const l = nodosIP.filter((n) => n.clave === k); for (let i = 0; i < l.length; i += PORFILA) filas.push({ nodes: l.slice(i, i + PORFILA), ip: k }); });
+    /* un nivel no se parte entre dos lazos si cabe completo en uno */
+    ['A', 'E', 'B', 'C'].forEach((k) => {
+      const l = nodosIP.filter((n) => n.clave === k), gr = [];
+      l.forEach((n) => { const u = gr[gr.length - 1]; if (u && u[0].lvl === n.lvl) u.push(n); else gr.push([n]); });
+      let fila = [];
+      gr.forEach((g) => {
+        if (fila.length && fila.length + g.length > PORFILA && g.length <= PORFILA) { filas.push({ nodes: fila, ip: k }); fila = []; }
+        g.forEach((n) => { if (fila.length >= PORFILA) { filas.push({ nodes: fila, ip: k }); fila = []; } fila.push(n); });
+      });
+      if (fila.length) filas.push({ nodes: fila, ip: k });
+    });
 
     const altP = 150 + kmax(itsP.length) * ITH;
     let y = 400;
