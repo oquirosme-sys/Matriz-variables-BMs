@@ -134,6 +134,26 @@
   const baseDe = (doc) => ESTANDAR_BASE.split('\n').filter((l) => ES_INC.test(BMS.norm(l)) === (doc === 'inc')).join('\n');
   /* bloques de un documento: cada sección (Título 1 y su contenido) va al documento que le corresponde */
   const bloquesNoDe = (bl, doc) => { const out = []; let actual = 'bms'; bl.forEach((b) => { if (b.t === 'h1') actual = docDe(b); if (actual !== doc) out.push(b); }); return out; };
+  /* Orden del documento: 0, SOO-1, SOO-2…, requisitos pendientes y anexos A, B, C…. Una sección que no se reconoce queda detrás de la anterior. */
+  function ordenarSecciones(bl) {
+    const pre = [], sec = [];
+    bl.forEach((b) => { if (b.t === 'h1') sec.push([b]); else (sec.length ? sec[sec.length - 1] : pre).push(b); });
+    let prev = 0;
+    const con = sec.map((g, i) => {
+      const t = String(g[0].texto || '').trim(); let k;
+      let m;
+      if (/^Requisitos del est[aá]ndar por incorporar/i.test(t)) k = 4000;
+      else if ((m = /^Anexo\s+([A-Z])\b/i.exec(t))) k = 5000 + m[1].toUpperCase().charCodeAt(0) - 64;
+      else if ((m = /^SOO-(\d+)/i.exec(t))) k = Number(m[1]);
+      else if (/^0[.\s]/.test(t)) k = 0;
+      else k = prev;
+      prev = k;
+      return { g: g.concat(), k, i };
+    });
+    con.sort((a, b) => a.k - b.k || a.i - b.i);
+    return pre.concat(...con.map((x) => x.g));
+  }
+  const ordenarDoc = (S) => { S.bloques = [...ordenarSecciones(bloquesDe(S.bloques, 'bms')), ...ordenarSecciones(bloquesDe(S.bloques, 'inc'))]; };
   function bloquesDe(bl, doc) {
     const out = []; let actual = 'bms';
     bl.forEach((b) => { if (b.t === 'h1') actual = docDe(b); if (actual === doc) out.push(b); });
@@ -522,7 +542,7 @@
       const pTrad = BMS.trad.crearTraductor((f) => { estado.textContent = 'Descargando el traductor del navegador… ' + Math.round(f * 100) + ' %'; });
       try {
         estado.textContent = 'Generando el documento' + (doc === 'bms' ? ' y los anexos…' : '…');
-        const mios = bloquesDe(S.bloques, doc);
+        const mios = ordenarSecciones(bloquesDe(S.bloques, doc));
         const letra0 = letraSiguiente(mios);
         const anexos = doc === 'bms' && ['b', 'c', 'd', 'e', 'f'].some((k) => S.opciones[k]) ? await generarAnexos(S.opciones, letra0) : [];
         let portada = S.portada.map((x) => resolverTexto(x));
@@ -634,12 +654,12 @@
       }) }, 'Importar desde Word'),
       h('button', { class: 'b', title: 'Agrega las secciones SOO-n, subsecciones y bloques ligados en vivo que falten, sin tocar lo ya escrito', onclick: () => {
         const vacio = !S.bloques.length;
-        const c = complementar(S); BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
+        const c = complementar(S); ordenarDoc(S); BMS.ui.secSel = 0; BMS.touch(); BMS.rerender();
         if (!vacio) setTimeout(() => alert('Se complementaron las secuencias: ' + c.secciones + ' sección(es) nueva(s), ' + c.subsecciones + ' subsección(es) y ' + c.vivos + ' bloque(s) ligado(s) agregados. Lo ya escrito no se modificó.'), 50);
       } }, 'Cargar estructura base del proyecto'),
       h('button', { class: 'b p', title: 'Redacta lo que falta para cumplir el estándar del hotel: completa las secciones por sistema con las variables del proyecto y agrega los requisitos no cubiertos. Lo que se debe actualizar queda en rojo', onclick: () => {
         if (!estDe(S).texto.trim() && !confirm('No hay estándar del hotel cargado; solo se completarán las secciones del proyecto. ¿Continuar?')) return;
-        const c = completarSecuencia(S, DOC); validar(true, DOC); BMS.touch(); BMS.rerender();
+        const c = completarSecuencia(S, DOC); ordenarDoc(S); validar(true, DOC); BMS.touch(); BMS.rerender();
         setTimeout(() => alert('Secuencia completada: ' + c.secciones + ' sección(es) nueva(s), ' + c.redactados + ' párrafo(s) redactado(s) con las variables del proyecto y ' + c.requisitos + ' requisito(s) del estándar redactado(s) como secuencia. Los datos que debe validar con el diseño quedan en rojo.'), 50);
       } }, 'Completar la secuencia'),
       h('button', { class: 'b', title: 'Sube el PDF del estándar del hotel para validar las secuencias', onclick: () => { BMS.ui.secSel = -2; cargarEstandar(); } }, 'Subir estándar del hotel (PDF)'),
