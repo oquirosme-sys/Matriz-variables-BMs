@@ -1,9 +1,9 @@
 /* Catálogo base de controladores por marca.
    Canales: uio = entrada/salida universal (Honeywell), ui = entrada universal, bi = entrada binaria, co = salida configurable, bo = salida binaria, ao = salida analógica.
    JCI: tomado de la hoja JCI_Catalogo del Excel (LIT-1900346 / LIT-1900349 y Guía de configuración Metasys 12.0).
-   Honeywell: Optimizer en Español (Honeywell LATAM 2023). Se corrigen en la pestaña "Catálogo de controladores". */
+   Honeywell: Optimizer en Español (Honeywell LATAM 2023). Schneider: EcoStruxure Building Operation (SpaceLogic AS-P y módulos de E/S), por confirmar con el proveedor. Se corrigen en la pestaña "Catálogo de controladores". */
 window.BMS_CATALOGO_CONTROLADORES = {
-  version: 5, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador
+  version: 6, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador y agrega las marcas nuevas
   marcas: {
     JCI: {
       nombre: 'Johnson Controls (Metasys)',
@@ -54,6 +54,25 @@ window.BMS_CATALOGO_CONTROLADORES = {
         { cod: 'N-ADV-112-H-C', maxDisp: 128, desc: 'Optimizer Advanced (servidor IoT edge): 1 Ethernet, 1 IP conmutado, 2 RS485, HMI y Touch Flake. Máx. = 64 dispositivos × 2 puertos', fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo derivado)' },
         { cod: 'N-ADV-133-H-C', maxDisp: 192, desc: 'Optimizer Advanced: 1 Ethernet, 3 IP conmutados, 3 RS485, HMI y Touch Flake. Máx. = 64 dispositivos × 3 puertos', fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo derivado)' },
         { cod: 'N-ADV-134-H-C', maxDisp: 256, desc: 'Optimizer Advanced: 1 Ethernet, 3 IP conmutados, 4 RS485, HMI y Touch Flake (próximo lanzamiento). Máx. = 64 dispositivos × 4 puertos', fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo derivado)' }
+      ]
+    },
+    Schneider: {
+      nombre: 'Schneider Electric (EcoStruxure Building Operation)',
+      maxModulosPorBase: 10,
+      bus: 'B', // troncal BACnet MS/TP / Modbus entre controladores; la LAN IP llega al servidor de automatización
+      confirmar: true,
+      nota: 'Datos por confirmar con Schneider Electric: SpaceLogic Automation Server AS-P con módulos de E/S SpaceLogic (UI-16, DI-16, DO-FA-12, AO-8) sobre base de terminales Central I/O (SXWTBIOW110001). La cantidad máxima de módulos por servidor y de dispositivos por servidor es una estimación conservadora: verifique en la hoja de datos de AS-P / AS-B y en la guía de hardware de EcoStruxure Building Operation. Los modelos con ventilador/HOA (sufijo -H) y las referencias exactas (SXW…) se completan en la pestaña "Catálogo de controladores".',
+      bases: [
+        { cod: 'SXWASPXX10001', desc: 'SpaceLogic Automation Server AS-P (servidor de automatización BACnet/IP, Modbus; sin entradas/salidas propias, se amplía con módulos de E/S)', maxMod: 32, fuente: 'EcoStruxure Building Operation — por confirmar' }
+      ],
+      modulos: [
+        { cod: 'UI-16 (SXWUI16XX10001)', desc: 'Módulo SpaceLogic de 16 entradas universales', ui: 16, fuente: 'Hoja de datos SpaceLogic UI-16' },
+        { cod: 'DI-16 (SXWDI16XX10001)', desc: 'Módulo SpaceLogic de 16 entradas digitales', bi: 16, fuente: 'Hoja de datos SpaceLogic DI-16' },
+        { cod: 'DO-FA-12 (SXWDOA12X10001)', desc: 'Módulo SpaceLogic de 12 salidas digitales de relé Form A (versión con HOA: DO-FA-12-H)', bo: 12, fuente: 'Hoja de datos SpaceLogic DO-FA-12' },
+        { cod: 'AO-8 (SXWAO8XXX10001)', desc: 'Módulo SpaceLogic de 8 salidas analógicas (0-10 V / 0-20 mA)', ao: 8, fuente: 'Hoja de datos SpaceLogic AO-8' }
+      ],
+      motores: [
+        { cod: 'SXWASPXX10001', maxDisp: 100, desc: 'SpaceLogic Automation Server AS-P como servidor de la red (capacidad por confirmar)', fuente: 'EcoStruxure Building Operation — por confirmar' }
       ]
     }
   }

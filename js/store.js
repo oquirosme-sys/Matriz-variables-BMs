@@ -88,6 +88,7 @@
     BMS.catCt = cc && cc.marcas ? cc : clone(window.BMS_CATALOGO_CONTROLADORES);
     if ((BMS.catCt.version || 1) < window.BMS_CATALOGO_CONTROLADORES.version) {
       BMS.catCt.marcas.Honeywell = clone(window.BMS_CATALOGO_CONTROLADORES.marcas.Honeywell);
+      Object.keys(window.BMS_CATALOGO_CONTROLADORES.marcas).forEach((k) => { if (!BMS.catCt.marcas[k]) BMS.catCt.marcas[k] = clone(window.BMS_CATALOGO_CONTROLADORES.marcas[k]); });
       BMS.catCt.version = window.BMS_CATALOGO_CONTROLADORES.version;
       BMS.guardarCatCt();
     }
