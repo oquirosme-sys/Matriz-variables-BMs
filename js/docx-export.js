@@ -131,13 +131,11 @@
       v += cab(pr[0], 28, { antes: 2200, color: '385623', b: true });
       v += cab(pr[1], 52, { b: true, despues: 240 });
       v += cab(pr[2], 24, { despues: 600 });
-      const datos = [[L.cod, opts.codigo || '—'], [L.revision, opts.revision || '—'], [L.fecha, opts.fecha || '—'], [L.estado, opts.estado || '—'], [L.elab, opts.preparado || '—']];
+      const datos = [[L.cod, opts.codigo || '—'], [L.revision, opts.revision || '—'], [L.fecha, opts.fecha || '—'], [L.elab, opts.preparado || '—']];
       v += tabla({ sinTitulo: true, cols: [3, 9], filas: [[L.datos, limpiar(pr[1]) || '—'], ...datos], align: ['l', 'l'] }, ANCHO.v, ctx);
       if (pr[4]) v += P(pr[4], { run: { i: true, color: '3C3F41' } });
       v += SALTO;
-      /* control de revisiones, contenido e índice de tablas */
-      v += TITULO(L.rev, { antes: 0 });
-      v += tabla({ sinTitulo: true, cols: [1.5, 2.1, 4.6, 2.6, 1.7, 1.7], filas: [[L.rev1, L.fecha, L.desc, L.elab, L.reviso, L.aprobo], [opts.revision || 'A', opts.fecha || '—', L.emision, opts.preparado || '—', '—', '—']], align: ['l', 'l', 'l', 'l', 'l', 'l'] }, ANCHO.v, ctx);
+      /* contenido e índice de tablas */
       const heads = []; let k = 0;
       bloques.forEach((b) => { if (b.t === 'h1' || b.t === 'h2') heads.push({ id: ++k, nivel: b.t === 'h1' ? 1 : 2, texto: limpiar(b.texto) }); });
       const tabs = []; let kt = 0;

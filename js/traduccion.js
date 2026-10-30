@@ -26,6 +26,8 @@
     [/^Tendencias: 15 min para temperaturas y humedades, 1 h para medición y filtros, y por cambio de valor para estados; retención de un año\.$/i, 'Trends: 15 min for temperatures and humidities, 1 h for metering and filters, and change-of-value for statuses; one-year retention.'],
     [/^Anexo A\. Parámetros por confirmar$/i, 'Annex A. Parameters to confirm'],
     [/^Parámetros por confirmar antes de emitir$/i, 'Parameters to confirm before issue'],
+    [/^Anexo A\. Parámetros propuestos$/i, 'Annex A. Proposed parameters'],
+    [/^Parámetros propuestos$/i, 'Proposed parameters'],
     [/^Anexo ([A-Z])\. (.+)$/i, (m, l, r) => 'Annex ' + l + '. ' + R(r)],
     [/^SOO-(\d+)\. (.+)$/i, (m, n, r) => 'SOO-' + n + '. ' + R(r)],
     /* bloques vivos */

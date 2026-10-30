@@ -135,7 +135,26 @@
   /* bloques de un documento: cada sección (Título 1 y su contenido) va al documento que le corresponde */
   const bloquesNoDe = (bl, doc) => { const out = []; let actual = 'bms'; bl.forEach((b) => { if (b.t === 'h1') actual = docDe(b); if (actual !== doc) out.push(b); }); return out; };
   /* Orden del documento: 0, SOO-1, SOO-2…, requisitos pendientes y anexos A, B, C…. Una sección que no se reconoce queda detrás de la anterior. */
+  /* Anexo A: «Parámetros propuestos» con dos columnas (parámetro y valor), sin la columna «Quien valida» */
+  function normalizaAnexoA(bl) {
+    return bl.map((b) => {
+      if (b.t === 'vivo') return b;
+      if (b.t === 'h1' && /^Anexo A\. Parámetros por confirmar$/i.test(String(b.texto || '').trim())) return { ...b, texto: 'Anexo A. Parámetros propuestos' };
+      if (b.t === 'p' && /^Parámetros por confirmar antes de emitir$/i.test(String(b.texto || '').trim())) return { ...b, texto: 'Parámetros propuestos' };
+      if (b.t === 'tabla' && Array.isArray(b.filas) && b.filas[0]) {
+        const k = b.filas[0].findIndex((x) => /^Quien valida$/i.test(String(x || '').trim()));
+        if (k >= 0 && /^Par[aá]metro$/i.test(String(b.filas[0][0] || '').trim())) {
+          const c = { ...b, filas: b.filas.map((f) => f.filter((_, i) => i !== k)) };
+          if (Array.isArray(b.cols)) c.cols = b.cols.filter((_, i) => i !== k);
+          if (Array.isArray(b.align)) c.align = b.align.filter((_, i) => i !== k);
+          return c;
+        }
+      }
+      return b;
+    });
+  }
   function ordenarSecciones(bl) {
+    bl = normalizaAnexoA(bl);
     const pre = [], sec = [];
     bl.forEach((b) => { if (b.t === 'h1') sec.push([b]); else (sec.length ? sec[sec.length - 1] : pre).push(b); });
     let prev = 0;
@@ -346,7 +365,7 @@
       b.push({ t: 'h1', texto: 'SOO-' + n + '. ' + cat.nombre }, { t: 'vivo', fuente: 'equipos', cat: cat.id }, { t: 'vivo', fuente: 'puntos', cat: cat.id },
         { t: 'li', texto: '**Habilitación y horario:** [por definir].' }, { t: 'li', texto: '**Control:** [por definir].' }, { t: 'li', texto: '**Alarmas:** [por definir].' });
     });
-    b.push({ t: 'h1', texto: 'Anexo A. Parámetros por confirmar' }, { t: 'p', texto: 'Tabla No. 1' }, { t: 'p', texto: 'Parámetros por confirmar antes de emitir' }, { t: 'tabla', filas: [['Parámetro', 'Valor propuesto', 'Quien valida'], ['—', '—', '—']] });
+    b.push({ t: 'h1', texto: 'Anexo A. Parámetros propuestos' }, { t: 'p', texto: 'Tabla No. 1' }, { t: 'p', texto: 'Parámetros propuestos' }, { t: 'tabla', filas: [['Parámetro', 'Valor propuesto'], ['—', '—']] });
     return { portada, bloques: b };
   }
 
@@ -532,7 +551,7 @@
   const pagina = (root) => {
     const E = BMS.estado;
     E.secuencias = E.secuencias || inicial();
-    const S = E.secuencias; S.opciones = Object.assign({ b: true, c: true, d: true, e: true, f: true, detalle: false }, S.opciones || {});
+    const S = E.secuencias; S.bloques = normalizaAnexoA(S.bloques || []); S.opciones = Object.assign({ b: true, c: true, d: true, e: true, f: true, detalle: false }, S.opciones || {});
     S.estandar = S.estandar || { nombre: 'Estándar del hotel', texto: '' };
     estDe(S);
     const DOC = docActual();
