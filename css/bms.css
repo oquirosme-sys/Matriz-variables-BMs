@@ -19,7 +19,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 "Sego
 header.top { background: var(--head); color: var(--head-ink); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; }
 header.top h1 { font-size: 17px; margin: 0; font-weight: 600; }
 header.top .proy { opacity: .8; font-size: 13px; }
-header.top .acc { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+header.top .acc { margin-left: auto; flex: 1 1 auto; justify-content: flex-end; min-width: 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 #estadoGuardado { font-size: 12px; opacity: .75; }
 nav.tabs { display: flex; flex-wrap: wrap; gap: 2px; background: var(--panel); border-bottom: 1px solid var(--line); padding: 0 12px; position: sticky; top: 0; z-index: 5; }
 nav.tabs button { border: 0; background: none; color: var(--mute); padding: 11px 14px; font: inherit; cursor: pointer; border-bottom: 3px solid transparent; }
