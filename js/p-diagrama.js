@@ -530,6 +530,7 @@
         h('button', { class: 'b', title: 'DXF con el cajetín Sinergia de 1100 × 750 mm: el diagrama se reparte en las láminas necesarias, cortando entre lazos', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms-laminas-1100x750.dxf', BMS.dxfLaminas(c), 'application/dxf'); } }, 'DXF láminas 1100×750 (cajetín)'),
         h('button', { class: 'b', title: 'PDF con una hoja de 1100 × 750 mm por lámina, con el cajetín Sinergia', onclick: () => BMS.pdfLaminas(svg, 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || '')) }, 'PDF láminas 1100×750 (cajetín)'),
         h('button', { class: 'b p', onclick: () => BMS.ir('equipos') }, 'Siguiente: equipos por nivel →')),
+      h('p', { class: 'hint' }, 'PDF de láminas 1100×750: en el cuadro de impresión use destino «Guardar como PDF», tamaño de papel A0 (o Arch E 36×48 in; no existe 1100×750 en la lista y cualquier tamaño menor recorta la lámina), orientación horizontal, escala 100 % (no «Personalizada»), márgenes «Ninguno» y active «Gráficos de fondo». La lámina queda en la esquina superior izquierda de la hoja a tamaño real; para el plotter se escala al papel disponible (por ejemplo 36 in de ancho = 83 %).'),
       barra, visor);
     if (BMS.ui.zoomPx) aplicarZoom(BMS.ui.zoomPx, 0, 0); else setTimeout(ajustar, 0);
   };
