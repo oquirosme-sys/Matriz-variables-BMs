@@ -475,13 +475,26 @@
     const svg = construir(), VB = svg.viewBox.baseVal, HOJA = VB.width;
     BMS.ui.modo = BMS.ui.modo || 'mano';
     const visor = h('div', { class: 'diag ' + BMS.ui.modo }, svg);
-    /* PDF para anexos: hoja carta con el membrete de la memoria; el diagrama va completo en una página, vectorial */
+    /* PDF para anexos: hojas carta con el membrete de la memoria; el diagrama se parte entre lazos en tantas hojas como haga falta, a todo el ancho del texto, vectorial */
     const pdfAnexo = () => {
-      const c = svg.cloneNode(true); c.removeAttribute('style'); c.removeAttribute('width'); c.removeAttribute('height');
-      const w = Math.min(156, 200 * VB.width / VB.height);
-      c.setAttribute('style', 'display:block;margin:0 auto;max-width:none;width:' + w.toFixed(2) + 'mm;height:' + (w * VB.height / VB.width).toFixed(2) + 'mm');
-      const t = h('h2', null, 'Diagrama unifilar del sistema de monitoreo y control (BMS)');
-      return BMS.imprimirPaginado({ nombre: 'Diagrama unifilar BMS', titulo: 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || ''), nodos: [t, c] });
+      const W = VB.width, H = VB.height, cortes = JSON.parse(svg.getAttribute('data-cortes') || '[]').filter((c) => c > 0 && c < H), AN = 156, K = W / AN; /* px por mm */
+      const partes = []; let ini = 0;
+      while (H - ini > 1) {
+        const tope = (partes.length ? 212 : 188) * K; let fn;
+        if (H - ini <= tope) fn = H;
+        else { const c = cortes.filter((v) => v > ini + tope * 0.3 && v <= ini + tope); fn = c.length ? Math.max(...c) : ini + tope; }
+        partes.push([ini, fn]); ini = fn;
+      }
+      const nodos = [h('h2', null, 'Diagrama unifilar del sistema de monitoreo y control (BMS)')];
+      partes.forEach(([ya, yb], n) => {
+        const c = svg.cloneNode(true); c.removeAttribute('style');
+        c.setAttribute('viewBox', '0 ' + ya + ' ' + W + ' ' + (yb - ya)); c.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+        c.setAttribute('width', AN + 'mm'); c.setAttribute('height', ((yb - ya) / K).toFixed(2) + 'mm');
+        c.setAttribute('style', 'display:block;max-width:none;width:' + AN + 'mm;height:' + ((yb - ya) / K).toFixed(2) + 'mm');
+        if (n) { const sl = document.createElement('div'); sl.className = 'pdf-salto'; nodos.push(sl); }
+        nodos.push(c);
+      });
+      return BMS.imprimirPaginado({ nombre: 'Diagrama unifilar BMS', titulo: 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || ''), nodos });
     };
 
     const pct = h('span', { class: 'mute', style: { minWidth: '48px', textAlign: 'center' } });
@@ -535,7 +548,7 @@
       h('div', { class: 'fila noprint' },
         h('button', { class: 'b', onclick: () => { const c = svg.cloneNode(true); c.removeAttribute('style'); BMS.descargar('diagrama-unifilar-bms.svg', new XMLSerializer().serializeToString(c), 'image/svg+xml'); } }, 'Descargar SVG'),
         h('button', { class: 'b', title: 'Archivo DXF para AutoCAD con capas por tipo de cableado. En AutoCAD use Guardar como… DWG.', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms.dxf', BMS.svgADxf(c), 'application/dxf'); } }, 'Descargar DXF (AutoCAD / DWG)'),
-        h('button', { class: 'b', title: 'PDF en hoja carta con el membrete Sinergia (formato de memoria), para agregar el diagrama a los anexos. Es vectorial: se puede ampliar. En el cuadro de impresión elija «Guardar como PDF», márgenes «Ninguno»', onclick: () => pdfAnexo() }, 'Imprimir / PDF (anexo, formato memoria)'),
+        h('button', { class: 'b', title: 'PDF en hojas carta con el membrete Sinergia (formato de memoria), para agregar el diagrama a los anexos. Se parte entre lazos en las hojas necesarias. En el cuadro de impresión elija «Guardar como PDF», márgenes «Ninguno»', onclick: () => pdfAnexo() }, 'Imprimir / PDF (anexo, formato memoria)'),
         h('button', { class: 'b', title: 'DXF con el cajetín Sinergia de 1100 × 750 mm: el diagrama se reparte en las láminas necesarias, cortando entre lazos', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms-laminas-1100x750.dxf', BMS.dxfLaminas(c), 'application/dxf'); } }, 'DXF láminas 1100×750 (cajetín)'),
         h('button', { class: 'b', title: 'PDF con una hoja de 1100 × 750 mm por lámina, con el cajetín Sinergia', onclick: () => BMS.pdfLaminas(svg, 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || '')) }, 'PDF láminas 1100×750 (cajetín)'),
         h('button', { class: 'b p', onclick: () => BMS.ir('equipos') }, 'Siguiente: equipos por nivel →')),
