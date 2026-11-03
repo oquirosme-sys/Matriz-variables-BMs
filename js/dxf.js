@@ -46,7 +46,7 @@
     };
     const dashed = (e) => !!e.getAttribute('stroke-dasharray');
 
-    const poly = (pts, cerrado, capa, ancho, punteada) => {
+    const polyRaw = (pts, cerrado, capa, ancho, punteada) => {
       if (pts.length < 2) return;
       g(0, 'POLYLINE'); g(8, capa); if (punteada) { g(6, 'DEMOLISHED'); g(48, 0.001); } g(66, 1); g(70, cerrado ? 1 : 0);
       g(10, 0); g(20, 0); g(30, 0);
@@ -54,11 +54,25 @@
       pts.forEach(([x, y]) => { g(0, 'VERTEX'); g(8, capa); g(10, x); g(20, y); g(30, 0); });
       g(0, 'SEQEND'); g(8, capa);
     };
+    /* las polilíneas abiertas (troncales, bajantes, rutas) también se cortan en el interior de los círculos de clave */
+    const poly = (pts, cerrado, capa, ancho, punteada) => {
+      if (cerrado || !claves.length || pts.length < 2) { polyRaw(pts, cerrado, capa, ancho, punteada); return; }
+      const corridas = []; let cur = null;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [ax, ay] = pts[i];
+        fuera(ax, ay, pts[i + 1][0], pts[i + 1][1]).forEach(([x1, y1, x2, y2]) => {
+          if (cur && x1 === ax && y1 === ay) cur.push([x2, y2]);
+          else { cur = [[x1, y1], [x2, y2]]; corridas.push(cur); }
+        });
+        if (!cur || cur[cur.length - 1][0] !== pts[i + 1][0] || cur[cur.length - 1][1] !== pts[i + 1][1]) cur = null;
+      }
+      corridas.forEach((r) => polyRaw(r, false, capa, ancho, punteada));
+    };
     const linea = (X1, Y1, X2, Y2, capa, ancho, punteada) => {
       fuera(X1, Y1, X2, Y2).forEach(([x1, y1, x2, y2]) => lineaSimple(x1, y1, x2, y2, capa, ancho, punteada));
     };
     const lineaSimple = (x1, y1, x2, y2, capa, ancho, punteada) => {
-      if (ancho >= 1.6) { poly([[x1, y1], [x2, y2]], false, capa, ancho * MM * 0.5, punteada); return; }
+      if (ancho >= 1.6) { polyRaw([[x1, y1], [x2, y2]], false, capa, ancho * MM * 0.5, punteada); return; }
       g(0, 'LINE'); g(8, capa); if (punteada) { g(6, 'DEMOLISHED'); g(48, 0.001); } g(10, x1); g(20, y1); g(30, 0); g(11, x2); g(21, y2); g(31, 0);
     };
 
