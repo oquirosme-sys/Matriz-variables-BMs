@@ -46,7 +46,7 @@
   /* reparte el diagrama en láminas: toma la escala más grande que dé el menor número de láminas y corta entre lazos */
   function repartir(svg) {
     const VB = svg.viewBox.baseVal, W = VB.width, H = VB.height;
-    const fin = Number(svg.getAttribute('data-fin')) || H - 110;
+    const fin = Number(svg.getAttribute('data-fin')) || H;
     const cortes = JSON.parse(svg.getAttribute('data-cortes') || '[]').filter((c) => c > 0 && c < fin);
     const ajuste = AW / (W * MM);
     let mejor = null;
@@ -66,8 +66,10 @@
 
   const rotuloLamina = (base, i) => { const m = /^(.*?)(\d+)$/.exec(String(base || 'BMS-01')); return m ? m[1] + String(Number(m[2]) + i).padStart(m[2].length, '0') : (base || 'BMS') + '-' + (i + 1); };
   function datosLamina(i, n) {
-    const E = BMS.estado, P = E.proyecto, D = E.diagrama || {};
-    return { lamina: rotuloLamina(D.lamina, i), titulo: 'Diagrama unifilar del sistema de monitoreo y control (BMS)', hoja: n > 1 ? 'Hoja ' + (i + 1) + ' de ' + n : '', rev: 'A', fecha: P.fecha || '', desc: 'Emisión para revisión', dibujo: 'SI', propietario: quita(P.propietario) };
+    const E = BMS.estado || {}, P = E.proyecto || {}, D = E.diagrama || {};
+    const r = { lamina: rotuloLamina(D.lamina, i), titulo: 'Diagrama unifilar del sistema de monitoreo y control (BMS)', hoja: n > 1 ? 'Hoja ' + (i + 1) + ' de ' + n : '', rev: 'A', fecha: P.fecha || '', desc: 'Emisión para revisión', dibujo: 'SI', propietario: quita(P.propietario) };
+    /* otras herramientas: BMS.cajetinDatos = (i, n, datos) => ({ lamina, titulo, hoja, rev, fecha, desc, dibujo, propietario }) para cambiar cualquier campo */
+    return typeof BMS.cajetinDatos === 'function' ? Object.assign(r, BMS.cajetinDatos(i, n, r)) : r;
   }
 
   /* ---------- DXF ---------- */
