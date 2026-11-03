@@ -6,7 +6,7 @@
   const PX = 72, MM = 25.4 / PX;
   const CAPAS = {
     'BMS-A-BACNET-IP': 31, 'BMS-B-BACNET-MSTP': 1, 'BMS-C-MODBUS-RTU': 4, 'BMS-E-MODBUS-TCP': 5, 'BMS-D-SENALES': 6,
-    'BMS-MARCO': 8, 'BMS-DIBUJO': 7, 'BMS-TEXTO': 7, 'BMS-TEXTO-SEC': 8, 'BMS-ALERTA': 1
+    'BMS-MARCO': 8, 'BMS-DIBUJO': 7, 'BMS-TEXTO': 7, 'BMS-TEXTO-SEC': 8, 'BMS-ALERTA': 1, 'BMS-CAJETIN': 7, 'BMS-CAJETIN-TEXTO': 7
   };
   const POR_COLOR = { '#ff9e7f': 'BMS-A-BACNET-IP', '#ff0000': 'BMS-B-BACNET-MSTP', '#00ffff': 'BMS-C-MODBUS-RTU', '#0a2fa8': 'BMS-E-MODBUS-TCP', '#ff00ff': 'BMS-D-SENALES', '#bbb': 'BMS-MARCO', '#c00': 'BMS-ALERTA' };
   const capaTrazo = (e) => POR_COLOR[(e.getAttribute('stroke') || '').toLowerCase()] || 'BMS-DIBUJO';
@@ -14,12 +14,16 @@
   /* Texto: los caracteres fuera de ASCII se escriben como \U+XXXX para no depender de la página de códigos. */
   const esc = (t) => String(t).replace(/⚠/g, '!').replace(/[^\x20-\x7e]/g, (c) => '\\U+' + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0'));
 
-  BMS.svgADxf = (svg) => {
+  /* op (opcional): { entidades: true, banda: [ya, yb], esc, ox, oy } dibuja solo la franja ya..yb del diagrama, a escala esc, con la esquina superior izquierda en (ox, oy), y devuelve solo las entidades */
+  BMS.svgADxf = (svg, op) => {
     const vb = svg.viewBox.baseVal, H = vb.height;
+    const S = op ? op.esc : 1, OX = op ? op.ox : 0, YA = op ? op.banda[0] : 0, OY = op ? op.oy : H * MM;
+    const yl = op ? OY - (op.banda[1] - YA) * MM * S : -Infinity, yh = op ? OY : Infinity;
+    const enBanda = (y) => !op || (y >= yl - 1e-6 && y <= yh + 1e-6);
     const out = [];
     const g = (code, val) => out.push(String(code), String(val));
     const f = (v) => Math.round(v * 10000) / 10000;
-    const X = (x, dx) => f((x + dx) * MM), Y = (y, dy) => f((H - (y + dy)) * MM);
+    const X = (x, dx) => f(OX + (x + dx) * MM * S), Y = (y, dy) => f(OY - (y + dy - YA) * MM * S);
     /* círculos de clave (relleno blanco): las líneas se cortan en su interior */
     const claves = [];
     (function recolecta(nodo, dx, dy) {
@@ -32,6 +36,10 @@
     /* tramos de un segmento que quedan fuera de los círculos de clave */
     const fuera = (x1, y1, x2, y2) => {
       const dxs = x2 - x1, dys = y2 - y1, a = dxs * dxs + dys * dys, cortes = [];
+      if (op && a > 0) {
+        if (Math.abs(dys) < 1e-9) { if (y1 < yl - 1e-6 || y1 > yh + 1e-6) cortes.push([0, 1]); }
+        else { let ta = (yl - y1) / dys, tb = (yh - y1) / dys; if (ta > tb) { const q = ta; ta = tb; tb = q; } if (ta > 0) cortes.push([0, Math.min(1, ta)]); if (tb < 1) cortes.push([Math.max(0, tb), 1]); if (ta >= 1 || tb <= 0) cortes.push([0, 1]); }
+      }
       if (a > 0) claves.forEach(([cx, cy, r]) => {
         const fx = x1 - cx, fy = y1 - cy, b = 2 * (fx * dxs + fy * dys), cc = fx * fx + fy * fy - r * r, d = b * b - 4 * a * cc;
         if (d <= 0) return;
@@ -56,7 +64,8 @@
     };
     /* las polilíneas abiertas (troncales, bajantes, rutas) también se cortan en el interior de los círculos de clave */
     const poly = (pts, cerrado, capa, ancho, punteada) => {
-      if (cerrado || !claves.length || pts.length < 2) { polyRaw(pts, cerrado, capa, ancho, punteada); return; }
+      if (cerrado && op && pts.length > 2 && pts.some((p) => !enBanda(p[1]))) { if (pts.every((p) => !enBanda(p[1]))) return; pts = pts.concat([pts[0]]); cerrado = false; }
+      if (cerrado || (!claves.length && !op) || pts.length < 2) { polyRaw(pts, cerrado, capa, ancho, punteada); return; }
       const corridas = []; let cur = null;
       for (let i = 0; i < pts.length - 1; i++) {
         const [ax, ay] = pts[i];
@@ -90,9 +99,11 @@
           poly([[X(x, dx), Y(y, dy)], [X(x + w, dx), Y(y, dy)], [X(x + w, dx), Y(y + hh, dy)], [X(x, dx), Y(y + hh, dy)]], true, capaTrazo(e), 0, dashed(e));
         } else if (tag === 'circle') {
           const capa = (e.getAttribute('fill') || '').toLowerCase() === '#c00' ? 'BMS-ALERTA' : (e.getAttribute('fill') === '#111' ? 'BMS-DIBUJO' : capaTrazo(e));
+          if (!enBanda(Y(num(e.getAttribute('cy')), dy))) continue;
           g(0, 'CIRCLE'); g(8, capa); g(10, X(num(e.getAttribute('cx')), dx)); g(20, Y(num(e.getAttribute('cy')), dy)); g(30, 0); g(40, f(num(e.getAttribute('r')) * MM));
         } else if (tag === 'ellipse') {
           const cx = num(e.getAttribute('cx')), cy = num(e.getAttribute('cy')), rx = num(e.getAttribute('rx')), ry = num(e.getAttribute('ry')), pts = [];
+          if (!enBanda(Y(cy, dy))) continue;
           for (let i = 0; i < 32; i++) { const a = i / 32 * 2 * Math.PI; pts.push([X(cx + rx * Math.cos(a), dx), Y(cy + ry * Math.sin(a), dy)]); }
           poly(pts, true, capaTrazo(e), 0, false);
         } else if (tag === 'path') {
@@ -102,10 +113,11 @@
           const t = e.textContent; if (!t) continue;
           const size = num(e.getAttribute('font-size')) || 9, ancla = e.getAttribute('text-anchor') === 'middle' ? 1 : e.getAttribute('text-anchor') === 'end' ? 2 : 0;
           const px = X(num(e.getAttribute('x')), dx), py = Y(num(e.getAttribute('y')), dy);
+          if (!enBanda(py)) continue;
           const sec = ['#555', '#555555'].includes((e.getAttribute('fill') || '').toLowerCase());
           const alerta = (e.getAttribute('fill') || '').toLowerCase() === '#c00';
           g(0, 'TEXT'); g(8, alerta ? 'BMS-ALERTA' : sec ? 'BMS-TEXTO-SEC' : 'BMS-TEXTO');
-          g(10, px); g(20, py); g(30, 0); g(40, f(size * 0.72 * MM)); g(1, esc(t)); g(41, 0.8); g(7, 'CENTURY');
+          g(10, px); g(20, py); g(30, 0); g(40, f(size * 0.72 * MM * S)); g(1, esc(t)); g(41, 0.8); g(7, 'CENTURY');
           if (ancla) { g(72, ancla); g(11, px); g(21, py); g(31, 0); }
         }
       }
@@ -130,8 +142,14 @@
       return { pts, cerrado };
     }
     recorrer(svg, 0, 0);
+    if (op && op.entidades) return out;
 
-    /* Archivo: HEADER, TABLES (tipos de línea, capas, estilo), ENTITIES */
+    return BMS.dxfArmar(out);
+  };
+
+  /* Archivo: HEADER, TABLES (tipos de línea, capas, estilo), ENTITIES */
+  BMS.dxfTexto = esc;
+  BMS.dxfArmar = (out) => {
     const cab = [];
     const c = (code, val) => cab.push(String(code), String(val));
     c(0, 'SECTION'); c(2, 'HEADER'); c(9, '$ACADVER'); c(1, 'AC1009'); c(9, '$INSUNITS'); c(70, 4); c(9, '$MEASUREMENT'); c(70, 1); c(9, '$LTSCALE'); c(40, 1); c(0, 'ENDSEC');

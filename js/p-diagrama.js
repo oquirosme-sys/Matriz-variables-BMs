@@ -434,6 +434,7 @@
 
     /* ---- cajetín ---- */
     const TY = H - 110;
+    svg.setAttribute('data-fin', TY); /* el cajetín propio de la lámina empieza aquí; las láminas de 1100 × 750 llevan el suyo */
     line(g, 40, TY, W - 40, TY, { w: 1.2 });
     mv(g, 'cajetin', (sg) => {
       txt(sg, 70, TY + 46, 'Diagrama unifilar del sistema de monitoreo y control (BMS)', { size: 26 }); txt(sg, 72, TY + 66, 'Sin escala', { size: 12 });
@@ -526,6 +527,8 @@
         h('button', { class: 'b', onclick: () => { const c = svg.cloneNode(true); c.removeAttribute('style'); BMS.descargar('diagrama-unifilar-bms.svg', new XMLSerializer().serializeToString(c), 'image/svg+xml'); } }, 'Descargar SVG'),
         h('button', { class: 'b', title: 'Archivo DXF para AutoCAD con capas por tipo de cableado. En AutoCAD use Guardar como… DWG.', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms.dxf', BMS.svgADxf(c), 'application/dxf'); } }, 'Descargar DXF (AutoCAD / DWG)'),
         h('button', { class: 'b', title: 'PDF de la lámina completa a tamaño de plano, en una sola página (36 in de ancho). En el cuadro de impresión elija «Guardar como PDF» y el tamaño de papel que propone el documento', onclick: () => BMS.imprimirLamina({ svg, ancho: 36, titulo: 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || '') }) }, 'Imprimir / PDF (36 in de ancho)'),
+        h('button', { class: 'b', title: 'DXF con el cajetín Sinergia de 1100 × 750 mm: el diagrama se reparte en las láminas necesarias, cortando entre lazos', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms-laminas-1100x750.dxf', BMS.dxfLaminas(c), 'application/dxf'); } }, 'DXF láminas 1100×750 (cajetín)'),
+        h('button', { class: 'b', title: 'PDF con una hoja de 1100 × 750 mm por lámina, con el cajetín Sinergia', onclick: () => BMS.pdfLaminas(svg, 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || '')) }, 'PDF láminas 1100×750 (cajetín)'),
         h('button', { class: 'b p', onclick: () => BMS.ir('equipos') }, 'Siguiente: equipos por nivel →')),
       barra, visor);
     if (BMS.ui.zoomPx) aplicarZoom(BMS.ui.zoomPx, 0, 0); else setTimeout(ajustar, 0);
