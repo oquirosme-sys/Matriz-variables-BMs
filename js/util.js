@@ -68,5 +68,28 @@ BMS.ui = { pagina: 'proyecto', nivelSel: null };
     r.sort((a, b) => b.sc - a.sc || a.t.nombre.localeCompare(b.t.nombre));
     return r.slice(0, max).map((x) => x.t);
   };
-  Object.assign(BMS, { h, uid, num, pad, cut, clone, descargar, leerArchivo, norm, buscarTipos });
+  /* Imprime a PDF con el membrete Sinergia del Word: logo y datos de la empresa arriba, contacto y «documento · Página N» abajo (cajas de margen de @page; Chrome/Edge recientes).
+     El contenido se limita con la clase de <body> (clase): el CSS de impresión de esa clase decide qué se ve. */
+  const imprimirSinergia = async ({ nombre, titulo, clase, apaisado }) => {
+    const ant = document.title; document.title = titulo || nombre;
+    let logo = '';
+    try {
+      const z = await JSZip.loadAsync(window.BMS_DOCX_BASE, { base64: true });
+      const b64 = await z.file('word/media/image2.png').async('base64');
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="215" height="77" viewBox="0 0 215 77"><image width="215" height="77" href="data:image/png;base64,' + b64 + '"/></svg>';
+      logo = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg).replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29') + '")';
+    } catch (e) { /* sin logo */ }
+    const cad = (t) => '"' + String(t).replace(/[\\"]/g, (m) => '\\' + m).replace(/\n/g, ' ') + '"';
+    const st = document.createElement('style');
+    st.textContent = '@page { size: letter' + (apaisado ? ' landscape' : '') + '; margin: 34mm 13.5mm 26mm 13.5mm;' +
+      ' @top-left { content: ' + (logo || '""') + '; vertical-align: top; padding-top: 8.5mm; }' +
+      ' @top-right { content: "Sinergia Consultoría Mecánica y Eléctrica S.A\\A Oficentro Plaza Roble, Edificio Pórtico, Escazú"; white-space: pre; text-align: right; vertical-align: top; padding: 9mm 16.5mm 0 0; font: 8pt Calibri, Arial, sans-serif; color: #000; }' +
+      ' @bottom-left { content: "www.sinergia.co.cr     info@sinergia.co.cr     Tel: 2215-3865"; width: 62%; text-align: left; vertical-align: top; padding: 4mm 0 0 16.5mm; font: 9pt "Yu Gothic UI Semibold", "Yu Gothic UI", Montserrat, Arial, sans-serif; color: #385623; white-space: nowrap; }' +
+      ' @bottom-right { content: ' + cad(String(nombre).slice(0, 40) + ' · Página ') + ' counter(page); width: 38%; text-align: right; vertical-align: top; padding: 4.6mm 16.5mm 0 0; font: 8pt Montserrat, Arial, sans-serif; color: #808080; white-space: nowrap; overflow: hidden; } }';
+    document.head.append(st);
+    document.body.classList.add(clase);
+    const fin = () => { document.body.classList.remove(clase); document.title = ant; st.remove(); window.removeEventListener('afterprint', fin); };
+    window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 150);
+  };
+  Object.assign(BMS, { h, uid, num, pad, cut, clone, descargar, leerArchivo, norm, buscarTipos, imprimirSinergia });
 })();
