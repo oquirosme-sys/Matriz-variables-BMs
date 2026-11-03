@@ -132,5 +132,18 @@ BMS.ui = { pagina: 'proyecto', nivelSel: null };
     const fin = () => { document.body.classList.remove('pdf-imprime'); document.title = ant; st.remove(); doc.remove(); window.removeEventListener('afterprint', fin); };
     window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 200);
   };
-  Object.assign(BMS, { h, uid, num, pad, cut, clone, descargar, leerArchivo, norm, buscarTipos, imprimirPaginado });
+  /* PDF de la lámina del diagrama a su tamaño de plano (36 in de ancho): se imprime solo la lámina, en una página del tamaño exacto, sin los controles de la pestaña */
+  const imprimirLamina = ({ svg, ancho = 36, titulo }) => {
+    const VB = svg.viewBox.baseVal, alto = Math.round(ancho * VB.height / VB.width * 100) / 100;
+    const c = svg.cloneNode(true); c.removeAttribute('style'); c.setAttribute('width', ancho + 'in'); c.setAttribute('height', alto + 'in');
+    c.style.cssText = 'display:block;width:' + ancho + 'in;height:' + alto + 'in;max-width:none;min-width:0';
+    const doc = h('div', { id: 'pdf-doc', class: 'pdf-lamina', style: { width: ancho + 'in', height: (alto - 0.03) + 'in' } }, c);
+    document.body.append(doc);
+    const ant = document.title; if (titulo) document.title = titulo;
+    const st = document.createElement('style'); st.textContent = '@page { size: ' + ancho + 'in ' + alto + 'in; margin: 0; }'; document.head.append(st);
+    document.body.classList.add('pdf-imprime');
+    const fin = () => { document.body.classList.remove('pdf-imprime'); document.title = ant; st.remove(); doc.remove(); window.removeEventListener('afterprint', fin); };
+    window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 200);
+  };
+  Object.assign(BMS, { h, uid, num, pad, cut, clone, descargar, leerArchivo, norm, buscarTipos, imprimirPaginado, imprimirLamina });
 })();

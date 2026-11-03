@@ -138,3 +138,5 @@ table.t tr.rel td { background: var(--accent-soft); }
   body.pdf-imprime #pdf-doc { position: static; }
   #pdf-doc * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+#pdf-doc.pdf-lamina { overflow: hidden; line-height: 0; font-size: 0; background: #fff; }

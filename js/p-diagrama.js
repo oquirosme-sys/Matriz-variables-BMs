@@ -525,7 +525,7 @@
       h('div', { class: 'fila noprint' },
         h('button', { class: 'b', onclick: () => { const c = svg.cloneNode(true); c.removeAttribute('style'); BMS.descargar('diagrama-unifilar-bms.svg', new XMLSerializer().serializeToString(c), 'image/svg+xml'); } }, 'Descargar SVG'),
         h('button', { class: 'b', title: 'Archivo DXF para AutoCAD con capas por tipo de cableado. En AutoCAD use Guardar como… DWG.', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms.dxf', BMS.svgADxf(c), 'application/dxf'); } }, 'Descargar DXF (AutoCAD / DWG)'),
-        h('button', { class: 'b', onclick: () => { const st = h('style', { id: 'pgprint' }, '@page { size: 36in ' + Math.round(36 * VB.height / VB.width * 10) / 10 + 'in; margin: 0 }'); document.head.append(st); window.print(); setTimeout(() => st.remove(), 1500); } }, 'Imprimir / PDF (36 in de ancho)'),
+        h('button', { class: 'b', title: 'PDF de la lámina completa a tamaño de plano, en una sola página (36 in de ancho). En el cuadro de impresión elija «Guardar como PDF» y el tamaño de papel que propone el documento', onclick: () => BMS.imprimirLamina({ svg, ancho: 36, titulo: 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || '') }) }, 'Imprimir / PDF (36 in de ancho)'),
         h('button', { class: 'b p', onclick: () => BMS.ir('equipos') }, 'Siguiente: equipos por nivel →')),
       barra, visor);
     if (BMS.ui.zoomPx) aplicarZoom(BMS.ui.zoomPx, 0, 0); else setTimeout(ajustar, 0);
