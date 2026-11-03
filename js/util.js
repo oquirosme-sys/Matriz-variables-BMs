@@ -68,28 +68,69 @@ BMS.ui = { pagina: 'proyecto', nivelSel: null };
     r.sort((a, b) => b.sc - a.sc || a.t.nombre.localeCompare(b.t.nombre));
     return r.slice(0, max).map((x) => x.t);
   };
-  /* Imprime a PDF con el membrete Sinergia del Word: logo y datos de la empresa arriba, contacto y «documento · Página N» abajo (cajas de margen de @page; Chrome/Edge recientes).
-     El contenido se limita con la clase de <body> (clase): el CSS de impresión de esa clase decide qué se ve. */
-  const imprimirSinergia = async ({ nombre, titulo, clase, apaisado }) => {
+  /* PDF con el membrete Sinergia del Word, armado página por página (sin depender de las cajas de margen de @page):
+     cada hoja carta lleva el logo y los datos de la empresa arriba y el contacto con «documento · Página N» abajo, y el contenido
+     se reparte en ellas midiendo cada bloque: los bloques no se parten, los títulos no quedan solos al final y las tablas
+     (div.pdf-tabla) se cortan por filas repitiendo el encabezado. Un div.pdf-salto fuerza hoja nueva. */
+  const imprimirPaginado = async ({ nombre, titulo, nodos }) => {
     const ant = document.title; document.title = titulo || nombre;
     let logo = '';
     try {
       const z = await JSZip.loadAsync(window.BMS_DOCX_BASE, { base64: true });
-      const b64 = await z.file('word/media/image2.png').async('base64');
-      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="215" height="77" viewBox="0 0 215 77"><image width="215" height="77" href="data:image/png;base64,' + b64 + '"/></svg>';
-      logo = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg).replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29') + '")';
+      logo = 'data:image/png;base64,' + await z.file('word/media/image2.png').async('base64');
     } catch (e) { /* sin logo */ }
-    const cad = (t) => '"' + String(t).replace(/[\\"]/g, (m) => '\\' + m).replace(/\n/g, ' ') + '"';
-    const st = document.createElement('style');
-    st.textContent = '@page { size: letter' + (apaisado ? ' landscape' : '') + '; margin: 34mm 13.5mm 26mm 13.5mm;' +
-      ' @top-left { content: ' + (logo || '""') + '; vertical-align: top; padding-top: 8.5mm; }' +
-      ' @top-right { content: "Sinergia Consultoría Mecánica y Eléctrica S.A\\A Oficentro Plaza Roble, Edificio Pórtico, Escazú"; white-space: pre; text-align: right; vertical-align: top; padding: 9mm 16.5mm 0 0; font: 8pt Calibri, Arial, sans-serif; color: #000; }' +
-      ' @bottom-left { content: "www.sinergia.co.cr     info@sinergia.co.cr     Tel: 2215-3865"; width: 62%; text-align: left; vertical-align: top; padding: 4mm 0 0 16.5mm; font: 9pt "Yu Gothic UI Semibold", "Yu Gothic UI", Montserrat, Arial, sans-serif; color: #385623; white-space: nowrap; }' +
-      ' @bottom-right { content: ' + cad(String(nombre).slice(0, 40) + ' · Página ') + ' counter(page); width: 38%; text-align: right; vertical-align: top; padding: 4.6mm 16.5mm 0 0; font: 8pt Montserrat, Arial, sans-serif; color: #808080; white-space: nowrap; overflow: hidden; } }';
-    document.head.append(st);
-    document.body.classList.add(clase);
-    const fin = () => { document.body.classList.remove(clase); document.title = ant; st.remove(); window.removeEventListener('afterprint', fin); };
-    window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 150);
+    /* las imágenes se miden ya cargadas */
+    await Promise.all(nodos.flatMap((n) => (n.tagName === 'IMG' ? [n] : [...n.querySelectorAll('img')])).map((i) => (i.decode ? Promise.race([i.decode().catch(() => {}), new Promise((r) => setTimeout(r, 4000))]) : null)));
+    const doc = h('div', { id: 'pdf-doc' }); document.body.append(doc);
+    let cuerpo = null, n = 0;
+    const nueva = () => {
+      n++; cuerpo = h('div', { class: 'pdf-cuerpo' });
+      doc.append(h('div', { class: 'pdf-pag' },
+        logo ? h('img', { class: 'pdf-logo', src: logo }) : null,
+        h('div', { class: 'pdf-emp' }, h('div', null, 'Sinergia Consultoría Mecánica y Eléctrica S.A'), h('div', null, 'Oficentro Plaza Roble, Edificio Pórtico, Escazú')),
+        cuerpo,
+        h('div', { class: 'pdf-pie' }, h('span', { class: 'c' }, 'www.sinergia.co.cr     info@sinergia.co.cr     Tel: 2215-3865'), h('span', { class: 'p' }, String(nombre).slice(0, 40) + ' · Página ' + n))));
+    };
+    const cabe = () => cuerpo.scrollHeight <= cuerpo.clientHeight + 1;
+    const esTitulo = (e) => /^H[1-6]$/.test(e.tagName);
+    /* hoja nueva; los títulos que quedaron solos al final de la anterior pasan con su contenido */
+    const siguiente = () => {
+      const huerf = [];
+      while (cuerpo.children.length > 1 && esTitulo(cuerpo.lastElementChild)) huerf.unshift(cuerpo.removeChild(cuerpo.lastElementChild));
+      nueva(); huerf.forEach((e) => cuerpo.append(e));
+    };
+    const dividir = (nodo) => {
+      const tabla = nodo.querySelector('table'), hijos = [...nodo.children], iT = hijos.indexOf(tabla);
+      if (iT < 0) return;
+      const antes = hijos.slice(0, iT), despues = hijos.slice(iT + 1), cab = tabla.rows[0], filas = [...tabla.rows].slice(1);
+      nodo.remove();
+      const crear = (primera) => { const w = nodo.cloneNode(false); if (primera) antes.forEach((a) => w.append(a)); const t = tabla.cloneNode(false); t.append(cab.cloneNode(true)); w.append(t); return { w, t }; };
+      let cur = crear(true); cuerpo.append(cur.w);
+      if (!cabe() && cuerpo.children.length > 1) { cur.w.remove(); siguiente(); cuerpo.append(cur.w); }
+      filas.forEach((fila) => {
+        cur.t.append(fila);
+        if (cabe()) return;
+        cur.t.removeChild(fila);
+        if (cur.t.rows.length <= 1) { cur.w.remove(); siguiente(); cuerpo.append(cur.w); cur.t.append(fila); return; }
+        siguiente(); cur = crear(false); cuerpo.append(cur.w); cur.t.append(fila);
+      });
+      despues.forEach((d) => { cuerpo.append(d); if (!cabe() && cuerpo.children.length > 1) { cuerpo.removeChild(d); siguiente(); cuerpo.append(d); } });
+    };
+    const poner = (nodo) => {
+      if (nodo.classList && nodo.classList.contains('pdf-salto')) { if (cuerpo.children.length) nueva(); return; }
+      cuerpo.append(nodo);
+      /* una tabla más ancha que la hoja se reduce para que quepa completa */
+      if (nodo.scrollWidth > cuerpo.clientWidth + 1) (nodo.querySelector('table') || nodo).style.zoom = cuerpo.clientWidth / nodo.scrollWidth;
+      if (cabe()) return;
+      if (nodo.classList.contains('pdf-tabla') && nodo.querySelector('table')) { dividir(nodo); return; }
+      if (cuerpo.children.length === 1) return; /* más alto que la hoja: se deja entero */
+      cuerpo.removeChild(nodo); siguiente(); cuerpo.append(nodo);
+    };
+    nueva(); nodos.forEach(poner);
+    const st = document.createElement('style'); st.textContent = '@page { size: letter; margin: 0; }'; document.head.append(st);
+    document.body.classList.add('pdf-imprime');
+    const fin = () => { document.body.classList.remove('pdf-imprime'); document.title = ant; st.remove(); doc.remove(); window.removeEventListener('afterprint', fin); };
+    window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 200);
   };
-  Object.assign(BMS, { h, uid, num, pad, cut, clone, descargar, leerArchivo, norm, buscarTipos, imprimirSinergia });
+  Object.assign(BMS, { h, uid, num, pad, cut, clone, descargar, leerArchivo, norm, buscarTipos, imprimirPaginado });
 })();

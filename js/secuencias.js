@@ -605,8 +605,14 @@
         const indice = toc.map(([n, t, id]) => '<div style="margin-left:' + (n === 2 ? 20 : 0) + 'px;"><a href="#' + id + '" style="color:inherit;">' + esc(String(t).replace(/\*\*|==|!!/g, '')) + '</a></div>').join('');
         const portadaHtml = portada.filter((x) => String(x).trim()).map((x, i) => '<div style="' + (i === 1 ? 'font-size:22px;font-weight:700;margin:6px 0;' : i === 0 ? 'font-size:15px;color:#385623;' : 'font-size:13px;color:#555;') + '">' + inline(x) + '</div>').join('');
         const cierra = () => { urls.forEach((u) => URL.revokeObjectURL(u)); fondo.remove(); document.removeEventListener('keydown', tecla); };
-        /* PDF con el formato del Word (membrete y pie de BMS.imprimirSinergia) */
-        const pdf = () => BMS.imprimirSinergia({ nombre: doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación', titulo: (portada[2] && String(portada[2]).trim()) || '', clase: 'vp-imprime' });
+        /* PDF con el formato del Word: hojas con membrete armadas por BMS.imprimirPaginado */
+        const pdf = () => {
+          const aNodos = (t) => { const d = document.createElement('div'); d.innerHTML = t; return [...d.children]; };
+          const salto = () => { const d = document.createElement('div'); d.className = 'pdf-salto'; return d; };
+          const marca = (e) => { if (e.tagName === 'HR') e.className = 'pdf-salto'; else if (e.querySelector(':scope > table')) e.classList.add('pdf-tabla'); return e; };
+          const nodos = [...aNodos('<div style="margin-bottom:26px;">' + portadaHtml + '</div>'), salto(), ...aNodos('<h2>Contenido</h2>' + indice), salto(), ...aNodos(html)].map(marca);
+          return BMS.imprimirPaginado({ nombre: doc === 'inc' ? 'Alarma contra incendio' : 'Secuencias de operación', titulo: (portada[2] && String(portada[2]).trim()) || '', nodos });
+        };
         const tecla = (e) => { if (e.key === 'Escape') cierra(); };
         const hoja = h('div', { class: 'vp-hoja', style: { background: '#fff', color: '#111', width: 'min(960px, 100%)', margin: '0 auto', padding: '40px 48px', boxShadow: '0 2px 14px rgba(0,0,0,.35)', fontFamily: 'Montserrat, Arial, sans-serif', fontSize: '13px', lineHeight: '1.5' } });
         hoja.innerHTML = '<div style="margin-bottom:26px;">' + portadaHtml + '</div><h2 style="font-size:19px;margin:20px 0 8px;">Contenido</h2>' + indice + html;

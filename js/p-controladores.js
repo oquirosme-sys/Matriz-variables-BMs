@@ -92,7 +92,21 @@
       h('label', { class: 'f' }, 'Reserva de puntos (%)', h('input', { class: 'in n', type: 'number', min: 0, max: 100, value: P.reserva, onchange: (e) => { P.reserva = Math.max(0, num(e.target.value)); BMS.touch(); BMS.rerender(); } })),
       h('label', { class: 'f' }, 'Motor de red / supervisor', h('select', { class: 'in', value: P.motor || 'auto', onchange: (e) => { P.motor = e.target.value; BMS.touch(); BMS.rerender(); } },
         h('option', { value: 'auto' }, 'Automático' + (mot.motor ? ' (' + mot.motor.cod + ')' : '')), (M ? M.motores : []).map((m) => h('option', { value: m.cod }, m.cod + ' — hasta ' + m.maxDisp + ' dispositivos')))))));
-    root.append(h('div', { class: 'fila noprint' }, h('button', { class: 'b p', title: 'Word con la selección de controladores, la capacidad por controlador y la lista de materiales, en formato de memoria Sinergia', onclick: (e) => exportarMemoria(e.currentTarget) }, 'Exportar memoria a Word (selección y materiales)'), h('button', { class: 'b', title: 'Abre el cuadro de impresión con las tarjetas de controladores y la lista de materiales, con el membrete Sinergia: elija «Guardar como PDF»', onclick: () => BMS.imprimirSinergia({ nombre: 'Controladores', titulo: 'Selección de controladores ' + (P.nombre || ''), clase: 'ctrl-imprime' }) }, 'Exportar PDF'), h('button', { class: 'b', title: 'Excel en el formato BMS Point Schedule: un grupo por controlador con sus equipos y variables, resumen por controlador y lista de materiales', onclick: () => BMS.exportarControladoresXlsx() }, 'Exportar controladores a Excel')));
+    /* PDF: hojas con membrete (vertical, márgenes del documento de secuencias); las tarjetas van de a dos por fila y la lista de materiales se corta por filas */
+    const pdfControladores = () => {
+      const clon = (e) => e.cloneNode(true);
+      const nodos = [clon(root.querySelector('h2')), clon(root.querySelector('p.hint'))];
+      nodos.push(h('p', null, 'Marca de controladores: ' + P.marca + (M ? ' — ' + M.nombre : '') + ' · Reserva de puntos: ' + P.reserva + ' % · Motor de red: ' + (P.motor && P.motor !== 'auto' ? P.motor : 'Automático' + (mot.motor ? ' (' + mot.motor.cod + ')' : ''))));
+      const kp = root.querySelector('.kpis'); if (kp) nodos.push(clon(kp));
+      const cards = [...root.querySelectorAll('.ctrls .ctrl')];
+      for (let i = 0; i < cards.length; i += 2) nodos.push(h('div', { class: 'pdf-fila' }, clon(cards[i]), cards[i + 1] ? clon(cards[i + 1]) : h('div')));
+      const tb = root.querySelector('table.t'), t3 = [...root.querySelectorAll('h3')].find((x) => /^Lista de controladores/.test(x.textContent));
+      if (t3) nodos.push(clon(t3));
+      if (tb) nodos.push(h('div', { class: 'pdf-tabla' }, clon(tb)));
+      const hints = root.querySelectorAll('p.hint'); if (hints.length > 1) nodos.push(clon(hints[hints.length - 1]));
+      return BMS.imprimirPaginado({ nombre: 'Controladores', titulo: 'Selección de controladores ' + (P.nombre || ''), nodos });
+    };
+    root.append(h('div', { class: 'fila noprint' }, h('button', { class: 'b p', title: 'Word con la selección de controladores, la capacidad por controlador y la lista de materiales, en formato de memoria Sinergia', onclick: (e) => exportarMemoria(e.currentTarget) }, 'Exportar memoria a Word (selección y materiales)'), h('button', { class: 'b', title: 'Abre el cuadro de impresión con las tarjetas de controladores y la lista de materiales, con el membrete Sinergia: elija «Guardar como PDF»', onclick: () => pdfControladores() }, 'Exportar PDF'), h('button', { class: 'b', title: 'Excel en el formato BMS Point Schedule: un grupo por controlador con sus equipos y variables, resumen por controlador y lista de materiales', onclick: () => BMS.exportarControladoresXlsx() }, 'Exportar controladores a Excel')));
     if (M && M.nota) root.append(h('div', { class: 'warnbox' }, M.nota));
     if (M && M.confirmar) root.append(h('div', { class: 'warnbox' }, 'Los datos de canales y modelos de ' + P.marca + ' son valores de referencia POR CONFIRMAR con el fabricante. Corríjalos en "Catálogo de controladores".'));
     root.append(h('div', { class: 'kpis' },
