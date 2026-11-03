@@ -18,11 +18,18 @@
   function hojasDisciplina(wb, res, C, E, P, resumen) {
     const DISC = BMS.xlDisc, CAT = BMS.catEq;
     const filas = C.filasOrdenadas(res).filter((f) => f.tipo && f.eq.qty > 0);
-    const usadas = new Set(DISC.flatMap((d) => d.cats));
     DISC.forEach((d) => {
       const cats = d.cats.map((id) => CAT.categorias.find((c) => c.id === id)).filter(Boolean);
-      const delaCat = (id) => filas.filter((f) => f.tipo.cat === id);
-      if (!cats.some((c) => delaCat(c.id).length)) return;
+      const grupos = cats.map((cat) => ({ nombre: cat.nombre, filas: filas.filter((f) => f.tipo.cat === cat.id) }));
+      hojaPuntos(wb, C, P, resumen, { hoja: d.hoja, sub: d.sub, ing: d.ing, grupos });
+    });
+  }
+
+  /* Hoja en el formato BMS Point Schedule: un grupo numerado por cada elemento de «grupos» (sistema, controlador…), un renglón por equipo y sus variables debajo */
+  function hojaPuntos(wb, C, P, resumen, d) {
+    {
+      const grupos = d.grupos.filter((gr) => gr.filas.length);
+      if (!grupos.length) return;
       const nombreHoja = d.hoja.replace(/ /g, '_').slice(0, 31), tabla = 'Tabla_' + nombreHoja.replace(/[^\w]/g, '_');
       const ws = wb.addWorksheet(nombreHoja, { views: [{ state: 'frozen', ySplit: 8, showGridLines: true }], pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
       [11.6, 62, 8, 9, 9, 9, 9, 11, 9, 16, 16, 12, 12, 20].forEach((w, i) => (ws.getColumn(i + 1).width = w));
@@ -45,11 +52,11 @@
       ws.getRow(7).height = 18; ws.getRow(8).height = 18;
 
       let fila = 9, g = 0, equipos = 0, puntos = 0; const totales = [], grupoFilas = [], subFilas = [];
-      cats.forEach((cat) => {
-        const fs0 = delaCat(cat.id); if (!fs0.length) return;
+      grupos.forEach((gr) => {
+        const fs0 = gr.filas;
         g++;
         const filaGrupo = fila++, primera = fila;
-        ws.getCell(filaGrupo, 1).value = g; ws.getCell(filaGrupo, 2).value = cat.nombre.toUpperCase();
+        ws.getCell(filaGrupo, 1).value = g; ws.getCell(filaGrupo, 2).value = gr.nombre.toUpperCase();
         fs0.forEach((f, i) => {
           equipos++;
           const fs = fila++, n = C.nivelDe(f.eq.nivel), ct = f.ctrlId ? C.nombreCtrl(C.ctrlDe(f.ctrlId)) : '';
@@ -100,8 +107,7 @@
         'La tabla de esta pestaña se llama «' + tabla + '» (rango con nombre; en el cuadro de nombres de Excel se selecciona completa).'
       ].forEach((t, i) => { ws.getCell(nota + 1 + i, 1).value = '• ' + t; ws.getCell(nota + 1 + i, 1).font = { size: 9 }; });
       resumen.push({ hoja: nombreHoja, tabla, desc: d.sub, filas: equipos, puntos, gran: fg });
-    });
-    void usadas;
+    }
   }
 
   /* ---------- tablas de Excel planas (una por pestaña, con el nombre de la pestaña) ---------- */
@@ -158,6 +164,32 @@
     indice(wb, 'BMS Point Schedule — Equipos por nivel', resumen, P);
     if (soloBuffer) return wb.xlsx.writeBuffer();
     return guardar(wb, P, 'Equipos_por_nivel_');
+  };
+
+  /* Controladores: hoja BMS Point Schedule con un grupo por controlador (sus equipos y variables), resumen por controlador y lista de materiales */
+  BMS.exportarControladoresXlsx = async (soloBuffer) => {
+    if (!window.ExcelJS) { alert('No se pudo cargar la librería de Excel (se necesita internet).'); return; }
+    const { E, C, P, res, mot, wb, resumen } = base();
+    const filas = C.filasOrdenadas(res).filter((f) => f.tipo && f.eq.qty > 0);
+    const idxNivel = (id) => E.niveles.findIndex((n) => n.id === id);
+    const ctrls = [...E.controladores].sort((a, b) => idxNivel(a.nivel) - idxNivel(b.nivel) || (a.tipo === 'CP' ? -1 : 0) - (b.tipo === 'CP' ? -1 : 0) || (a.consec || 0) - (b.consec || 0));
+    const grupos = ctrls.map((c) => { const n = C.nivelDe(c.nivel); return { nombre: C.nombreCtrl(c) + (n ? ' — ' + n.nombre : '') + (c.ubicacion ? ' · ' + c.ubicacion : ''), filas: filas.filter((f) => f.ctrlId === c.id) }; });
+    grupos.push({ nombre: 'Sin controlador asignado', filas: filas.filter((f) => !f.ctrlId || !ctrls.some((c) => c.id === f.ctrlId)) });
+    hojaPuntos(wb, C, P, resumen, { hoja: 'Controladores', sub: 'Controladores y variables por controlador', ing: 'Controller', grupos });
+    const fila = (t) => { const rv = C.conReserva(t, P.reserva); return { ...t, cab: C.cable(t), res: C.cable(rv) }; };
+    tablaPlana(wb, resumen, 'Resumen_Controlador', 'Resumen de variables y selección por controlador', ['Controlador', 'Tipo', 'Nivel', 'Ubicación', 'Equipos', 'AI', 'AO', 'DI', 'DO', 'INT', 'Total cableados', 'Cableados con reserva', 'Marca', 'Selección', 'Verificación'],
+      mot.detalle.map((d) => { const f = fila(d.t), n = C.nivelDe(d.c.nivel); const sel = d.cfg.base ? d.cfg.baseQty + '×' + d.cfg.base + Object.keys(d.cfg.modulos || {}).filter((k) => d.cfg.modulos[k]).map((k) => ' + ' + d.cfg.modulos[k] + '×' + k).join('') : ''; return [C.nombreCtrl(d.c), d.c.tipo === 'CP' ? 'Principal' : 'Secundario', n ? n.codigo : '', d.c.ubicacion || '', f.eq, f.ai, f.ao, f.di, f.do, f.int, f.cab, f.res, P.marca, sel, !f.cab ? 'Sin puntos' : d.ev.ok ? 'Cubre' : 'Faltan ' + d.ev.falta]; }), [4, 5, 6, 7, 8, 9, 10, 11]);
+    const M = BMS.catCt.marcas[P.marca] || { bases: [], modulos: [], motores: [] };
+    const desc = (cod) => { const x = [...M.bases, ...M.modulos, ...M.motores].find((m) => m.cod === cod); return x ? x.desc || '' : ''; };
+    const tipo = (cod) => (M.bases.some((m) => m.cod === cod) ? 'Controlador' : M.modulos.some((m) => m.cod === cod) ? 'Módulo de E/S' : 'Motor de red');
+    const bom = Object.entries(mot.bom || {}).filter(([, q]) => q > 0);
+    if (mot.motor) bom.push([mot.motor.cod, 1]);
+    const filasBom = [];
+    bom.forEach(([cod, q]) => { const ya = filasBom.find((r) => r[0] === cod && r[2] === tipo(cod)); if (ya) ya[3] += q; else filasBom.push([cod, desc(cod), tipo(cod), q]); });
+    tablaPlana(wb, resumen, 'Materiales_Controladores', 'Lista de materiales de controladores (' + (P.marca || '') + '; modelos por confirmar con el integrador)', ['Código', 'Descripción', 'Tipo', 'Cantidad'], filasBom, [3]);
+    indice(wb, 'BMS Point Schedule — Controladores', resumen, P);
+    if (soloBuffer) return wb.xlsx.writeBuffer();
+    return guardar(wb, P, 'Controladores_');
   };
 
   /* Módulo 4: resumen */
