@@ -121,7 +121,7 @@ table.t tr.rel td { background: var(--accent-soft); }
 @media print {
   body.ctrl-imprime { --bg: #fff; --panel: #fff; --ink: #1d2733; --mute: #667085; --line: #c9d1db; --head: #2b2f36; --head-ink: #fff; --accent: #0b6bcb; --accent-soft: #dbeafe; --in: #fff; --in-line: #c9d1db; --calc: #eef0f3; --sub: #dce6f5; --ok: #1b7f3b; --warn: #b45309; --bad: #b42318; --ok-bg: #dcfce7; --warn-bg: #fef3c7; --bad-bg: #fee2e2; --cp: #0b3d91; --cs: #e8f0fb; background: #fff; font-family: Montserrat, "Segoe UI", Arial, sans-serif; }
   body.ctrl-imprime main { padding: 0 16.5mm; max-width: none; }
-  body.ctrl-imprime main .fila, body.ctrl-imprime .ctrl .mods { display: none !important; }
+  body.ctrl-imprime main .fila, body.ctrl-imprime .ctrl .mods, body.ctrl-imprime .warnbox { display: none !important; }
   body.ctrl-imprime .ctrls { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   body.ctrl-imprime .ctrl { break-inside: avoid; page-break-inside: avoid; font-size: 10px; padding: 7px 8px; }
   body.ctrl-imprime .ctrl h4 { font-size: 11px; }
