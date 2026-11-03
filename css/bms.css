@@ -117,15 +117,15 @@ table.t tr.rel td { background: var(--accent-soft); }
 .sug .it:last-child { border-bottom: 0; }
 .sug .it.on, .sug .it:hover { background: var(--accent-soft); }
 
-/* PDF de controladores: hoja carta apaisada, tarjetas en tres columnas, siempre en tema claro y sin controles */
+/* PDF de controladores: hoja carta vertical con los márgenes del documento de secuencias, tarjetas en dos columnas, siempre en tema claro y sin controles */
 @media print {
   body.ctrl-imprime { --bg: #fff; --panel: #fff; --ink: #1d2733; --mute: #667085; --line: #c9d1db; --head: #2b2f36; --head-ink: #fff; --accent: #0b6bcb; --accent-soft: #dbeafe; --in: #fff; --in-line: #c9d1db; --calc: #eef0f3; --sub: #dce6f5; --ok: #1b7f3b; --warn: #b45309; --bad: #b42318; --ok-bg: #dcfce7; --warn-bg: #fef3c7; --bad-bg: #fee2e2; --cp: #0b3d91; --cs: #e8f0fb; background: #fff; font-family: Montserrat, "Segoe UI", Arial, sans-serif; }
-  body.ctrl-imprime main { padding: 0 8mm; max-width: none; }
+  body.ctrl-imprime main { padding: 0 16.5mm; max-width: none; }
   body.ctrl-imprime main .fila, body.ctrl-imprime .ctrl .mods { display: none !important; }
-  body.ctrl-imprime .ctrls { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  body.ctrl-imprime .ctrl { break-inside: avoid; page-break-inside: avoid; font-size: 9.5px; padding: 7px 8px; }
+  body.ctrl-imprime .ctrls { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  body.ctrl-imprime .ctrl { break-inside: avoid; page-break-inside: avoid; font-size: 10px; padding: 7px 8px; }
   body.ctrl-imprime .ctrl h4 { font-size: 11px; }
-  body.ctrl-imprime .mini { font-size: 8.5px; } body.ctrl-imprime .mini th, body.ctrl-imprime .mini td { padding: 1px 4px; }
+  body.ctrl-imprime .mini { font-size: 9px; } body.ctrl-imprime .mini th, body.ctrl-imprime .mini td { padding: 1px 4px; }
   body.ctrl-imprime h2 { font-size: 14pt; } body.ctrl-imprime h3 { break-after: avoid; }
   body.ctrl-imprime .scroll { max-height: none; overflow: visible; } body.ctrl-imprime table.t tr { break-inside: avoid; }
   body.ctrl-imprime * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
