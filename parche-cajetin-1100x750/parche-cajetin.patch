@@ -1,0 +1,295 @@
+diff --git a/css/bms.css b/css/bms.css
+index 700811d..09501f6 100644
+--- a/css/bms.css
++++ b/css/bms.css
+@@ -140,3 +140,5 @@ table.t tr.rel td { background: var(--accent-soft); }
+ }
+ 
+ #pdf-doc.pdf-lamina { overflow: hidden; line-height: 0; font-size: 0; background: #fff; }
++#pdf-doc.pdf-lamina .pdf-lam { overflow: hidden; break-after: page; page-break-after: always; }
++#pdf-doc.pdf-lamina .pdf-lam:last-child { break-after: auto; page-break-after: auto; }
+diff --git a/js/cajetin.js b/js/cajetin.js
+new file mode 100644
+index 0000000..dae7b17
+--- /dev/null
++++ b/js/cajetin.js
+@@ -0,0 +1,131 @@
++/* Láminas del diagrama con el cajetín Sinergia de 1100 × 750 mm (plantilla D-01-2 SINERGIA CAJETÍN 1100X750).
++   El diagrama se reparte en las láminas necesarias cortando entre lazos; cada lámina lleva el marco, el cajetín (logo, control de revisiones, contenido,
++   registro público, lámina y fecha) y su parte del diagrama dentro del área de dibujo (911 × 724 mm).
++   Medidas tomadas del bloque del DWG: hoja de 1100 × 750.05 mm; marco interior a 51.81 mm del borde izquierdo y a 13.1 mm del inferior;
++   tira del cajetín de 127 mm en el lado derecho. Coordenadas de la lámina en mm, con el origen abajo a la izquierda (como AutoCAD). */
++(function () {
++  const PX = 72, MM = 25.4 / PX;
++  const SW = 1100, SH = 750.05;
++  const AREA = { x0: 51.8138, x1: 963.0, y0: 13.1, y1: 737.0 };
++  const AW = AREA.x1 - AREA.x0, AH = AREA.y1 - AREA.y0;
++  const SEP = 100; /* separación entre láminas en el DXF */
++  const T = (x, y) => [x + 70.2656, y - 12.5];
++
++  /* líneas del bloque (coordenadas de la plantilla); w = grosor en mm */
++  const LINEAS = [
++    [-70.2656, 762.55, -70.2656, 12.5, 0.7], [1029.7344, 762.55, -70.2656, 762.55, 0.7], [1029.7344, 12.5, 1029.7344, 762.55, 0.7], [-70.2656, 12.5, 1029.7344, 12.5, 0.7],
++    [1019.7344, 749.5, -18.4518, 749.5], [1019.7344, 25.6, -18.4518, 25.6], [1019.7344, 749.5, 1019.7344, 25.6], [-18.4518, 749.5, -18.4518, 25.6],
++    [956.2344, 35.6, 956.2344, 25.6], [1000.4345, 169.4145, 1000.4345, 151.4145], [979.6285, 169.4145, 979.6285, 151.4145], [921.9751, 169.4145, 921.9751, 151.4145],
++    [892.7344, 169.4145, 892.7344, 25.6], [892.7344, 169.4145, 892.7344, 749.5],
++    [1019.7344, 35.6, 892.7344, 35.6], [1019.7344, 75.9158, 892.7344, 75.9158], [1019.7344, 169.4145, 892.7344, 169.4145], [1019.7344, 163.4145, 892.7344, 163.4145],
++    [1019.7344, 157.4145, 892.7344, 157.4145], [1019.7344, 102.5547, 892.7344, 102.5547], [1019.7344, 151.4145, 892.7344, 151.4145]
++  ];
++  const LOGO = { x: 927.4649, y: 108.8879, w: 57.7, h: 37.2 }; /* esquina inferior izquierda y tamaño, en coordenadas de la plantilla */
++
++  const quita = (s) => String(s || '').replace(/\*\*|==|!!/g, '');
++  const parte = (txt, n) => { const w = String(txt).split(/\s+/), out = []; let l = ''; w.forEach((p) => { if ((l + ' ' + p).trim().length > n && l) { out.push(l); l = p; } else l = (l + ' ' + p).trim(); }); if (l) out.push(l); return out; };
++
++  /* primitivas del cajetín de una lámina: líneas y textos (y = borde superior del texto) */
++  function cajetin(d) {
++    const lineas = LINEAS.map(([x1, y1, x2, y2, w]) => { const a = T(x1, y1), b = T(x2, y2); return { x1: a[0], y1: a[1], x2: b[0], y2: b[1], w: w || 0 }; });
++    const textos = [];
++    const tx = (x, y, h, t) => { if (!t) return; const p = T(x, y); textos.push({ x: p[0], y: p[1], h, t: String(t).toUpperCase() }); };
++    tx(899.1136, 167.9448, 3.0, '# Rev.'); tx(927.4339, 167.9448, 3.0, 'Fecha y Descripción'); tx(985.0803, 167.9448, 3.0, 'Dibujo'); tx(1002.6143, 167.9448, 3.0, 'Aprob.');
++    tx(899.1136, 162.2, 2.8, d.rev); tx(927.4339, 162.2, 2.8, [d.fecha, d.desc].filter(Boolean).join('  ')); tx(985.0803, 162.2, 2.8, d.dibujo);
++    tx(895.894, 99.4052, 3.0, 'Contenido');
++    const ti = parte(d.titulo, 38);
++    ti.slice(0, 2).forEach((l, i) => tx(899.5859, 94.2 - i * 4.4, 3.0, l));
++    if (d.hoja) tx(899.5859, 94.2 - 2 * 4.4, 3.0, d.hoja);
++    tx(895.8175, 72.2345, 3.0, 'Información de registro público:');
++    const campo = (y, rot, val) => { tx(895.8175, y, 3.0, rot); if (val) tx(895.8175 + rot.length * 2.3 + 3, y, 3.0, val); };
++    campo(61.2004, 'Propietario:', d.propietario); campo(51.6708, 'Plano de catastro:', ''); campo(42.7882, 'Citas folio Real:', '');
++    tx(895.894, 31.4918, 3.0, 'Lámina'); tx(918.0, 31.3438, 3.0, d.lamina); tx(959.5, 31.4918, 3.0, d.fecha);
++    return { lineas, textos };
++  }
++
++  /* reparte el diagrama en láminas: toma la escala más grande que dé el menor número de láminas y corta entre lazos */
++  function repartir(svg) {
++    const VB = svg.viewBox.baseVal, W = VB.width, H = VB.height;
++    const fin = Number(svg.getAttribute('data-fin')) || H - 110;
++    const cortes = JSON.parse(svg.getAttribute('data-cortes') || '[]').filter((c) => c > 0 && c < fin);
++    const ajuste = AW / (W * MM);
++    let mejor = null;
++    [1, 0.98, 0.96, 0.94, 0.92, 0.9, 0.88].forEach((k) => {
++      const esc = ajuste * k, tope = AH / (MM * esc), partes = [];
++      let ini = 0;
++      while (fin - ini > 1) {
++        let fn;
++        if (fin - ini <= tope) fn = fin;
++        else { const c = cortes.filter((v) => v > ini + tope * 0.3 && v <= ini + tope); fn = c.length ? Math.max(...c) : ini + tope; }
++        partes.push([ini, fn]); ini = fn;
++      }
++      if (!mejor || partes.length < mejor.partes.length) mejor = { esc, partes };
++    });
++    return mejor;
++  }
++
++  const rotuloLamina = (base, i) => { const m = /^(.*?)(\d+)$/.exec(String(base || 'BMS-01')); return m ? m[1] + String(Number(m[2]) + i).padStart(m[2].length, '0') : (base || 'BMS') + '-' + (i + 1); };
++  function datosLamina(i, n) {
++    const E = BMS.estado, P = E.proyecto, D = E.diagrama || {};
++    return { lamina: rotuloLamina(D.lamina, i), titulo: 'Diagrama unifilar del sistema de monitoreo y control (BMS)', hoja: n > 1 ? 'Hoja ' + (i + 1) + ' de ' + n : '', rev: 'A', fecha: P.fecha || '', desc: 'Emisión para revisión', dibujo: 'SI', propietario: quita(P.propietario) };
++  }
++
++  /* ---------- DXF ---------- */
++  BMS.dxfLaminas = (svg) => {
++    const { esc, partes } = repartir(svg), out = [];
++    const g = (c, v) => out.push(String(c), String(v));
++    const f = (v) => Math.round(v * 10000) / 10000;
++    partes.forEach(([ya, yb], i) => {
++      const ox = i * (SW + SEP), d = datosLamina(i, partes.length), c = cajetin(d);
++      c.lineas.forEach((l) => {
++        if (l.w) { g(0, 'POLYLINE'); g(8, 'BMS-CAJETIN'); g(66, 1); g(70, 0); g(10, 0); g(20, 0); g(30, 0); g(40, l.w); g(41, l.w); [[l.x1, l.y1], [l.x2, l.y2]].forEach(([x, y]) => { g(0, 'VERTEX'); g(8, 'BMS-CAJETIN'); g(10, f(ox + x)); g(20, f(y)); g(30, 0); }); g(0, 'SEQEND'); g(8, 'BMS-CAJETIN'); }
++        else { g(0, 'LINE'); g(8, 'BMS-CAJETIN'); g(10, f(ox + l.x1)); g(20, f(l.y1)); g(30, 0); g(11, f(ox + l.x2)); g(21, f(l.y2)); g(31, 0); }
++      });
++      const txt = (x, y, h, t) => { g(0, 'TEXT'); g(8, 'BMS-CAJETIN-TEXTO'); g(10, f(x)); g(20, f(y)); g(30, 0); g(40, h); g(1, BMS.dxfTexto(t)); g(41, 0.95); g(7, 'CENTURY'); };
++      c.textos.forEach((t) => txt(ox + t.x, t.y - t.h, t.h, t.t));
++      const lg = T(LOGO.x, LOGO.y); /* el logo es una imagen; en el DXF se rotula con texto */
++      txt(ox + lg[0] + 2, lg[1] + 22, 9, 'SINERGIA'); txt(ox + lg[0] + 2, lg[1] + 10, 9, 'INGENIERÍA');
++      out.push(...BMS.svgADxf(svg.cloneNode(true), { entidades: true, banda: [ya, yb], esc, ox: ox + AREA.x0, oy: AREA.y1 }));
++    });
++    return BMS.dxfArmar(out);
++  };
++
++  /* ---------- PDF ---------- */
++  let logoPng = null;
++  async function logo() {
++    if (logoPng !== null) return logoPng;
++    try { const z = await JSZip.loadAsync(window.BMS_DOCX_BASE, { base64: true }); logoPng = 'data:image/png;base64,' + await z.file('word/media/image2.png').async('base64'); } catch (e) { logoPng = ''; }
++    return logoPng;
++  }
++  const NS = 'http://www.w3.org/2000/svg';
++  const el = (n, a, hijos) => { const e = document.createElementNS(NS, n); Object.entries(a || {}).forEach(([k, v]) => e.setAttribute(k, v)); (hijos || []).forEach((h) => e.append(h)); return e; };
++  async function laminasSvg(svg) {
++    const { esc, partes } = repartir(svg), VB = svg.viewBox.baseVal, W = VB.width, png = await logo();
++    return partes.map(([ya, yb], i) => {
++      const d = datosLamina(i, partes.length), c = cajetin(d), Y = (y) => SH - y;
++      const hoja = el('svg', { xmlns: NS, viewBox: '0 0 ' + SW + ' ' + SH, width: SW + 'mm', height: SH + 'mm', 'font-family': 'Century Gothic, Montserrat, Arial, sans-serif' });
++      hoja.append(el('rect', { width: SW, height: SH, fill: '#fff' }));
++      const dib = svg.cloneNode(true); dib.removeAttribute('style'); dib.removeAttribute('width'); dib.removeAttribute('height');
++      Object.entries({ x: AREA.x0, y: Y(AREA.y1), width: W * MM * esc, height: (yb - ya) * MM * esc, viewBox: '0 ' + ya + ' ' + W + ' ' + (yb - ya), preserveAspectRatio: 'xMinYMin meet', overflow: 'hidden' }).forEach(([k, v]) => dib.setAttribute(k, v));
++      hoja.append(dib);
++      c.lineas.forEach((l) => hoja.append(el('line', { x1: l.x1, y1: Y(l.y1), x2: l.x2, y2: Y(l.y2), stroke: '#000', 'stroke-width': l.w || 0.25 })));
++      c.textos.forEach((t) => { const e = el('text', { x: t.x, y: Y(t.y - t.h), 'font-size': t.h / 0.72, fill: '#000' }); e.textContent = t.t; hoja.append(e); });
++      const lg = T(LOGO.x, LOGO.y);
++      if (png) hoja.append(el('image', { href: png, x: lg[0], y: Y(lg[1] + LOGO.h), width: LOGO.w, height: LOGO.h, preserveAspectRatio: 'xMidYMid meet' }));
++      return hoja;
++    });
++  }
++  BMS.pdfLaminas = async (svg, titulo) => {
++    const hojas = await laminasSvg(svg);
++    const doc = document.createElement('div'); doc.id = 'pdf-doc'; doc.className = 'pdf-lamina'; doc.style.width = SW + 'mm';
++    hojas.forEach((h) => { const w = document.createElement('div'); w.className = 'pdf-lam'; w.style.cssText = 'width:' + SW + 'mm;height:' + (SH - 0.1) + 'mm'; h.style.display = 'block'; w.append(h); doc.append(w); });
++    document.body.append(doc);
++    const ant = document.title; if (titulo) document.title = titulo;
++    const st = document.createElement('style'); st.textContent = '@page { size: ' + SW + 'mm ' + SH + 'mm; margin: 0; }'; document.head.append(st);
++    document.body.classList.add('pdf-imprime');
++    const fin = () => { document.body.classList.remove('pdf-imprime'); document.title = ant; st.remove(); doc.remove(); window.removeEventListener('afterprint', fin); };
++    window.addEventListener('afterprint', fin); setTimeout(() => window.print(), 300);
++    return hojas.length;
++  };
++  BMS.laminasInfo = (svg) => { const r = repartir(svg); return { laminas: r.partes.length, escala: Math.round(r.esc * 1000) / 1000, partes: r.partes }; };
++})();
+diff --git a/js/dxf.js b/js/dxf.js
+index ed2eeeb..57a0944 100644
+--- a/js/dxf.js
++++ b/js/dxf.js
+@@ -6,7 +6,7 @@
+   const PX = 72, MM = 25.4 / PX;
+   const CAPAS = {
+     'BMS-A-BACNET-IP': 31, 'BMS-B-BACNET-MSTP': 1, 'BMS-C-MODBUS-RTU': 4, 'BMS-E-MODBUS-TCP': 5, 'BMS-D-SENALES': 6,
+-    'BMS-MARCO': 8, 'BMS-DIBUJO': 7, 'BMS-TEXTO': 7, 'BMS-TEXTO-SEC': 8, 'BMS-ALERTA': 1
++    'BMS-MARCO': 8, 'BMS-DIBUJO': 7, 'BMS-TEXTO': 7, 'BMS-TEXTO-SEC': 8, 'BMS-ALERTA': 1, 'BMS-CAJETIN': 7, 'BMS-CAJETIN-TEXTO': 7
+   };
+   const POR_COLOR = { '#ff9e7f': 'BMS-A-BACNET-IP', '#ff0000': 'BMS-B-BACNET-MSTP', '#00ffff': 'BMS-C-MODBUS-RTU', '#0a2fa8': 'BMS-E-MODBUS-TCP', '#ff00ff': 'BMS-D-SENALES', '#bbb': 'BMS-MARCO', '#c00': 'BMS-ALERTA' };
+   const capaTrazo = (e) => POR_COLOR[(e.getAttribute('stroke') || '').toLowerCase()] || 'BMS-DIBUJO';
+@@ -14,12 +14,16 @@
+   /* Texto: los caracteres fuera de ASCII se escriben como \U+XXXX para no depender de la página de códigos. */
+   const esc = (t) => String(t).replace(/⚠/g, '!').replace(/[^\x20-\x7e]/g, (c) => '\\U+' + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0'));
+ 
+-  BMS.svgADxf = (svg) => {
++  /* op (opcional): { entidades: true, banda: [ya, yb], esc, ox, oy } dibuja solo la franja ya..yb del diagrama, a escala esc, con la esquina superior izquierda en (ox, oy), y devuelve solo las entidades */
++  BMS.svgADxf = (svg, op) => {
+     const vb = svg.viewBox.baseVal, H = vb.height;
++    const S = op ? op.esc : 1, OX = op ? op.ox : 0, YA = op ? op.banda[0] : 0, OY = op ? op.oy : H * MM;
++    const yl = op ? OY - (op.banda[1] - YA) * MM * S : -Infinity, yh = op ? OY : Infinity;
++    const enBanda = (y) => !op || (y >= yl - 1e-6 && y <= yh + 1e-6);
+     const out = [];
+     const g = (code, val) => out.push(String(code), String(val));
+     const f = (v) => Math.round(v * 10000) / 10000;
+-    const X = (x, dx) => f((x + dx) * MM), Y = (y, dy) => f((H - (y + dy)) * MM);
++    const X = (x, dx) => f(OX + (x + dx) * MM * S), Y = (y, dy) => f(OY - (y + dy - YA) * MM * S);
+     /* círculos de clave (relleno blanco): las líneas se cortan en su interior */
+     const claves = [];
+     (function recolecta(nodo, dx, dy) {
+@@ -32,6 +36,10 @@
+     /* tramos de un segmento que quedan fuera de los círculos de clave */
+     const fuera = (x1, y1, x2, y2) => {
+       const dxs = x2 - x1, dys = y2 - y1, a = dxs * dxs + dys * dys, cortes = [];
++      if (op && a > 0) {
++        if (Math.abs(dys) < 1e-9) { if (y1 < yl - 1e-6 || y1 > yh + 1e-6) cortes.push([0, 1]); }
++        else { let ta = (yl - y1) / dys, tb = (yh - y1) / dys; if (ta > tb) { const q = ta; ta = tb; tb = q; } if (ta > 0) cortes.push([0, Math.min(1, ta)]); if (tb < 1) cortes.push([Math.max(0, tb), 1]); if (ta >= 1 || tb <= 0) cortes.push([0, 1]); }
++      }
+       if (a > 0) claves.forEach(([cx, cy, r]) => {
+         const fx = x1 - cx, fy = y1 - cy, b = 2 * (fx * dxs + fy * dys), cc = fx * fx + fy * fy - r * r, d = b * b - 4 * a * cc;
+         if (d <= 0) return;
+@@ -56,7 +64,8 @@
+     };
+     /* las polilíneas abiertas (troncales, bajantes, rutas) también se cortan en el interior de los círculos de clave */
+     const poly = (pts, cerrado, capa, ancho, punteada) => {
+-      if (cerrado || !claves.length || pts.length < 2) { polyRaw(pts, cerrado, capa, ancho, punteada); return; }
++      if (cerrado && op && pts.length > 2 && pts.some((p) => !enBanda(p[1]))) { if (pts.every((p) => !enBanda(p[1]))) return; pts = pts.concat([pts[0]]); cerrado = false; }
++      if (cerrado || (!claves.length && !op) || pts.length < 2) { polyRaw(pts, cerrado, capa, ancho, punteada); return; }
+       const corridas = []; let cur = null;
+       for (let i = 0; i < pts.length - 1; i++) {
+         const [ax, ay] = pts[i];
+@@ -90,9 +99,11 @@
+           poly([[X(x, dx), Y(y, dy)], [X(x + w, dx), Y(y, dy)], [X(x + w, dx), Y(y + hh, dy)], [X(x, dx), Y(y + hh, dy)]], true, capaTrazo(e), 0, dashed(e));
+         } else if (tag === 'circle') {
+           const capa = (e.getAttribute('fill') || '').toLowerCase() === '#c00' ? 'BMS-ALERTA' : (e.getAttribute('fill') === '#111' ? 'BMS-DIBUJO' : capaTrazo(e));
++          if (!enBanda(Y(num(e.getAttribute('cy')), dy))) continue;
+           g(0, 'CIRCLE'); g(8, capa); g(10, X(num(e.getAttribute('cx')), dx)); g(20, Y(num(e.getAttribute('cy')), dy)); g(30, 0); g(40, f(num(e.getAttribute('r')) * MM));
+         } else if (tag === 'ellipse') {
+           const cx = num(e.getAttribute('cx')), cy = num(e.getAttribute('cy')), rx = num(e.getAttribute('rx')), ry = num(e.getAttribute('ry')), pts = [];
++          if (!enBanda(Y(cy, dy))) continue;
+           for (let i = 0; i < 32; i++) { const a = i / 32 * 2 * Math.PI; pts.push([X(cx + rx * Math.cos(a), dx), Y(cy + ry * Math.sin(a), dy)]); }
+           poly(pts, true, capaTrazo(e), 0, false);
+         } else if (tag === 'path') {
+@@ -102,10 +113,11 @@
+           const t = e.textContent; if (!t) continue;
+           const size = num(e.getAttribute('font-size')) || 9, ancla = e.getAttribute('text-anchor') === 'middle' ? 1 : e.getAttribute('text-anchor') === 'end' ? 2 : 0;
+           const px = X(num(e.getAttribute('x')), dx), py = Y(num(e.getAttribute('y')), dy);
++          if (!enBanda(py)) continue;
+           const sec = ['#555', '#555555'].includes((e.getAttribute('fill') || '').toLowerCase());
+           const alerta = (e.getAttribute('fill') || '').toLowerCase() === '#c00';
+           g(0, 'TEXT'); g(8, alerta ? 'BMS-ALERTA' : sec ? 'BMS-TEXTO-SEC' : 'BMS-TEXTO');
+-          g(10, px); g(20, py); g(30, 0); g(40, f(size * 0.72 * MM)); g(1, esc(t)); g(41, 0.8); g(7, 'CENTURY');
++          g(10, px); g(20, py); g(30, 0); g(40, f(size * 0.72 * MM * S)); g(1, esc(t)); g(41, 0.8); g(7, 'CENTURY');
+           if (ancla) { g(72, ancla); g(11, px); g(21, py); g(31, 0); }
+         }
+       }
+@@ -130,8 +142,14 @@
+       return { pts, cerrado };
+     }
+     recorrer(svg, 0, 0);
++    if (op && op.entidades) return out;
++
++    return BMS.dxfArmar(out);
++  };
+ 
+-    /* Archivo: HEADER, TABLES (tipos de línea, capas, estilo), ENTITIES */
++  /* Archivo: HEADER, TABLES (tipos de línea, capas, estilo), ENTITIES */
++  BMS.dxfTexto = esc;
++  BMS.dxfArmar = (out) => {
+     const cab = [];
+     const c = (code, val) => cab.push(String(code), String(val));
+     c(0, 'SECTION'); c(2, 'HEADER'); c(9, '$ACADVER'); c(1, 'AC1009'); c(9, '$INSUNITS'); c(70, 4); c(9, '$MEASUREMENT'); c(70, 1); c(9, '$LTSCALE'); c(40, 1); c(0, 'ENDSEC');
+diff --git a/js/p-diagrama.js b/js/p-diagrama.js
+index 2e703ac..b6c8d25 100644
+--- a/js/p-diagrama.js
++++ b/js/p-diagrama.js
+@@ -434,6 +434,7 @@
+ 
+     /* ---- cajetín ---- */
+     const TY = H - 110;
++    svg.setAttribute('data-fin', TY); /* el cajetín propio de la lámina empieza aquí; las láminas de 1100 × 750 llevan el suyo */
+     line(g, 40, TY, W - 40, TY, { w: 1.2 });
+     mv(g, 'cajetin', (sg) => {
+       txt(sg, 70, TY + 46, 'Diagrama unifilar del sistema de monitoreo y control (BMS)', { size: 26 }); txt(sg, 72, TY + 66, 'Sin escala', { size: 12 });
+@@ -474,6 +475,28 @@
+     const svg = construir(), VB = svg.viewBox.baseVal, HOJA = VB.width;
+     BMS.ui.modo = BMS.ui.modo || 'mano';
+     const visor = h('div', { class: 'diag ' + BMS.ui.modo }, svg);
++    /* PDF para anexos: hojas carta con el membrete de la memoria; el diagrama se parte entre lazos en tantas hojas como haga falta, a todo el ancho del texto, vectorial */
++    const pdfAnexo = () => {
++      const W = VB.width, H = VB.height, cortes = JSON.parse(svg.getAttribute('data-cortes') || '[]').filter((c) => c > 0 && c < H), AN = 156, K = W / AN; /* px por mm */
++      const partes = []; let ini = 0;
++      while (H - ini > 1) {
++        const tope = (partes.length ? 212 : 188) * K; let fn;
++        if (H - ini <= tope) fn = H;
++        else { const c = cortes.filter((v) => v > ini + tope * 0.3 && v <= ini + tope); fn = c.length ? Math.max(...c) : ini + tope; }
++        partes.push([ini, fn]); ini = fn;
++      }
++      const nodos = [h('h2', null, 'Diagrama unifilar del sistema de monitoreo y control (BMS)')];
++      partes.forEach(([ya, yb], n) => {
++        const c = svg.cloneNode(true); c.removeAttribute('style');
++        c.setAttribute('viewBox', '0 ' + ya + ' ' + W + ' ' + (yb - ya)); c.setAttribute('preserveAspectRatio', 'xMinYMin meet');
++        c.setAttribute('width', AN + 'mm'); c.setAttribute('height', ((yb - ya) / K).toFixed(2) + 'mm');
++        c.setAttribute('style', 'display:block;max-width:none;width:' + AN + 'mm;height:' + ((yb - ya) / K).toFixed(2) + 'mm');
++        if (n) { const sl = document.createElement('div'); sl.className = 'pdf-salto'; nodos.push(sl); }
++        nodos.push(c);
++      });
++      return BMS.imprimirPaginado({ nombre: 'Diagrama unifilar BMS', titulo: 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || ''), nodos });
++    };
++
+     const pct = h('span', { class: 'mute', style: { minWidth: '48px', textAlign: 'center' } });
+     function aplicarZoom(px, cx, cy) {
+       const w0 = svg.getBoundingClientRect().width || px;
+@@ -525,8 +548,11 @@
+       h('div', { class: 'fila noprint' },
+         h('button', { class: 'b', onclick: () => { const c = svg.cloneNode(true); c.removeAttribute('style'); BMS.descargar('diagrama-unifilar-bms.svg', new XMLSerializer().serializeToString(c), 'image/svg+xml'); } }, 'Descargar SVG'),
+         h('button', { class: 'b', title: 'Archivo DXF para AutoCAD con capas por tipo de cableado. En AutoCAD use Guardar como… DWG.', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms.dxf', BMS.svgADxf(c), 'application/dxf'); } }, 'Descargar DXF (AutoCAD / DWG)'),
+-        h('button', { class: 'b', title: 'PDF de la lámina completa a tamaño de plano, en una sola página (36 in de ancho). En el cuadro de impresión elija «Guardar como PDF» y el tamaño de papel que propone el documento', onclick: () => BMS.imprimirLamina({ svg, ancho: 36, titulo: 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || '') }) }, 'Imprimir / PDF (36 in de ancho)'),
++        h('button', { class: 'b', title: 'PDF en hojas carta con el membrete Sinergia (formato de memoria), para agregar el diagrama a los anexos. Se parte entre lazos en las hojas necesarias. En el cuadro de impresión elija «Guardar como PDF», márgenes «Ninguno»', onclick: () => pdfAnexo() }, 'Imprimir / PDF (anexo, formato memoria)'),
++        h('button', { class: 'b', title: 'DXF con el cajetín Sinergia de 1100 × 750 mm: el diagrama se reparte en las láminas necesarias, cortando entre lazos', onclick: () => { const c = svg.cloneNode(true); BMS.descargar('diagrama-unifilar-bms-laminas-1100x750.dxf', BMS.dxfLaminas(c), 'application/dxf'); } }, 'DXF láminas 1100×750 (cajetín)'),
++        h('button', { class: 'b', title: 'PDF con una hoja de 1100 × 750 mm por lámina, con el cajetín Sinergia', onclick: () => BMS.pdfLaminas(svg, 'Diagrama unifilar BMS ' + (BMS.estado.proyecto.nombre || '')) }, 'PDF láminas 1100×750 (cajetín)'),
+         h('button', { class: 'b p', onclick: () => BMS.ir('equipos') }, 'Siguiente: equipos por nivel →')),
++      h('p', { class: 'hint' }, 'PDF de láminas 1100×750: en el cuadro de impresión use destino «Guardar como PDF», tamaño de papel A0 (o Arch E 36×48 in; no existe 1100×750 en la lista y cualquier tamaño menor recorta la lámina), orientación horizontal, escala 100 % (no «Personalizada»), márgenes «Ninguno» y active «Gráficos de fondo». La lámina queda en la esquina superior izquierda de la hoja a tamaño real; para el plotter se escala al papel disponible (por ejemplo 36 in de ancho = 83 %).'),
+       barra, visor);
+     if (BMS.ui.zoomPx) aplicarZoom(BMS.ui.zoomPx, 0, 0); else setTimeout(ajustar, 0);
+   };
