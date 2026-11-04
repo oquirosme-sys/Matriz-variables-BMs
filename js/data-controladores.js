@@ -1,9 +1,10 @@
 /* Catálogo base de controladores por marca.
    Canales: uio = entrada/salida universal (Honeywell), ui = entrada universal, bi = entrada binaria, co = salida configurable, bo = salida binaria, ao = salida analógica.
    JCI: tomado de la hoja JCI_Catalogo del Excel (LIT-1900346 / LIT-1900349 y Guía de configuración Metasys 12.0).
-   Honeywell: Optimizer en Español (Honeywell LATAM 2023). Schneider: EcoStruxure Building Operation (SpaceLogic AS-P y módulos de E/S), por confirmar con el proveedor. Se corrigen en la pestaña "Catálogo de controladores". */
+   Honeywell: Optimizer en Español (Honeywell LATAM 2023). Schneider: EcoStruxure Building Operation (SpaceLogic AS-P y módulos de E/S), por confirmar con el proveedor. Se corrigen en la pestaña "Catálogo de controladores".
+   Schneider (v7): gateways y módulos de comunicación de distribución eléctrica de la presentación Smart Systems y la hoja de datos del Panel Server PAS600 (ver nota de la marca). */
 window.BMS_CATALOGO_CONTROLADORES = {
-  version: 6, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador y agrega las marcas nuevas
+  version: 7, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador y agrega las marcas nuevas
   marcas: {
     JCI: {
       nombre: 'Johnson Controls (Metasys)',
@@ -61,7 +62,7 @@ window.BMS_CATALOGO_CONTROLADORES = {
       maxModulosPorBase: 10,
       bus: 'B', // troncal BACnet MS/TP / Modbus entre controladores; la LAN IP llega al servidor de automatización
       confirmar: true,
-      nota: 'Datos por confirmar con Schneider Electric: SpaceLogic Automation Server AS-P con módulos de E/S SpaceLogic (UI-16, DI-16, DO-FA-12, AO-8) sobre base de terminales Central I/O (SXWTBIOW110001). La cantidad máxima de módulos por servidor y de dispositivos por servidor es una estimación conservadora: verifique en la hoja de datos de AS-P / AS-B y en la guía de hardware de EcoStruxure Building Operation. Los modelos con ventilador/HOA (sufijo -H) y las referencias exactas (SXW…) se completan en la pestaña "Catálogo de controladores".',
+      nota: 'Datos por confirmar con Schneider Electric: SpaceLogic Automation Server AS-P con módulos de E/S SpaceLogic (UI-16, DI-16, DO-FA-12, AO-8) sobre base de terminales Central I/O (SXWTBIOW110001). La cantidad máxima de módulos por servidor y de dispositivos por servidor es una estimación conservadora: verifique en la hoja de datos de AS-P / AS-B y en la guía de hardware de EcoStruxure Building Operation. Integración de distribución eléctrica (no ocupa canales del servidor; entra por gateway): EcoStruxure Panel Server PAS600 (gateway universal Ethernet / Modbus RTU / inalámbrico IEEE 802.15.4, 110-277 V CA/CC, 128 esclavos Modbus RTU y 100 inalámbricos, 2 RJ45 + 1 RS485, 512 MB, riel DIN); módulo IFE LV434001 (1 interruptor a Ethernet) y LV434002 (1 interruptor + gateway Modbus para hasta 12 módulos IFM y 20 dispositivos, 128 MB de registro); IFM LV434000 (interfaz Modbus RTU, direcciones 01-99); módulo de E/S LV434063 (6 DI, 3 DO, 1 AI PT100; cuna y ERMS); Com\'X 200/210/510 (servidor de energía con gateway Ethernet). Los modelos con ventilador/HOA (sufijo -H) y las referencias exactas (SXW…) se completan en la pestaña "Catálogo de controladores".',
       bases: [
         { cod: 'SXWASPXX10001', desc: 'SpaceLogic Automation Server AS-P (servidor de automatización BACnet/IP, Modbus; sin entradas/salidas propias, se amplía con módulos de E/S)', maxMod: 32, fuente: 'EcoStruxure Building Operation — por confirmar' }
       ],
