@@ -42,8 +42,17 @@
   const catDe = (id) => BMS.catEq.categorias.find((c) => c.id === id);
   const corto = (t) => String(t).replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
   const sumaPuntos = (t) => `AI ${num(t.ai)}, AO ${num(t.ao)}, DI ${num(t.di)}, DO ${num(t.do)} e INT ${num(t.int)}`;
+  /* La frase de arquitectura sigue el protocolo elegido en la pestaña 5 (BACnet/IP por defecto o BACnet MS/TP), también en proyectos guardados */
+  function arquitecturaRed(t) {
+    const P = BMS.estado.proyecto, Mc = BMS.catCt.marcas[P.marca];
+    if (!Mc || !Mc.bases.some((x) => x.com)) return t;
+    const MS = 'controlador principal y gateways; troncal BACnet MS/TP entre controladores.', IP = 'controladores y gateways; cada controlador se conecta directamente a la red IP (la troncal BACnet MS/TP queda como opción).';
+    return P.protocolo === 'mstp' ? t.replace(IP, MS) : t.replace(MS, IP);
+  }
   function resolverTexto(txt) {
-    if (txt == null || String(txt).indexOf('{{') < 0) return txt;
+    if (txt == null) return txt;
+    txt = arquitecturaRed(String(txt));
+    if (txt.indexOf('{{') < 0) return txt;
     const E = BMS.estado, P = E.proyecto, res = BMS.calc.todo();
     const mapa = { proyecto: P.nombre || 'el proyecto', ubicacion: P.ubicacion || '', marca: P.marca, reserva: P.reserva, niveles: E.niveles.length, controladores: E.controladores.length, equipos: res.total.eq, puntos: sumaPuntos(res.total), propietario: P.propietario || '' };
     return String(txt).replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in mapa ? mapa[k] : m));
