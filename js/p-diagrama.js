@@ -139,7 +139,7 @@
     const { E, P, C, res, mot, M, det } = datos();
     cfg = E.diagrama; coloresOn = cfg.colores !== false; cfg.mv = cfg.mv || {};
     E.gabDim = E.gabDim || {};
-    const trunk = cfg.troncal === 'A' || cfg.troncal === 'B' ? cfg.troncal : ((M && M.bus) || 'B');
+    const trunk = cfg.troncal === 'A' || cfg.troncal === 'B' ? cfg.troncal : (M && M.bases.some((b) => b.com) ? (BMS.estado.proyecto.protocolo === 'mstp' ? 'B' : 'A') : ((M && M.bus) || 'B'));
     const COLW = 238, X0 = 330, PORFILA = 9, MAXIT = 30, ITH = 44, IT0 = 156, awg = cfg.awg || '16';
     const cps = E.controladores.filter((c) => c.tipo === 'CP');
     const principal = cps[0] || null;

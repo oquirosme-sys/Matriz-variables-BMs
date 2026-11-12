@@ -166,7 +166,9 @@
     if (!M || !falta(req)) return { base: null, baseQty: 0, modulos: {} };
     let mejor = null, mejorOk = null, mejorTope = null;
     const mas = (a, b) => !b || a.score[0] < b.score[0] || (a.score[0] === b.score[0] && (a.score[1] < b.score[1] || (a.score[1] === b.score[1] && a.score[2] < b.score[2])));
-    for (const b of M.bases) {
+    const proto = (BMS.estado.proyecto.protocolo || 'ip');
+    const bases = M.bases.filter((b) => !b.com || b.com === proto);
+    for (const b of (bases.length ? bases : M.bases)) {
       const s = resolver(req, M, b);
       const ev = evaluar(s, marcaId, req);
       const cand = { s, score: [ev.falta, ev.canales, Object.values(s.modulos).reduce((a, x) => a + x, 0) + s.baseQty] };
@@ -221,6 +223,52 @@
     return { disp, motor: m, excede: m ? disp > m.maxDisp : false, detalle, bom };
   }
 
+  /* Licencias de software por hardware (la marca las trae en su catálogo): una licencia núcleo con sus ampliaciones por cada estación Niagara (el motor de red y cada controlador Advanced adicional) y el supervisor según las estaciones. Devuelve null si la marca no tiene licencias cargadas. */
+  function licencias(res, mot, marcaId) {
+    const M = BMS.catCt.marcas[marcaId], L = M && M.licencias;
+    if (!L) return null;
+    const rx = new RegExp(L.aplica || '$^');
+    const pts = (r) => r.ai + r.ao + r.di + r.do;
+    const unidades = [];
+    mot.detalle.forEach((d) => {
+      const q = d.cfg.baseQty || 0;
+      if (!d.cfg.base || !rx.test(d.cfg.base) || !q) return;
+      const mods = Object.keys(d.cfg.modulos || {}).filter((k) => d.cfg.modulos[k]);
+      const nMod = mods.reduce((a, k) => a + d.cfg.modulos[k], 0), bus = mods.reduce((a, k) => { const m = M.modulos.find((x) => x.cod === k); return a + (m ? canalesDe(m) * d.cfg.modulos[k] : 0); }, 0);
+      for (let i = 0; i < q; i++) unidades.push({ c: d.c, disp: Math.ceil(nMod / q), global: Math.ceil(pts(d.req) / q) + Math.ceil((d.t.int || 0) / q), bus: Math.ceil(bus / q), hw: d.cfg.base });
+    });
+    const motorLic = !!(mot.motor && rx.test(mot.motor.cod));
+    const globalRed = mot.detalle.reduce((a, d) => a + pts(d.req) + (d.t.int || 0), 0);
+    const estaciones = [];
+    if (motorLic) {
+      const u0 = unidades.shift();
+      estaciones.push({ nombre: 'Motor de red', hw: mot.motor.cod, c: u0 ? u0.c : null, disp: mot.disp, global: globalRed, bus: u0 ? u0.bus : 0 });
+    }
+    unidades.forEach((u) => estaciones.push({ nombre: 'Controlador Advanced adicional', hw: u.hw, c: u.c, disp: u.disp, global: u.global, bus: u.bus }));
+    const nucleos = [...L.nucleo].sort((a, b) => a.ptsGlobal - b.ptsGlobal);
+    estaciones.forEach((e) => {
+      let n = nucleos.find((x) => x.disp >= e.disp && x.ptsGlobal >= e.global);
+      const extra = [];
+      if (!n) {
+        n = nucleos[nucleos.length - 1];
+        let dd = Math.max(0, e.disp - n.disp), gg = Math.max(0, e.global - n.ptsGlobal);
+        for (const m of L.mejorasGlobal) { const q = Math.floor(Math.max(dd / m.disp, gg / m.ptsGlobal)); if (q > 0) { extra.push({ ...m, qty: q }); dd -= q * m.disp; gg -= q * m.ptsGlobal; } }
+        if (dd > 0 || gg > 0) { const m = L.mejorasGlobal[L.mejorasGlobal.length - 1], q = Math.ceil(Math.max(dd / m.disp, gg / m.ptsGlobal)), ya = extra.find((x) => x.cod === m.cod); if (ya) ya.qty += q; else extra.push({ ...m, qty: q }); }
+      }
+      e.nucleo = n; e.extra = extra; e.excedeBus = false;
+      if (e.bus > n.ptsBus) { const up = [...L.mejorasBus].sort((a, b) => a.ptsBus - b.ptsBus).find((x) => x.ptsBus >= e.bus); if (up) extra.push({ ...up, qty: 1 }); else e.excedeBus = true; }
+    });
+    const nEst = estaciones.length;
+    const sup = nEst ? [...L.supervisor].sort((a, b) => a.conex - b.conex).find((x) => x.conex >= nEst) : null;
+    const sd = [...(L.supervisorDisp || [])].sort((a, b) => a.disp - b.disp);
+    const supDisp = nEst && sd.length ? (sd.find((x) => x.disp >= mot.disp && x.pts >= globalRed) || sd[sd.length - 1]) : null;
+    const lista = [], suma = (cod, desc, tipo, qty) => { const ya = lista.find((r) => r.cod === cod); if (ya) ya.qty += qty; else lista.push({ cod, desc, tipo, qty }); };
+    estaciones.forEach((e) => { suma(e.nucleo.cod, e.nucleo.desc, 'Licencia de controlador', 1); e.extra.forEach((x) => suma(x.cod, x.desc, 'Ampliación de licencia', x.qty)); });
+    if (sup) { suma(sup.cod, sup.desc, 'Licencia de supervisor', 1); suma(sup.sma, 'Mantenimiento inicial de 18 meses del supervisor (SMA)', 'Mantenimiento', 1); }
+    if (supDisp) suma(supDisp.cod, supDisp.desc, 'Licencia de supervisor', 1);
+    return { estaciones, supervisor: sup, supervisorDisp: supDisp, lista, global: globalRed, nota: L.nota || '', porCtrl: estaciones.reduce((m, e) => { if (e.c) (m[e.c.id] = m[e.c.id] || []).push(e); return m; }, {}) };
+  }
+
   /* Numeración de referencia por categoría (1.1, 1.2 …) para la matriz exportada. */
   function filasOrdenadas(res) {
     const E = BMS.estado;
@@ -232,5 +280,5 @@
     return lista;
   }
 
-  Object.assign(BMS, { calc: { tagConNivel, habsDe, porHabCant, comDe, PANELES, panelCanon, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
+  Object.assign(BMS, { calc: { tagConNivel, habsDe, porHabCant, comDe, PANELES, panelCanon, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, licencias, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
 })();

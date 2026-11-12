@@ -21,7 +21,7 @@
 
   BMS.proyectoNuevo = () => ({
     v: 1,
-    proyecto: { nombre: '', propietario: '', ubicacion: '', preparado: '', fecha: BMS.hoy(), estado: 'Borrador', marca: 'JCI', reserva: 10, motor: 'auto' },
+    proyecto: { nombre: '', propietario: '', ubicacion: '', preparado: '', fecha: BMS.hoy(), estado: 'Borrador', marca: 'JCI', reserva: 10, motor: 'auto', protocolo: 'ip' },
     niveles: [],
     controladores: [],
     equipos: []

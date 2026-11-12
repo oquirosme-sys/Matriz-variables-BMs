@@ -11,7 +11,7 @@
   const NOMRED = { A: 'BACnet/IP', B: 'BACnet MS/TP', C: 'Modbus RTU', E: 'Modbus TCP/IP', D: 'Señales cableadas' };
   const memoria = () => {
     const E = BMS.estado, P = E.proyecto, C = BMS.calc, M = BMS.catCt.marcas[P.marca];
-    const res = C.todo(), mot = C.motor(res, P.marca), S = (x) => String(x);
+    const res = C.todo(), mot = C.motor(res, P.marca), S = (x) => String(x), lic = C.licencias(res, mot, P.marca);
     const detMap = Object.fromEntries(mot.detalle.map((x) => [x.c.id, x]));
     const nCP = mot.detalle.filter((d) => d.c.tipo === 'CP').length, nCS = mot.detalle.length - nCP;
     const manuales = mot.detalle.filter((d) => d.manual).length;
@@ -55,7 +55,16 @@
     const cajas = new Map(), vistos = new Set();
     mot.detalle.forEach((d) => { const k = C.gabDe(d.c) || d.c.id; if (vistos.has(k)) return; vistos.add(k); const dim = C.panelCanon((E.gabDim && E.gabDim[k]) || C.panelSugerido(C.unidadesPanel(d.c, detMap))); cajas.set(dim, (cajas.get(dim) || 0) + 1); });
     [...cajas.entries()].forEach(([dim, q]) => bom.push([dim, C.panelModelo(dim), 'Caja', S(q)]));
-    out.push({ t: 'tabla', titulo: 'Lista de materiales de controladores, módulos y cajas — ' + P.marca, cols: [3, 8, 2, 1], align: ['l', 'l', 'l', 'r'], filas: [['Código', 'Descripción', 'Tipo', 'Cant.'], ...(bom.length ? bom : [['—', '—', '—', '—']])] });
+    if (lic) lic.lista.forEach((l) => bom.push([l.cod, l.desc, l.tipo, S(l.qty)]));
+    out.push({ t: 'tabla', titulo: 'Lista de materiales de controladores, módulos, licencias y cajas — ' + P.marca, cols: [3, 8, 2, 1], align: ['l', 'l', 'l', 'r'], filas: [['Código', 'Descripción', 'Tipo', 'Cant.'], ...(bom.length ? bom : [['—', '—', '—', '—']])] });
+
+    if (lic && lic.estaciones.length) {
+      out.push({ t: 'p', texto: 'Cada hardware que ejecuta el software de la marca lleva su licencia, dimensionada con los dispositivos, los puntos globales y los puntos del bus de paneles que le corresponden, y el supervisor se dimensiona con las estaciones de la red.' });
+      out.push({ t: 'tabla', titulo: 'Licencias por hardware', nota: lic.nota ? 'Nota: ' + lic.nota : '', cols: [3, 2.4, 1.1, 1.3, 1.3, 4, 3], align: ['l', 'l', 'r', 'r', 'r', 'l', 'l'],
+        filas: [['Hardware', 'Ubicación', 'Disp.', 'Puntos globales', 'Puntos del bus', 'Licencia', 'Ampliaciones'],
+          ...lic.estaciones.map((e) => [e.hw, e.nombre + (e.c ? ' — ' + C.nombreCtrl(e.c) : ''), S(e.disp), S(e.global), S(e.bus), e.nucleo.cod, e.extra.length ? e.extra.map((x) => x.qty + '× ' + x.cod).join(', ') : (e.excedeBus ? '[Excede el bus de paneles]' : '—')]),
+          ...(lic.supervisor ? [['Supervisor', 'Estación de monitoreo / servidor', S(mot.disp), S(lic.global), '—', lic.supervisor.cod + (lic.supervisorDisp ? ' + ' + lic.supervisorDisp.cod : ''), lic.supervisor.sma] ] : [])] });
+    } else if (!lic) out.push({ t: 'p', texto: '[Las licencias de software de ' + P.marca + ' no están cargadas en el catálogo: se deben cotizar con el fabricante para cada hardware.]' });
 
     out.push({ t: 'h1', texto: '5. Dispositivos de red e integraciones' });
     const disp = [];
@@ -81,7 +90,7 @@
   BMS.pControladores = (root) => {
     const E = BMS.estado, P = E.proyecto, C = BMS.calc;
     const M = BMS.catCt.marcas[P.marca];
-    const res = C.todo(), mot = C.motor(res, P.marca);
+    const res = C.todo(), mot = C.motor(res, P.marca), lic = C.licencias(res, mot, P.marca);
 
     root.append(h('h2', null, 'Selector de controladores'),
       h('p', { class: 'hint' }, 'La selección es automática según los puntos de cada controlador (con reserva) y puede cambiarla a manual. UI = entrada universal, BI = entrada binaria, CO = salida configurable, BO = salida binaria, AO = salida analógica, UIO = entrada/salida universal.'));
@@ -89,6 +98,7 @@
     root.append(h('div', { class: 'card' }, h('div', { class: 'grid' },
       h('label', { class: 'f' }, 'Marca de controladores', h('select', { class: 'in', value: P.marca, onchange: (e) => { P.marca = e.target.value; P.motor = 'auto'; BMS.touch(); BMS.rerender(); } },
         Object.keys(BMS.catCt.marcas).map((k) => h('option', { value: k }, k + ' — ' + BMS.catCt.marcas[k].nombre)))),
+      M && M.bases.some((b) => b.com) ? h('label', { class: 'f' }, 'Protocolo de los controladores', h('select', { class: 'in', value: P.protocolo || 'ip', onchange: (e) => { P.protocolo = e.target.value; BMS.touch(); BMS.rerender(); } }, h('option', { value: 'ip' }, 'BACnet/IP (por defecto)'), h('option', { value: 'mstp' }, 'BACnet MS/TP'))) : null,
       h('label', { class: 'f' }, 'Reserva de puntos (%)', h('input', { class: 'in n', type: 'number', min: 0, max: 100, value: P.reserva, onchange: (e) => { P.reserva = Math.max(0, num(e.target.value)); BMS.touch(); BMS.rerender(); } })),
       h('label', { class: 'f' }, 'Motor de red / supervisor', h('select', { class: 'in', value: P.motor || 'auto', onchange: (e) => { P.motor = e.target.value; BMS.touch(); BMS.rerender(); } },
         h('option', { value: 'auto' }, 'Automático' + (mot.motor ? ' (' + mot.motor.cod + ')' : '')), (M ? M.motores : []).map((m) => h('option', { value: m.cod }, m.cod + ' — hasta ' + m.maxDisp + ' dispositivos')))))));
@@ -96,14 +106,16 @@
     const pdfControladores = () => {
       const clon = (e) => e.cloneNode(true);
       const nodos = [clon(root.querySelector('h2')), clon(root.querySelector('p.hint'))];
-      nodos.push(h('p', null, 'Marca de controladores: ' + P.marca + (M ? ' — ' + M.nombre : '') + ' · Reserva de puntos: ' + P.reserva + ' % · Motor de red: ' + (P.motor && P.motor !== 'auto' ? P.motor : 'Automático' + (mot.motor ? ' (' + mot.motor.cod + ')' : ''))));
+      nodos.push(h('p', null, 'Marca de controladores: ' + P.marca + (M ? ' — ' + M.nombre : '') + (M && M.bases.some((b) => b.com) ? ' · Protocolo: ' + (P.protocolo === 'mstp' ? 'BACnet MS/TP' : 'BACnet/IP') : '') + ' · Reserva de puntos: ' + P.reserva + ' % · Motor de red: ' + (P.motor && P.motor !== 'auto' ? P.motor : 'Automático' + (mot.motor ? ' (' + mot.motor.cod + ')' : ''))));
       const kp = root.querySelector('.kpis'); if (kp) nodos.push(clon(kp));
       const cards = [...root.querySelectorAll('.ctrls .ctrl')];
       for (let i = 0; i < cards.length; i += 2) nodos.push(h('div', { class: 'pdf-fila' }, clon(cards[i]), cards[i + 1] ? clon(cards[i + 1]) : h('div')));
       const tb = root.querySelector('table.t'), t3 = [...root.querySelectorAll('h3')].find((x) => /^Lista de controladores/.test(x.textContent));
       if (t3) nodos.push(clon(t3));
       if (tb) nodos.push(h('div', { class: 'pdf-tabla' }, clon(tb)));
-      const hints = root.querySelectorAll('p.hint'); if (hints.length > 1) nodos.push(clon(hints[hints.length - 1]));
+      const hints = [...root.querySelectorAll('p.hint')].filter((x) => !x.closest('.lic-sec')); if (hints.length > 1) nodos.push(clon(hints[hints.length - 1]));
+      const ls = root.querySelector('.lic-sec');
+      if (ls) [...ls.children].forEach((e) => nodos.push(e.classList.contains('scroll') ? h('div', { class: 'pdf-tabla' }, clon(e.querySelector('table'))) : clon(e)));
       return BMS.imprimirPaginado({ nombre: 'Controladores', titulo: 'Selección de controladores ' + (P.nombre || ''), nodos });
     };
     root.append(h('div', { class: 'fila noprint' }, h('button', { class: 'b p', title: 'Word con la selección de controladores, la capacidad por controlador y la lista de materiales, en formato de memoria Sinergia', onclick: (e) => exportarMemoria(e.currentTarget) }, 'Exportar memoria a Word (selección y materiales)'), h('button', { class: 'b', title: 'Abre el cuadro de impresión con las tarjetas de controladores y la lista de materiales, con el membrete Sinergia: elija «Guardar como PDF»', onclick: () => pdfControladores() }, 'Exportar PDF'), h('button', { class: 'b', title: 'Excel en el formato BMS Point Schedule: un grupo por controlador con sus equipos y variables, resumen por controlador y lista de materiales', onclick: () => BMS.exportarControladoresXlsx() }, 'Exportar controladores a Excel')));
@@ -164,6 +176,7 @@
         h('div', { class: 'mute', style: { fontSize: '12px' } }, c.ubicacion || ''),
         req, h('div', null, h('b', null, resumenCfg(d.cfg)), manual ? h('span', { class: 'chip warn', style: { marginLeft: '8px' } }, 'Manual') : h('span', { class: 'chip gw', style: { marginLeft: '8px' } }, 'Automático')),
         cap, modo, manualUI,
+        lic && lic.porCtrl[c.id] ? h('div', { class: 'mute', style: { fontSize: '12px', marginTop: '6px' } }, h('b', null, 'Licencia: '), lic.porCtrl[c.id].map((e) => e.nucleo.cod + (e.extra.length ? ' + ' + e.extra.map((x) => x.qty + '× ' + x.cod).join(' + ') : '')).join(' · ')) : null,
         d.cfg.baseQty >= 2 ? h('div', { class: 'fila' }, h('button', { class: 'b', title: 'Crea un controlador nuevo en este nivel y reparte los equipos entre los dos', onclick: () => repartir(d) }, 'Repartir con un controlador nuevo')) : null));
     });
     root.append(tarjetas);
@@ -178,5 +191,19 @@
     root.append(h('h3', null, 'Lista de controladores y módulos — ' + P.marca),
       h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '900px' } }, h('thead', null, h('tr', null, ['Código', 'Descripción', 'Tipo', 'Cantidad'].map((x) => h('th', null, x)))), h('tbody', null, filas.length ? filas : h('tr', null, h('td', { colspan: 4, class: 'mute' }, 'Sin hardware: aún no hay puntos asignados.'))))),
       h('p', { class: 'hint' }, 'Los puntos de integración (INT) entran por gateway y no consumen canales; sí cuentan como dispositivos para el motor de red.'));
+
+    /* Licencias de software por hardware */
+    const sec = h('div', { class: 'lic-sec' }, h('h3', null, 'Licencias de software — ' + P.marca));
+    if (!lic) sec.append(h('div', { class: 'warnbox' }, 'Las licencias de software de ' + P.marca + ' no están cargadas en el catálogo de controladores: cotícelas con el fabricante para cada hardware.'));
+    else if (!lic.estaciones.length) sec.append(h('p', { class: 'hint' }, 'Con el hardware seleccionado no hay equipos que requieran licencia de software de ' + P.marca + '. ' + lic.nota));
+    else {
+      sec.append(h('p', { class: 'hint' }, 'Cada hardware que ejecuta el software (el motor de red y cada controlador Advanced adicional) lleva una licencia núcleo según sus dispositivos, puntos globales (incluye INT) y puntos del bus de paneles; el supervisor se dimensiona con las estaciones de la red. ' + lic.nota),
+        h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Hardware', 'Ubicación', 'Dispositivos', 'Puntos globales', 'Puntos del bus de paneles', 'Licencia', 'Ampliaciones'].map((x) => h('th', null, x)))),
+          h('tbody', null, lic.estaciones.map((e) => h('tr', null, h('td', { style: { fontWeight: 600 } }, e.hw), h('td', null, e.nombre + (e.c ? ' — ' + C.nombreCtrl(e.c) : '')), h('td', { class: 'r' }, e.disp), h('td', { class: 'r' }, e.global), h('td', { class: 'r' }, e.bus),
+            h('td', { style: { fontWeight: 600 }, title: e.nucleo.desc }, e.nucleo.cod), h('td', null, e.extra.length ? e.extra.map((x) => x.qty + '× ' + x.cod).join(', ') : (e.excedeBus ? 'Excede el bus de paneles' : '—'))))))),
+        h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '900px', marginTop: '10px' } }, h('thead', null, h('tr', null, ['Código', 'Descripción', 'Tipo', 'Cantidad'].map((x) => h('th', null, x)))),
+          h('tbody', null, lic.lista.map((l) => h('tr', null, h('td', { style: { fontWeight: 600 } }, l.cod), h('td', null, l.desc), h('td', { class: 'c' }, l.tipo), h('td', { class: 'r' }, l.qty)))))));
+    }
+    root.append(sec);
   };
 })();

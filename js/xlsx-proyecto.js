@@ -186,7 +186,9 @@
     if (mot.motor) bom.push([mot.motor.cod, 1]);
     const filasBom = [];
     bom.forEach(([cod, q]) => { const ya = filasBom.find((r) => r[0] === cod && r[2] === tipo(cod)); if (ya) ya[3] += q; else filasBom.push([cod, desc(cod), tipo(cod), q]); });
-    tablaPlana(wb, resumen, 'Materiales_Controladores', 'Lista de materiales de controladores (' + (P.marca || '') + '; modelos por confirmar con el integrador)', ['Código', 'Descripción', 'Tipo', 'Cantidad'], filasBom, [3]);
+    const licX = C.licencias(res, mot, P.marca);
+    if (licX) licX.lista.forEach((l) => filasBom.push([l.cod, l.desc, l.tipo, l.qty]));
+    tablaPlana(wb, resumen, 'Materiales_Controladores', 'Lista de materiales de controladores y licencias (' + (P.marca || '') + '; modelos por confirmar con el integrador)', ['Código', 'Descripción', 'Tipo', 'Cantidad'], filasBom, [3]);
     indice(wb, 'BMS Point Schedule — Controladores', resumen, P);
     if (soloBuffer) return wb.xlsx.writeBuffer();
     return guardar(wb, P, 'Controladores_');
