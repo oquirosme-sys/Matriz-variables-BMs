@@ -480,21 +480,27 @@
         }),
         h('tr', { style: { fontWeight: 700 } }, h('td', null, 'TOTAL'), g.tipos.map((t) => h('td', { class: 'c' }, totTipo(t))), h('td', { class: 'c' }, est.total), h('td', { class: 'c' }, c.tot.b578))))));
 
-    /* pasillos por nivel (tabla compacta) */
+    /* pasillos por nivel (tabla compacta): cada pasillo se liga a un nivel con su selector de nivel */
     const filasP = [];
+    const selNivel = (valor, onch, w) => h('select', { class: 'in', value: valor, style: { width: w || '110px', padding: '3px 6px' }, onchange: onch }, E.niveles.map((n) => h('option', { value: n.id }, (n.codigo || '') + ' · ' + (n.nombre || ''))));
     E.niveles.forEach((n) => {
       const cfg = cfgNivel(n), l = c.niveles.find((x) => x.n.id === n.id);
-      if (!l) return;
+      if (!l && cfg.pasillos.length < 2) return;
       cfg.pasillos.forEach((p, i) => filasP.push(h('tr', null,
-        h('td', { style: { fontWeight: 600 } }, i === 0 ? (n.codigo || '') : ''),
+        h('td', null, selNivel(n.id, (e) => { const dest = cfgNivel(E.niveles.find((x) => x.id === e.target.value)); cfg.pasillos.splice(i, 1); dest.pasillos.push(p); guarda(); })),
         h('td', null, h('input', { class: 'in', value: p.nombre, style: { width: '130px', padding: '3px 6px' }, onchange: (e) => { p.nombre = e.target.value; guarda(); } })),
         h('td', { class: 'c' }, nc(num(p.largo), (v) => { p.largo = v; guarda(); })),
-        h('td', { class: 'c' }, cfg.pasillos.length === 1 ? h('span', null, l.habs) : nc(num(p.habs), (v) => { p.habs = v; guarda(); })),
-        h('td', { class: 'c' }, l.pas[i] ? l.pas[i].b578 : 0),
-        h('td', { class: 'c', style: { whiteSpace: 'nowrap' } }, i === 0 ? h('button', { class: 'b', title: 'Agrega otro pasillo a este nivel (reparta las habitaciones entre los pasillos)', onclick: () => { cfg.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cfg.pasillos.length + 1), largo: 40, habs: 0 }); guarda(); } }, '+ Agregar pasillo') : null, cfg.pasillos.length > 1 ? h('button', { class: 'b x s', onclick: () => { cfg.pasillos.splice(i, 1); guarda(); } }, '✕') : null),
-        h('td', null, i === 0 && l.avisoPas ? h('span', { class: 'chip bad' }, 'Pasillos suman ' + l.sumaP + ' de ' + l.habs) : null))));
+        h('td', { class: 'c' }, cfg.pasillos.length === 1 && l ? h('span', null, l.habs) : nc(num(p.habs), (v) => { p.habs = v; guarda(); })),
+        h('td', { class: 'c' }, l && l.pas[i] ? l.pas[i].b578 : 0),
+        h('td', { class: 'c' }, cfg.pasillos.length > 1 ? h('button', { class: 'b x s', title: 'Quitar este pasillo', onclick: () => { cfg.pasillos.splice(i, 1); guarda(); } }, '✕') : null),
+        h('td', null, i === 0 && l && l.avisoPas ? h('span', { class: 'chip bad' }, 'Pasillos suman ' + l.sumaP + ' de ' + l.habs) : null))));
     });
-    if (filasP.length) root.append(h('h3', null, 'Pasillos por nivel'), h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '760px' } }, h('thead', null, h('tr', null, ['Nivel', 'Pasillo', 'Largo (m)', 'Habitaciones', 'B578', 'Agregar / quitar', ''].map((x, i) => h('th', { class: i > 1 ? 'c' : '' }, x)))), h('tbody', null, filasP))));
+    const nuevoNivel = { v: (BMS.ui.grmsPasNivel && E.niveles.find((n) => n.id === BMS.ui.grmsPasNivel) ? BMS.ui.grmsPasNivel : (c.niveles[0] ? c.niveles[0].n.id : E.niveles[0].id)) };
+    const agregar = h('div', { class: 'fila' },
+      h('label', { class: 'f' }, 'Agregar pasillo al nivel', selNivel(nuevoNivel.v, (e) => { nuevoNivel.v = e.target.value; BMS.ui.grmsPasNivel = e.target.value; }, '180px')),
+      h('button', { class: 'b p', onclick: () => { const nn = E.niveles.find((x) => x.id === nuevoNivel.v), cf = cfgNivel(nn); cf.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cf.pasillos.length + 1), largo: 40, habs: 0 }); BMS.ui.grmsPasNivel = nn.id; guarda(); } }, '+ Agregar pasillo'));
+    root.append(h('h3', null, 'Pasillos por nivel'), agregar,
+      filasP.length ? h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '860px' } }, h('thead', null, h('tr', null, ['Nivel', 'Pasillo', 'Largo (m)', 'Habitaciones', 'B578', '', ''].map((x, i) => h('th', { class: i > 1 ? 'c' : '' }, x)))), h('tbody', null, filasP))) : h('p', { class: 'hint' }, 'Los niveles con habitaciones aparecen aquí con su pasillo. Con más de un pasillo en un nivel, indique cuántas habitaciones atiende cada uno; el selector «Nivel» de cada fila permite pasarlo a otro nivel.'));
 
     if (!c.niveles.length) { root.append(h('div', { class: 'warnbox' }, 'Ningún nivel tiene habitaciones. Indique la cantidad por tipo en la tabla de arriba.')); plegar(); return; }
 
