@@ -337,6 +337,28 @@
     const E = BMS.estado, g = G(), c = calcular(), P = g.param;
     const guarda = () => { sincronizar(); BMS.touch(); BMS.rerender(); };
     const nin = (v, f, min) => h('input', { class: 'in n', type: 'number', min: min == null ? 0 : min, value: v, style: { width: '74px' }, onchange: (e) => f(Math.max(min == null ? 0 : min, num(e.target.value))) });
+    /* Cada bloque (título h3) queda en una sección que se puede cerrar; el estado se recuerda al volver a pintar la pestaña. */
+    const plegar = () => {
+      const ab = BMS.ui.grmsAb || (BMS.ui.grmsAb = {});
+      const out = [], fin = [], dets = [];
+      let cur = null;
+      const abre = (titulo, def) => {
+        const d = document.createElement('details'); d.className = 'grms-sec'; d.open = ab[titulo] !== undefined ? ab[titulo] : def;
+        const sm = document.createElement('summary'); sm.textContent = titulo; d.append(sm);
+        d.addEventListener('toggle', () => { ab[titulo] = d.open; });
+        out.push(d); dets.push([d, titulo]); cur = d;
+      };
+      [...root.children].forEach((n, i) => {
+        if (i < 2 && (n.tagName === 'H2' || n.classList.contains('hint'))) { out.push(n); return; }
+        if (n.classList && n.classList.contains('noprint')) { fin.push(n); return; }
+        if (n.tagName === 'H3') { abre(n.textContent, true); return; }
+        if (!cur) abre('Parámetros del cálculo', true);
+        cur.append(n);
+      });
+      const barra = h('div', { class: 'fila noprint' }, h('button', { class: 'b s', onclick: () => { dets.forEach(([d, t]) => { d.open = false; ab[t] = false; }); } }, 'Cerrar todas las secciones'), h('button', { class: 'b s', onclick: () => { dets.forEach(([d, t]) => { d.open = true; ab[t] = true; }); } }, 'Abrir todas'));
+      out.splice(Math.min(2, out.length), 0, barra);
+      root.replaceChildren(...out, ...fin);
+    };
     const vista = BMS.ui.grms || (BMS.ui.grms = { tipo: g.tipos[0] && g.tipos[0].id, nivel: c.niveles[0] && c.niveles[0].n.id });
 
     root.append(h('h2', null, 'GRMS — gestión de habitaciones (INNCOM / Honeywell)'),
@@ -366,7 +388,7 @@
 
     /* por nivel */
     const est = estadoGrms();
-    root.append(h('h3', null, 'Habitaciones por tipo, pasillos y nivel'),
+    root.append(h('h3', null, 'Habitaciones por nivel y tipo'),
       h('div', { class: 'kpis' }, h('div', { class: 'kpi' }, h('b', null, est.total), h('span', null, 'Habitaciones del hotel (total del módulo)')),
         h('div', { class: 'kpi' }, h('b', null, est.cargadas), h('span', null, 'Habitaciones GRMS cargadas en equipos (pestaña 3)'))),
       est.total && est.total !== est.cargadas ? h('div', { class: 'warnbox' }, 'No calzan las cantidades: el módulo suma ' + est.total + ' habitaciones y los equipos «GRMS — habitación» de la pestaña 3 suman ' + est.cargadas + '. Ajuste el equipo en el nivel del controlador principal.') : null);
@@ -398,12 +420,12 @@
         h('td', { class: 'c' }, nc(num(p.largo), (v) => { p.largo = v; guarda(); })),
         h('td', { class: 'c' }, cfg.pasillos.length === 1 ? h('span', null, l.habs) : nc(num(p.habs), (v) => { p.habs = v; guarda(); })),
         h('td', { class: 'c' }, l.pas[i] ? l.pas[i].b578 : 0),
-        h('td', { class: 'c', style: { whiteSpace: 'nowrap' } }, i === 0 ? h('button', { class: 'b s', title: 'Agregar pasillo a este nivel', onclick: () => { cfg.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cfg.pasillos.length + 1), largo: 40, habs: 0 }); guarda(); } }, '+') : null, cfg.pasillos.length > 1 ? h('button', { class: 'b x s', onclick: () => { cfg.pasillos.splice(i, 1); guarda(); } }, '✕') : null),
+        h('td', { class: 'c', style: { whiteSpace: 'nowrap' } }, i === 0 ? h('button', { class: 'b', title: 'Agrega otro pasillo a este nivel (reparta las habitaciones entre los pasillos)', onclick: () => { cfg.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cfg.pasillos.length + 1), largo: 40, habs: 0 }); guarda(); } }, '+ Agregar pasillo') : null, cfg.pasillos.length > 1 ? h('button', { class: 'b x s', onclick: () => { cfg.pasillos.splice(i, 1); guarda(); } }, '✕') : null),
         h('td', null, i === 0 && l.avisoPas ? h('span', { class: 'chip bad' }, 'Pasillos suman ' + l.sumaP + ' de ' + l.habs) : null))));
     });
-    if (filasP.length) root.append(h('h3', null, 'Pasillos por nivel'), h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '760px' } }, h('thead', null, h('tr', null, ['Nivel', 'Pasillo', 'Largo (m)', 'Habitaciones', 'B578', '', ''].map((x, i) => h('th', { class: i > 1 ? 'c' : '' }, x)))), h('tbody', null, filasP))));
+    if (filasP.length) root.append(h('h3', null, 'Pasillos por nivel'), h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '760px' } }, h('thead', null, h('tr', null, ['Nivel', 'Pasillo', 'Largo (m)', 'Habitaciones', 'B578', 'Agregar / quitar', ''].map((x, i) => h('th', { class: i > 1 ? 'c' : '' }, x)))), h('tbody', null, filasP))));
 
-    if (!c.niveles.length) { root.append(h('div', { class: 'warnbox' }, 'Ningún nivel tiene habitaciones. Indique la cantidad por tipo en los niveles de arriba.')); return; }
+    if (!c.niveles.length) { root.append(h('div', { class: 'warnbox' }, 'Ningún nivel tiene habitaciones. Indique la cantidad por tipo en la tabla de arriba.')); plegar(); return; }
 
     /* resultados */
     root.append(h('h3', null, 'Dispositivos por nivel'),
@@ -449,6 +471,7 @@
     root.append(h('div', { class: 'fila noprint' },
       h('button', { class: 'b p', onclick: () => exportarXlsx(c) }, 'Exportar GRMS a Excel'),
       h('button', { class: 'b', title: 'PDF en hojas carta con el membrete Sinergia: tablas, diagrama de ascenso, habitaciones y niveles', onclick: () => pdfGrms(c) }, 'Exportar PDF (formato memoria)')));
+    plegar();
   };
   /* total de habitaciones del módulo contra las cargadas como equipos «GRMS — habitación» */
   const estadoGrms = () => {
