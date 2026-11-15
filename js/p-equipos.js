@@ -40,6 +40,8 @@
 
   BMS.pEquipos = (root) => {
     const E = BMS.estado, C = BMS.calc;
+    if (BMS.grms) BMS.grms.sincronizar();
+    const qtyInicial = (t) => (t.id === 'grms_hab' && BMS.grms ? (BMS.grms.total() || 1) : 1);
     root.append(h('h2', null, 'Equipos por nivel'),
       h('p', { class: 'hint' }, 'Escoja el nivel, agregue equipos del catálogo e indique la cantidad. La lista de variables sale del catálogo (pestaña "Catálogo de variables"). El controlador se asigna solo entre los del nivel; puede cambiarlo en cada fila.'));
     if (!E.niveles.length) { root.append(h('div', { class: 'warnbox' }, 'Defina los niveles y controladores en la pestaña 1 antes de cargar equipos.')); return; }
@@ -95,7 +97,8 @@
             if (a && b) eq.tag = C.tagConNivel(eq.tag, a.codigo, b.codigo);
             eq.nivel = e.target.value; BMS.touch(); BMS.rerender();
           } }, E.niveles.map((n) => h('option', { value: n.id }, n.codigo)))),
-          h('td', null, h('input', { class: 'in n', type: 'number', min: 0, step: 1, value: eq.qty, disabled: C.porHabCant(eq), title: C.porHabCant(eq) ? 'La cantidad es el número de habitaciones del nivel (pestaña 1, Niveles).' : '', onchange: (e) => { eq.qty = Math.max(0, Math.round(num(e.target.value))); e.target.value = eq.qty; BMS.touch(); actualizar(); } })),
+          h('td', null, h('input', { class: 'in n', type: 'number', min: 0, step: 1, value: eq.qty, disabled: C.porHabCant(eq), title: C.porHabCant(eq) ? 'La cantidad es el número de habitaciones del nivel (pestaña 1, Niveles).' : '', onchange: (e) => { eq.qty = Math.max(0, Math.round(num(e.target.value))); e.target.value = eq.qty; BMS.touch(); BMS.rerender(); } }),
+            eq.tipoId === 'grms_hab' && BMS.grms && BMS.grms.total() && num(eq.qty) !== BMS.grms.total() ? h('div', { class: 'chip bad', style: { marginTop: '4px', cursor: 'pointer' }, title: 'La cantidad no calza con las habitaciones del módulo GRMS (pestaña 7). Clic para usar el total del módulo.', onclick: () => { eq.qty = BMS.grms.total(); BMS.touch(); BMS.rerender(); } }, '⚠ módulo: ' + BMS.grms.total()) : null),
           ipCell, ctlCell, c('ai'), c('ao'), c('di'), c('do'), c('int'), c('tot'),
           h('td', null, h('input', { class: 'in', style: { width: '160px' }, value: eq.obs || '', placeholder: 'Observación', onchange: (e) => { eq.obs = e.target.value; BMS.touch(); } })),
           h('td', { class: 'c' }, h('button', { class: 'b x', title: 'Quitar', onclick: () => { E.equipos.splice(E.equipos.indexOf(eq), 1); BMS.ui.abiertos.delete(eq.id); BMS.touch(); BMS.rerender(); } }, '✕'))));
@@ -138,13 +141,13 @@
 
     /* Buscador predictivo para agregar equipos */
     const buscador = combo('', 'Escriba para buscar y agregar un equipo (ej. generador, VFD, UPS, chiller, inyector…)', (t) => {
-      E.equipos.push({ id: uid(), nivel: nivel.id, tipoId: t.id, qty: 1, tag: etiquetaTag(t), ctrl: 'auto', obs: '', excl: [] }); BMS.touch(); BMS.rerender();
+      E.equipos.push({ id: uid(), nivel: nivel.id, tipoId: t.id, qty: qtyInicial(t), tag: etiquetaTag(t), ctrl: 'auto', obs: '', excl: [] }); BMS.touch(); BMS.rerender();
     }, '420px');
 
     /* Barra de acciones */
     const selAgregar = h('select', { class: 'in', style: { maxWidth: '380px' }, onchange: (e) => {
       const t = C.tipoDe(e.target.value); if (!t) return;
-      E.equipos.push({ id: uid(), nivel: nivel.id, tipoId: t.id, qty: 1, tag: etiquetaTag(t), ctrl: 'auto', obs: '', excl: [] });
+      E.equipos.push({ id: uid(), nivel: nivel.id, tipoId: t.id, qty: qtyInicial(t), tag: etiquetaTag(t), ctrl: 'auto', obs: '', excl: [] });
       BMS.touch(); BMS.rerender();
     } }, h('option', { value: '' }, '…o elija de la lista del catálogo'),
       BMS.catEq.categorias.map((cat) => h('optgroup', { label: cat.nombre }, BMS.catEq.tipos.filter((t) => t.cat === cat.id).map((t) => h('option', { value: t.id }, t.nombre)))));
@@ -172,6 +175,7 @@
 
     root.append(h('div', { class: 'split' }, lista, h('div', null,
       h('h3', { style: { marginTop: 0 } }, 'Nivel ' + nivel.codigo + ' — ' + nivel.nombre),
+      BMS.grms ? BMS.grms.avisoCP(nivel) : null,
       resumenEl,
       h('div', { class: 'fila noprint' }, buscador),
       h('div', { class: 'fila noprint' }, selAgregar, selCopiar, h('button', { class: 'b', onclick: copiar }, 'Copiar'), h('button', { class: 'b', title: 'Cambia el código de otro nivel que quedó en los tags de este nivel (p. ej. FCU-HAB-N2 → FCU-HAB-N3)', onclick: ajustarTags }, 'Ajustar tags al nivel')),

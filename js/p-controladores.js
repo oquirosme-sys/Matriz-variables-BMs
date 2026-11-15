@@ -119,6 +119,7 @@
       return BMS.imprimirPaginado({ nombre: 'Controladores', titulo: 'Selección de controladores ' + (P.nombre || ''), nodos });
     };
     root.append(h('div', { class: 'fila noprint' }, h('button', { class: 'b p', title: 'Word con la selección de controladores, la capacidad por controlador y la lista de materiales, en formato de memoria Sinergia', onclick: (e) => exportarMemoria(e.currentTarget) }, 'Exportar memoria a Word (selección y materiales)'), h('button', { class: 'b', title: 'Abre el cuadro de impresión con las tarjetas de controladores y la lista de materiales, con el membrete Sinergia: elija «Guardar como PDF»', onclick: () => pdfControladores() }, 'Exportar PDF'), h('button', { class: 'b', title: 'Excel en el formato BMS Point Schedule: un grupo por controlador con sus equipos y variables, resumen por controlador y lista de materiales', onclick: () => BMS.exportarControladoresXlsx() }, 'Exportar controladores a Excel')));
+    if (BMS.grms) { const av = BMS.grms.avisoCP(null); if (av) root.append(av); }
     if (M && M.nota) root.append(h('div', { class: 'warnbox' }, M.nota));
     if (M && M.confirmar) root.append(h('div', { class: 'warnbox' }, 'Los datos de canales y modelos de ' + P.marca + ' son valores de referencia POR CONFIRMAR con el fabricante. Corríjalos en "Catálogo de controladores".'));
     root.append(h('div', { class: 'kpis' },

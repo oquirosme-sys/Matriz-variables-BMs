@@ -55,13 +55,14 @@
   /* ---------- cálculo ---------- */
   function calcular() {
     const E = BMS.estado, g = G(), P = g.param;
-    const niveles = E.niveles.filter((n) => n.habs > 0).map((n) => {
-      const c = cfgNivel(n), habs = Math.round(n.habs);
+    const niveles = E.niveles.map((n) => {
+      const c = cfgNivel(n);
       const cant = {}; let suma = 0;
       g.tipos.forEach((t) => { const q = Math.max(0, Math.round(num(c.tipos[t.id]))); if (q) { cant[t.id] = q; suma += q; } });
-      const sinTipo = Math.max(0, habs - suma);
-      if (sinTipo && g.tipos[0]) cant[g.tipos[0].id] = (cant[g.tipos[0].id] || 0) + sinTipo;
-      const exceso = Math.max(0, suma - habs);
+      const habs = suma > 0 ? suma : Math.round(n.habs || 0);
+      let sinTipo = 0;
+      if (!suma && habs && g.tipos[0]) { cant[g.tipos[0].id] = habs; sinTipo = habs; }
+      const exceso = 0;
       const disp = {}; POR_HAB.forEach((k) => { disp[k] = g.tipos.reduce((a, t) => a + (cant[t.id] || 0) * num(t[k]), 0); });
       const pas = c.pasillos.map((p) => ({ ...p, habs: Math.max(0, Math.round(num(p.habs))), largo: Math.max(0, num(p.largo)), b578: 0 }));
       pas.forEach((p) => { p.b578 = p.habs > 0 ? Math.max(1, Math.ceil(p.largo / Math.max(1, P.coberturaM))) : 0; });
@@ -71,7 +72,7 @@
       const puertos = Math.ceil(b578 * (1 + P.reservaPoE / 100)), switches = Math.ceil(puertos / Math.max(1, P.puertosSwitch));
       const sumaP = pas.reduce((a, p) => a + p.habs, 0);
       return { n, c, habs, cant, sinTipo, exceso, disp, pas, b578, puertos, switches, avisoPas: sumaP !== habs, sumaP };
-    });
+    }).filter((l) => l.habs > 0);
     const tot = { habs: 0, b578: 0, puertos: 0, switches: 0 }; POR_HAB.forEach((k) => { tot[k] = 0; });
     niveles.forEach((l) => { tot.habs += l.habs; tot.b578 += l.b578; tot.puertos += l.puertos; tot.switches += l.switches; POR_HAB.forEach((k) => { tot[k] += l.disp[k]; }); });
     const hab = g.objetos.filter((o) => !o.g && o.on).length, glo = g.objetos.filter((o) => o.g && o.on).length;
@@ -95,7 +96,68 @@
   const colorTipo = (id) => PALETA[(G().tipos.findIndex((t) => t.id === id) + PALETA.length) % PALETA.length];
   const marco = (W, H) => sv('rect', { x: 0, y: 0, width: W, height: H, fill: '#fff' });
 
+  /* Habitación sobre el plano real de BMS del modelo (ED-4102 a ED-4112): imagen en gris claro y los dispositivos en las posiciones de los símbolos del plano. */
+  function svgHabitacionPlano(t, cant, pl) {
+    const a = pl.a, one = (k) => (a[k] && a[k][0]) || null;
+    const T = one('T'), ZRT = one('ZRT'), DF = one('DF'), FB = one('FB'), CRN = one('CRN'), V = one('V');
+    const pts = ['T', 'ZRT', 'DF', 'CRN', 'V', 'LP'].flatMap((k) => (a[k] || []).map((p) => p[1])).concat(FB ? [FB[1]] : []);
+    const y0 = Math.max(0, Math.min(...pts, pl.h) - 150), alto = pl.h - y0;
+    const s = Math.min(470 / alto, 520 / pl.w), pw = pl.w * s, ph = alto * s;
+    const OX = 30, OY = 52, W = Math.round(OX + pw + 30 + 330), H = Math.round(OY + ph + 90);
+    const X = (x) => OX + x * s, Y = (y) => OY + (y - y0) * s;
+    const sg = sv('svg', { xmlns: NS, viewBox: `0 0 ${W} ${H}`, 'font-family': 'Arial, Helvetica, sans-serif' });
+    const halo = { 'paint-order': 'stroke', stroke: '#fff', 'stroke-width': 3, 'stroke-linejoin': 'round' };
+    sg.append(marco(W, H), tx(OX, 28, 'HABITACIÓN TIPO ' + t.nombre.toUpperCase() + ' — ' + cant + ' hab. · plano ' + t.plano, { 'font-size': 14, 'font-weight': 700 }));
+    const vp = sv('svg', { x: OX, y: OY, width: pw, height: ph, viewBox: `0 ${y0} ${pl.w} ${alto}`, overflow: 'hidden' });
+    vp.append(sv('image', { href: pl.img, x: 0, y: 0, width: pl.w, height: pl.h, preserveAspectRatio: 'none' }));
+    sg.append(sv('rect', { x: OX, y: OY, width: pw, height: ph, fill: 'none', stroke: '#9ca3af' }), vp);
+    const dev = (p, letra, etiq, o) => { sg.append(sv('circle', Object.assign({ cx: X(p[0]), cy: Y(p[1]), r: 10, fill: '#fff', stroke: '#1a1a1b', 'stroke-width': 1.6 }, o || {})), tx(X(p[0]), Y(p[1]) + 3.5, letra, { 'text-anchor': 'middle', 'font-weight': 700 })); if (etiq) sg.append(tx(X(p[0]) + 14, Y(p[1]) + 3.5, etiq, Object.assign({ 'font-size': 8.5 }, halo))); };
+    const lin = (p, q, o) => sg.append(sv('line', Object.assign({ x1: X(p[0]), y1: Y(p[1]), x2: X(q[0]), y2: Y(q[1]), stroke: '#1a1a1b', 'stroke-width': 1.2 }, o || {})));
+    /* posiciones derivadas de los símbolos del plano */
+    const cen = ZRT && DF ? [(ZRT[0] + DF[0]) / 2, (ZRT[1] + DF[1]) / 2] : null;
+    const signo = CRN && cen ? (CRN[0] > cen[0] ? 1 : -1) : 1;
+    const X45 = cen ? [cen[0] + signo * 40, cen[1] - 58] : (CRN ? [CRN[0] - 49, CRN[1] + 70] : null);
+    const BA = cen ? [cen[0] - signo * 15, cen[1] + 60] : null;
+    const c = (a.C || []).find((q) => V && Math.abs(q[0] - V[0]) < 30 && Math.abs(q[1] - V[1]) < 30) || (a.C || [])[0] || null;
+    const door = c || V;
+    const bed = T ? [pl.w * 0.5, Math.max(y0 + 60, T[1] - 170)] : null;
+    const bB = door ? [door[0] + 40, pl.h + 10] : [pl.w * 0.5, pl.h + 10];
+    /* cableado y señales */
+    if (T && BA && num(t.pir) > 0) lin(BA, T, { stroke: '#0b6bcb', 'stroke-width': 1.4 });
+    if (T && X45) lin(T, X45, { stroke: '#b42318' });
+    if (X45 && door) lin(door, X45, { stroke: '#667085', 'stroke-dasharray': '4 3' });
+    if (T && FB) lin(T, [(FB[0] + FB[2]) / 2, (FB[1] + FB[3]) / 2], { stroke: '#1b7f3b', 'stroke-width': 1.4 });
+    if (T) sg.append(sv('line', { x1: X(T[0]), y1: Y(T[1]), x2: X(bB[0]), y2: Math.min(OY + ph + 40, Y(bB[1])), stroke: '#7c3aed', 'stroke-dasharray': '6 4', 'stroke-width': 1.4 }));
+    /* símbolos */
+    if (FB) sg.append(sv('rect', { x: X(FB[0]), y: Y(FB[1]), width: (FB[2] - FB[0]) * s, height: (FB[3] - FB[1]) * s, fill: 'none', stroke: '#1b7f3b', 'stroke-width': 2 }), tx(X(FB[0]) + 3, Y(FB[1]) - 3, 'FCU-HAB', Object.assign({ 'font-size': 8.5, 'font-weight': 700, fill: '#1b7f3b' }, halo)));
+    [ZRT && ['ZRT', ZRT], DF && ['DF', DF]].filter(Boolean).forEach(([n2, p]) => sg.append(sv('rect', { x: X(p[0]) - 12, y: Y(p[1]) - 7, width: 24, height: 14, fill: '#fff', stroke: '#b42318', 'stroke-width': 1.2 }), tx(X(p[0]), Y(p[1]) + 3, n2, { 'text-anchor': 'middle', 'font-size': 8, fill: '#b42318' })));
+    if (X45) { sg.append(sv('rect', { x: X(X45[0]) - 22, y: Y(X45[1]) - 14, width: 44, height: 28, fill: '#fff', stroke: '#1a1a1b', 'stroke-width': 1.6 }), tx(X(X45[0]), Y(X45[1]) - 2, 'X45B', { 'text-anchor': 'middle', 'font-weight': 700, 'font-size': 8 }), tx(X(X45[0]), Y(X45[1]) + 9, 'X06', { 'text-anchor': 'middle', 'font-weight': 700, 'font-size': 8 })); }
+    if (T) dev(T, 'T', 'e7');
+    if (BA && num(t.pir) > 0) dev(BA, 'S', 'K594C (baño)', { 'stroke-dasharray': '3 2' });
+    if (bed && num(t.pir) > 1) dev(bed, 'S', 'K594.RF (dormitorio)');
+    if (bed && num(t.pir) === 1 && !BA) dev(bed, 'S', 'K594.RF');
+    if (door) dev(door, 'C', 'S241 / S541.RF', { r: 9 });
+    sg.append(sv('rect', { x: X(bB[0]) - 30, y: Math.min(OY + ph + 40, Y(bB[1])) - 6, width: 60, height: 26, fill: '#ede9fe', stroke: '#7c3aed', 'stroke-width': 1.5 }), tx(X(bB[0]), Math.min(OY + ph + 40, Y(bB[1])) + 11, 'G · B578', { 'text-anchor': 'middle', 'font-weight': 700, fill: '#5b21b6' }), tx(X(bB[0]) + 36, Math.min(OY + ph + 40, Y(bB[1])) + 11, 'pasillo del nivel', { 'font-size': 8, fill: '#667085' }));
+    /* leyenda */
+    const lx = OX + pw + 30; let y = OY + 6;
+    sg.append(tx(lx, y, 'DISPOSITIVOS POR HABITACIÓN', { 'font-weight': 700 })); y += 18;
+    const fila = (cc, tt) => { sg.append(tx(lx, y, cc, { 'font-weight': 700 }), tx(lx + 30, y, tt)); y += 15; };
+    fila(num(t.e7) + '×', 'Termostato e7 (T) con humedad');
+    fila(num(t.x45) + '×', 'Módulo X45B-X06 + caja NSYCRN33200P');
+    fila(num(t.pir) + '×', 'Sensor de movimiento (S)');
+    fila(num(t.puerta) + '×', 'Contacto de puerta (C)');
+    if (num(t.pc502)) fila(num(t.pc502) + '×', 'Repetidor PC-502.4g');
+    fila('1×', 'Damper de extracción (ZRT)* y aire fresco (DF)*');
+    fila('1×', 'FCU-HAB y válvula de agua helada 24 V*');
+    sg.append(tx(lx, y + 4, '* suministrado por otros', { 'font-size': 8, fill: '#667085' })); y += 28;
+    sg.append(tx(lx, y, 'NOTAS', { 'font-weight': 700 })); y += 14;
+    ['Plano de fondo: ' + t.plano + ' (BMS). Los símbolos T, X45B,', 'ZRT, DF, FCU y C siguen la ubicación del plano.', 'Los sensores de movimiento van en ubicación', 'indicativa: coordinar con los registros de equipos.', 'Integración con PMS, BMS/BAS y cerradura:', 'la interfaz va incluida en la licencia.', 'B578 en el pasillo de cada nivel, alimentado', 'desde switch PoE; a 1.8 m (6 ft) o más de un', 'punto de acceso Wi-Fi y fuera de gabinete metálico.'].forEach((t2) => { sg.append(tx(lx, y, t2, { 'font-size': 8.5 })); y += 11.5; });
+    return sg;
+  }
+
   function svgHabitacion(t, cant) {
+    const pl = (window.BMS_GRMS_PLANTAS || {})[t.plano];
+    if (pl) return svgHabitacionPlano(t, cant, pl);
     const W = 800, H = 520, s = sv('svg', { xmlns: NS, viewBox: `0 0 ${W} ${H}`, 'font-family': 'Arial, Helvetica, sans-serif' });
     const L = (x1, y1, x2, y2, o) => sv('line', Object.assign({ x1, y1, x2, y2, stroke: '#1a1a1b', 'stroke-width': 1 }, o || {}));
     s.append(marco(W, H), tx(40, 28, 'HABITACIÓN TIPO ' + t.nombre.toUpperCase() + ' — ' + cant + ' hab.' + (t.plano ? ' · plano ' + t.plano : ''), { 'font-size': 14, 'font-weight': 700 }));
@@ -241,14 +303,14 @@
 
   /* ---------- pantalla ---------- */
   BMS.pGrms = (root) => {
+    sincronizar();
     const E = BMS.estado, g = G(), c = calcular(), P = g.param;
-    const guarda = () => { BMS.touch(); BMS.rerender(); };
+    const guarda = () => { sincronizar(); BMS.touch(); BMS.rerender(); };
     const nin = (v, f, min) => h('input', { class: 'in n', type: 'number', min: min == null ? 0 : min, value: v, style: { width: '74px' }, onchange: (e) => f(Math.max(min == null ? 0 : min, num(e.target.value))) });
     const vista = BMS.ui.grms || (BMS.ui.grms = { tipo: g.tipos[0] && g.tipos[0].id, nivel: c.niveles[0] && c.niveles[0].n.id });
 
     root.append(h('h2', null, 'GRMS — gestión de habitaciones (INNCOM / Honeywell)'),
-      h('p', { class: 'hint' }, 'Dispositivos por habitación, por pasillo y por nivel, diagramas de habitación, de nivel y de ascenso, e integración al BMS por BACnet/IP. Las habitaciones de cada nivel salen de la pestaña 1. Los modelos de habitación y sus dispositivos parten de los planos ED-4102 a ED-4112 y de las fichas INNCOM; ajuste lo que difiera en obra.'));
-    if (!c.niveles.length) { root.append(h('div', { class: 'warnbox' }, 'Ningún nivel tiene habitaciones definidas. Indique las habitaciones de cada nivel en la pestaña 1 (columna Hab.).')); return; }
+      h('p', { class: 'hint' }, 'Dispositivos por habitación, por pasillo y por nivel, diagramas de habitación, de nivel y de ascenso, e integración al BMS por BACnet/IP. La cantidad y el tipo de habitaciones de cada nivel se definen aquí; este módulo es la fuente del total de habitaciones que debe considerar el controlador principal. Los modelos de habitación y sus dispositivos parten de los planos ED-4102 a ED-4112 y de las fichas INNCOM; ajuste lo que difiera en obra.'));
 
     /* parámetros */
     root.append(h('div', { class: 'card' }, h('div', { class: 'grid' },
@@ -273,25 +335,30 @@
         h('button', { class: 'b', onclick: () => { if (confirm('Se restablecen los tipos de habitación de los planos ED-4102 a ED-4112. ¿Continuar?')) { g.tipos = clone(TIPOS_BASE); g.niveles = {}; guarda(); } } }, 'Restablecer tipos de los planos')));
 
     /* por nivel */
-    root.append(h('h3', null, 'Habitaciones y pasillos por nivel'));
-    c.niveles.forEach((l) => {
-      const cfg = l.c;
+    const est = estadoGrms();
+    root.append(h('h3', null, 'Habitaciones por tipo, pasillos y nivel'),
+      h('div', { class: 'kpis' }, h('div', { class: 'kpi' }, h('b', null, est.total), h('span', null, 'Habitaciones del hotel (total del módulo)')),
+        h('div', { class: 'kpi' }, h('b', null, est.cargadas), h('span', null, 'Habitaciones GRMS cargadas en equipos (pestaña 3)'))),
+      est.total && est.total !== est.cargadas ? h('div', { class: 'warnbox' }, 'No calzan las cantidades: el módulo suma ' + est.total + ' habitaciones y los equipos «GRMS — habitación» de la pestaña 3 suman ' + est.cargadas + '. Ajuste el equipo en el nivel del controlador principal.') : null);
+    E.niveles.forEach((n) => {
+      const cfg = cfgNivel(n), l = c.niveles.find((x) => x.n.id === n.id);
+      const suma = () => g.tipos.reduce((a, t) => a + Math.max(0, Math.round(num(cfg.tipos[t.id]))), 0);
       root.append(h('div', { class: 'card' },
-        h('h4', { style: { margin: '0 0 6px' } }, 'Nivel ' + (l.n.codigo || '') + ' · ' + (l.n.nombre || '') + ' · ' + l.habs + ' habitaciones',
-          l.sinTipo ? h('span', { class: 'chip warn', style: { marginLeft: '8px' } }, l.sinTipo + ' sin tipo (se cuentan como ' + g.tipos[0].nombre + ')') : null,
-          l.exceso ? h('span', { class: 'chip bad', style: { marginLeft: '8px' } }, 'Sobran ' + l.exceso + ' en los tipos') : null),
-        h('div', { class: 'fila', style: { flexWrap: 'wrap', gap: '8px' } }, g.tipos.map((t) => h('label', { class: 'f', style: { minWidth: '110px' } }, t.nombre, nin(cfg.tipos[t.id] || 0, (v) => { cfg.tipos[t.id] = v; guarda(); })))),
-        h('table', { class: 'mini', style: { marginTop: '8px' } }, h('tr', null, ['Pasillo', 'Largo (m)', 'Habitaciones', 'B578', ''].map((x) => h('th', null, x))),
+        h('h4', { style: { margin: '0 0 6px' } }, 'Nivel ' + (n.codigo || '') + ' · ' + (n.nombre || '') + ' · ' + (l ? l.habs : 0) + ' habitaciones',
+          l && l.sinTipo ? h('span', { class: 'chip warn', style: { marginLeft: '8px' } }, l.sinTipo + ' habitaciones sin tipo (se cuentan como ' + g.tipos[0].nombre + ')') : null),
+        h('div', { class: 'fila', style: { flexWrap: 'wrap', gap: '8px' } }, g.tipos.map((t) => h('label', { class: 'f', style: { minWidth: '110px' } }, t.nombre, nin(cfg.tipos[t.id] || 0, (v) => { cfg.tipos[t.id] = v; const s2 = suma(); if (s2 > 0) n.habs = s2; guarda(); })))),
+        l ? [h('table', { class: 'mini', style: { marginTop: '8px' } }, h('tr', null, ['Pasillo', 'Largo (m)', 'Habitaciones', 'B578', ''].map((x) => h('th', null, x))),
           cfg.pasillos.map((p, i) => h('tr', null,
             h('td', null, h('input', { class: 'in', value: p.nombre, style: { width: '130px' }, onchange: (e) => { p.nombre = e.target.value; guarda(); } })),
             h('td', null, nin(num(p.largo), (v) => { p.largo = v; guarda(); })),
             h('td', null, cfg.pasillos.length === 1 ? h('span', null, l.habs) : nin(num(p.habs), (v) => { p.habs = v; guarda(); })),
             h('td', { class: 'r' }, l.pas[i] ? l.pas[i].b578 : 0),
             h('td', null, cfg.pasillos.length > 1 ? h('button', { class: 'b x', onclick: () => { cfg.pasillos.splice(i, 1); guarda(); } }, '✕') : null)))),
-        l.avisoPas ? h('div', { class: 'warnbox' }, 'Las habitaciones de los pasillos suman ' + l.sumaP + ' y el nivel tiene ' + l.habs + '.') : null,
-        h('div', { class: 'fila' }, h('button', { class: 'b', onclick: () => { cfg.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cfg.pasillos.length + 1), largo: 40, habs: 0 }); guarda(); } }, '+ Agregar pasillo'),
-          h('span', { class: 'mute' }, 'Por nivel: ' + l.b578 + ' B578 · ' + l.puertos + ' puertos PoE (' + l.switches + ' switch) · ' + POR_HAB.filter((k) => l.disp[k]).map((k) => l.disp[k] + '× ' + DISP.find((d) => d.k === k).parte).join(' · ')))));
+          l.avisoPas ? h('div', { class: 'warnbox' }, 'Las habitaciones de los pasillos suman ' + l.sumaP + ' y el nivel tiene ' + l.habs + '.') : null,
+          h('div', { class: 'fila' }, h('button', { class: 'b', onclick: () => { cfg.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cfg.pasillos.length + 1), largo: 40, habs: 0 }); guarda(); } }, '+ Agregar pasillo'),
+            h('span', { class: 'mute' }, 'Por nivel: ' + l.b578 + ' B578 · ' + l.puertos + ' puertos PoE (' + l.switches + ' switch) · ' + POR_HAB.filter((k) => l.disp[k]).map((k) => l.disp[k] + '× ' + DISP.find((d) => d.k === k).parte).join(' · ')))] : h('p', { class: 'hint' }, 'Sin habitaciones en este nivel.')));
     });
+    if (!c.niveles.length) { root.append(h('div', { class: 'warnbox' }, 'Ningún nivel tiene habitaciones. Indique la cantidad por tipo en los niveles de arriba.')); return; }
 
     /* resultados */
     root.append(h('h3', null, 'Dispositivos por nivel'),
@@ -338,5 +405,45 @@
       h('button', { class: 'b p', onclick: () => exportarXlsx(c) }, 'Exportar GRMS a Excel'),
       h('button', { class: 'b', title: 'PDF en hojas carta con el membrete Sinergia: tablas, diagrama de ascenso, habitaciones y niveles', onclick: () => pdfGrms(c) }, 'Exportar PDF (formato memoria)')));
   };
-  BMS.grms = { calcular, DISP };
+  /* total de habitaciones del módulo contra las cargadas como equipos «GRMS — habitación» */
+  const estadoGrms = () => {
+    const E = BMS.estado, total = calcular().tot.habs;
+    const cargadas = E.equipos.filter((q) => q.tipoId === 'grms_hab').reduce((a, q) => a + num(q.qty), 0);
+    return { total, cargadas, ok: total === cargadas };
+  };
+  /* mantiene los tipos de equipo GRMS del catálogo con los objetos BACnet marcados en el módulo */
+  const sincronizar = () => {
+    const g = G(), cat = BMS.catEq;
+    if (!cat || !cat.tipos) return;
+    let cambio = false;
+    const mk = (id, nombre, tag, glob, nota) => {
+      let t = cat.tipos.find((x) => x.id === id);
+      if (!t) { t = { id, cat: 'grms', nombre, tag, gw: '', nota, pts: [] }; cat.tipos.push(t); cambio = true; }
+      const pts = g.objetos.filter((o) => !!o.g === glob && o.on).map((o, i) => ({ id: id + '_' + (i + 1), n: o.n + ' (' + o.id + ', ' + o.ac + ')', ai: 0, ao: 0, di: 0, do: 0, int: 1, alm: /Alarm|Dirty/.test(o.n) ? 'Aviso' : '', tend: /Temp|Humidity|Level/.test(o.n) ? '15 min' : '', ifc: 'BACnet/IP' }));
+      if (JSON.stringify(pts) !== JSON.stringify(t.pts)) { t.pts = pts; cambio = true; }
+    };
+    mk('grms_hab', 'GRMS — habitación (objetos BACnet del módulo GRMS)', 'GRMS-HAB', false, 'Variables por habitación tomadas del módulo GRMS (pestaña 7). La cantidad debe ser el total de habitaciones del módulo; se cargan en el nivel del controlador principal.');
+    mk('grms_glob', 'GRMS — dispositivo global 65999 (módulo GRMS)', 'GRMS-G', true, 'Objetos del dispositivo global del servidor IC3 (módulo GRMS, pestaña 7). Cantidad: 1.');
+    if (cambio && BMS.guardarCatEq) BMS.guardarCatEq();
+  };
+  /* aviso para el nivel del controlador principal; con nivel = null solo informa (pestaña 5) */
+  const avisoCP = (nivel) => {
+    const E = BMS.estado, cps = E.controladores.filter((c) => c.tipo === 'CP');
+    if (nivel && !cps.some((c) => c.nivel === nivel.id)) return null;
+    const c = calcular(), est = estadoGrms();
+    if (!est.total) return null;
+    const nombres = cps.filter((x) => !nivel || x.nivel === nivel.id).map((x) => BMS.calc.nombreCtrl(x)).join(', ') || 'el controlador principal';
+    const gl = c.glo;
+    const msg = 'GRMS: ' + nombres + ' debe considerar el total de habitaciones del módulo GRMS (pestaña 7): ' + est.total + ' habitaciones, ' + c.devices + ' dispositivos BACnet y ' + c.puntos + ' puntos de integración (' + c.hab + ' por habitación + ' + gl + ' globales). ';
+    const el = h('div', { class: 'warnbox', style: est.ok ? {} : { borderColor: 'var(--bad)' } }, h('b', null, msg), est.ok ? '✓ La cantidad cargada en equipos coincide.' : 'No calzan las cantidades: en equipos hay ' + est.cargadas + ' habitaciones GRMS cargadas y el módulo suma ' + est.total + '.');
+    if (nivel) {
+      const q = E.equipos.find((x) => x.nivel === nivel.id && x.tipoId === 'grms_hab');
+      const acc = h('div', { class: 'fila' });
+      if (!q) acc.append(h('button', { class: 'b p', onclick: () => { sincronizar(); E.equipos.push({ id: BMS.uid(), nivel: nivel.id, tipoId: 'grms_hab', qty: est.total, tag: 'GRMS-HAB-' + (nivel.codigo || ''), ctrl: 'auto', obs: 'Cantidad tomada del módulo GRMS', excl: [] }); if (!E.equipos.some((x) => x.tipoId === 'grms_glob')) E.equipos.push({ id: BMS.uid(), nivel: nivel.id, tipoId: 'grms_glob', qty: 1, tag: 'GRMS-G', ctrl: 'auto', obs: 'Dispositivo global 65999', excl: [] }); BMS.touch(); BMS.rerender(); } }, 'Agregar «GRMS — habitación» con ' + est.total + ' habitaciones'));
+      else if (num(q.qty) !== est.total) acc.append(h('button', { class: 'b p', onclick: () => { q.qty = est.total; BMS.touch(); BMS.rerender(); } }, 'Ajustar «GRMS — habitación» a ' + est.total));
+      if (acc.children.length) el.append(acc);
+    }
+    return el;
+  };
+  BMS.grms = { calcular, DISP, total: () => calcular().tot.habs, estado: estadoGrms, sincronizar, avisoCP };
 })();
