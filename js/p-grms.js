@@ -370,24 +370,39 @@
       h('div', { class: 'kpis' }, h('div', { class: 'kpi' }, h('b', null, est.total), h('span', null, 'Habitaciones del hotel (total del módulo)')),
         h('div', { class: 'kpi' }, h('b', null, est.cargadas), h('span', null, 'Habitaciones GRMS cargadas en equipos (pestaña 3)'))),
       est.total && est.total !== est.cargadas ? h('div', { class: 'warnbox' }, 'No calzan las cantidades: el módulo suma ' + est.total + ' habitaciones y los equipos «GRMS — habitación» de la pestaña 3 suman ' + est.cargadas + '. Ajuste el equipo en el nivel del controlador principal.') : null);
+    const sumaN = (cfg) => g.tipos.reduce((a2, t) => a2 + Math.max(0, Math.round(num(cfg.tipos[t.id]))), 0);
+    const hab = (n) => { const l = c.niveles.find((x) => x.n.id === n.id); return l ? l.habs : 0; };
+    const nc = (v, f) => h('input', { class: 'in n', type: 'number', min: 0, value: v || 0, style: { width: '54px', padding: '3px 4px', textAlign: 'center' }, onchange: (e) => f(Math.max(0, Math.round(num(e.target.value)))) });
+    const totTipo = (t) => E.niveles.reduce((a2, n) => a2 + Math.max(0, Math.round(num(cfgNivel(n).tipos[t.id]))), 0);
+    root.append(h('div', { class: 'scroll' }, h('table', { class: 't' },
+      h('thead', null, h('tr', null, [h('th', null, 'Nivel'), ...g.tipos.map((t) => h('th', { class: 'c', title: t.plano ? 'Plano ' + t.plano : '' }, t.nombre)), h('th', { class: 'c' }, 'Total'), h('th', { class: 'c' }, 'B578')])),
+      h('tbody', null,
+        E.niveles.map((n) => {
+          const cfg = cfgNivel(n), l = c.niveles.find((x) => x.n.id === n.id);
+          return h('tr', null,
+            h('td', { style: { whiteSpace: 'nowrap', fontWeight: 600 }, title: n.nombre }, (n.codigo || '') + ' · ' + (n.nombre || '')),
+            g.tipos.map((t) => h('td', { class: 'c' }, nc(cfg.tipos[t.id], (v) => { cfg.tipos[t.id] = v; const s2 = sumaN(cfg); if (s2 > 0) n.habs = s2; guarda(); }))),
+            h('td', { class: 'c', style: { fontWeight: 700 } }, hab(n), l && l.sinTipo ? h('span', { class: 'chip warn', style: { marginLeft: '6px' }, title: 'Habitaciones sin tipo: se cuentan como ' + g.tipos[0].nombre }, l.sinTipo + ' sin tipo') : null),
+            h('td', { class: 'c' }, l ? l.b578 : 0));
+        }),
+        h('tr', { style: { fontWeight: 700 } }, h('td', null, 'TOTAL'), g.tipos.map((t) => h('td', { class: 'c' }, totTipo(t))), h('td', { class: 'c' }, est.total), h('td', { class: 'c' }, c.tot.b578))))));
+
+    /* pasillos por nivel (tabla compacta) */
+    const filasP = [];
     E.niveles.forEach((n) => {
       const cfg = cfgNivel(n), l = c.niveles.find((x) => x.n.id === n.id);
-      const suma = () => g.tipos.reduce((a, t) => a + Math.max(0, Math.round(num(cfg.tipos[t.id]))), 0);
-      root.append(h('div', { class: 'card' },
-        h('h4', { style: { margin: '0 0 6px' } }, 'Nivel ' + (n.codigo || '') + ' · ' + (n.nombre || '') + ' · ' + (l ? l.habs : 0) + ' habitaciones',
-          l && l.sinTipo ? h('span', { class: 'chip warn', style: { marginLeft: '8px' } }, l.sinTipo + ' habitaciones sin tipo (se cuentan como ' + g.tipos[0].nombre + ')') : null),
-        h('div', { class: 'fila', style: { flexWrap: 'wrap', gap: '8px' } }, g.tipos.map((t) => h('label', { class: 'f', style: { minWidth: '110px' } }, t.nombre, nin(cfg.tipos[t.id] || 0, (v) => { cfg.tipos[t.id] = v; const s2 = suma(); if (s2 > 0) n.habs = s2; guarda(); })))),
-        l ? [h('table', { class: 'mini', style: { marginTop: '8px' } }, h('tr', null, ['Pasillo', 'Largo (m)', 'Habitaciones', 'B578', ''].map((x) => h('th', null, x))),
-          cfg.pasillos.map((p, i) => h('tr', null,
-            h('td', null, h('input', { class: 'in', value: p.nombre, style: { width: '130px' }, onchange: (e) => { p.nombre = e.target.value; guarda(); } })),
-            h('td', null, nin(num(p.largo), (v) => { p.largo = v; guarda(); })),
-            h('td', null, cfg.pasillos.length === 1 ? h('span', null, l.habs) : nin(num(p.habs), (v) => { p.habs = v; guarda(); })),
-            h('td', { class: 'r' }, l.pas[i] ? l.pas[i].b578 : 0),
-            h('td', null, cfg.pasillos.length > 1 ? h('button', { class: 'b x', onclick: () => { cfg.pasillos.splice(i, 1); guarda(); } }, '✕') : null)))),
-          l.avisoPas ? h('div', { class: 'warnbox' }, 'Las habitaciones de los pasillos suman ' + l.sumaP + ' y el nivel tiene ' + l.habs + '.') : null,
-          h('div', { class: 'fila' }, h('button', { class: 'b', onclick: () => { cfg.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cfg.pasillos.length + 1), largo: 40, habs: 0 }); guarda(); } }, '+ Agregar pasillo'),
-            h('span', { class: 'mute' }, 'Por nivel: ' + l.b578 + ' B578 · ' + l.puertos + ' puertos PoE (' + l.switches + ' switch) · ' + POR_HAB.filter((k) => l.disp[k]).map((k) => l.disp[k] + '× ' + DISP.find((d) => d.k === k).parte).join(' · ')))] : h('p', { class: 'hint' }, 'Sin habitaciones en este nivel.')));
+      if (!l) return;
+      cfg.pasillos.forEach((p, i) => filasP.push(h('tr', null,
+        h('td', { style: { fontWeight: 600 } }, i === 0 ? (n.codigo || '') : ''),
+        h('td', null, h('input', { class: 'in', value: p.nombre, style: { width: '130px', padding: '3px 6px' }, onchange: (e) => { p.nombre = e.target.value; guarda(); } })),
+        h('td', { class: 'c' }, nc(num(p.largo), (v) => { p.largo = v; guarda(); })),
+        h('td', { class: 'c' }, cfg.pasillos.length === 1 ? h('span', null, l.habs) : nc(num(p.habs), (v) => { p.habs = v; guarda(); })),
+        h('td', { class: 'c' }, l.pas[i] ? l.pas[i].b578 : 0),
+        h('td', { class: 'c', style: { whiteSpace: 'nowrap' } }, i === 0 ? h('button', { class: 'b s', title: 'Agregar pasillo a este nivel', onclick: () => { cfg.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cfg.pasillos.length + 1), largo: 40, habs: 0 }); guarda(); } }, '+') : null, cfg.pasillos.length > 1 ? h('button', { class: 'b x s', onclick: () => { cfg.pasillos.splice(i, 1); guarda(); } }, '✕') : null),
+        h('td', null, i === 0 && l.avisoPas ? h('span', { class: 'chip bad' }, 'Pasillos suman ' + l.sumaP + ' de ' + l.habs) : null))));
     });
+    if (filasP.length) root.append(h('h3', null, 'Pasillos por nivel'), h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '760px' } }, h('thead', null, h('tr', null, ['Nivel', 'Pasillo', 'Largo (m)', 'Habitaciones', 'B578', '', ''].map((x, i) => h('th', { class: i > 1 ? 'c' : '' }, x)))), h('tbody', null, filasP))));
+
     if (!c.niveles.length) { root.append(h('div', { class: 'warnbox' }, 'Ningún nivel tiene habitaciones. Indique la cantidad por tipo en los niveles de arriba.')); return; }
 
     /* resultados */
