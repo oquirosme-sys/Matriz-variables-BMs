@@ -96,6 +96,35 @@
   const colorTipo = (id) => PALETA[(G().tipos.findIndex((t) => t.id === id) + PALETA.length) % PALETA.length];
   const marco = (W, H) => sv('rect', { x: 0, y: 0, width: W, height: H, fill: '#fff' });
 
+  /* Esquema de conexión de la habitación (como en el plano ED-4102): termostato, módulo de relés y sus salidas, FCU con válvula 24 V y gateway B578 */
+  function esquemaHabitacion(sg, x, y, t) {
+    const g = sv('g', { transform: `translate(${x},${y})` });
+    const T = (px, py, txt, o) => g.append(tx(px, py, txt, Object.assign({ 'font-size': 7 }, o || {})));
+    const R = (rx, ry, w, hh, o) => g.append(sv('rect', Object.assign({ x: rx, y: ry, width: w, height: hh, fill: '#fff', stroke: '#1a1a1b', 'stroke-width': 1 }, o || {})));
+    const Ln = (x1, y1, x2, y2, o) => g.append(sv('line', Object.assign({ x1, y1, x2, y2, stroke: '#1a1a1b', 'stroke-width': 1 }, o || {})));
+    g.append(tx(0, -6, 'ESQUEMA DE CONEXIÓN DE LA HABITACIÓN', { 'font-weight': 700, 'font-size': 9 }));
+    T(0, 30, 'TERMOSTATO INNCOM E7'); Ln(30, 34, 30, 60, { 'marker-end': '' }); Ln(30, 60, 27, 54); Ln(30, 60, 33, 54);
+    R(16, 62, 28, 28); T(30, 82, 'T', { 'text-anchor': 'middle', 'font-size': 16 });
+    Ln(44, 76, 118, 76); g.append(sv('circle', { cx: 68, cy: 76, r: 8, fill: '#fff', stroke: '#1a1a1b' })); T(68, 79, 'A', { 'text-anchor': 'middle', 'font-size': 9 });
+    R(100, 2, 218, 104);
+    T(106, 14, 'CAJA REGISTRO 300X300X200', { 'font-weight': 700 }); T(106, 24, 'NSYCRN33200P', { 'font-weight': 700 }); T(106, 34, 'MODULO RELAYS INNCOM X45B-X06', { 'font-weight': 700 });
+    R(118, 62, 28, 28);
+    Ln(318, 14, 326, 14, { stroke: '#b42318' });
+    T(326, 8, 'CONEXIÓN HACIA MÓDULO DE RELÉS', { 'font-size': 6.5 });
+    Ln(326, 12, 326, 92, { stroke: '#1a1a1b' });
+    [['RELAY DE ILUMINACIÓN', 14], ['DAMPER ZRT', 30], ['DAMPER DF', 46], ['CONTACTO PUERTA S541.RF/S241', 62], ['K594C MINI PIR MOTION SENSOR', 78]].forEach(([n, ly]) => { Ln(318, ly + 5, 332, ly + 5, { stroke: '#b42318' }); R(332, ly - 1, 118, 13); T(336, ly + 8, n, { 'font-size': 6 }); });
+    /* termostato a FCU */
+    Ln(30, 90, 30, 120); g.append(sv('circle', { cx: 30, cy: 124, r: 8, fill: '#fff', stroke: '#1a1a1b' })); T(30, 127, 'A', { 'text-anchor': 'middle', 'font-size': 9 });
+    Ln(30, 132, 30, 150); Ln(30, 150, 150, 150); Ln(30, 166, 150, 166); Ln(30, 150, 30, 166);
+    [150, 166].forEach((ly) => { g.append(sv('polygon', { points: `118,${ly - 4} 126,${ly + 4} 126,${ly - 4} 118,${ly + 4}`, fill: '#fff', stroke: '#1a1a1b', 'stroke-width': 0.9 })); });
+    R(150, 140, 100, 36, { fill: '#fff' }); R(154, 144, 92, 28, { fill: 'none', 'stroke-width': 0.7 }); T(200, 162, 'FCU-HAB', { 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700 });
+    T(0, 190, '24 V VÁLVULA DE AGUA HELADA DESDE'); T(0, 199, 'TERMOSTATO O DEL EQUIPO DE HVAC');
+    /* gateway */
+    R(270, 150, 26, 26); T(283, 168, 'G', { 'text-anchor': 'middle', 'font-size': 14 });
+    T(304, 156, 'GATEWAY B578 UBICADO EN', { 'font-size': 6.5 }); T(304, 165, 'PASILLO DE CADA NIVEL', { 'font-size': 6.5 }); T(304, 174, 'ALIMENTADO DESDE SWITCH POE', { 'font-size': 6.5 });
+    sg.append(g);
+  }
+
   /* Habitación sobre el plano real de BMS del modelo (ED-4102 a ED-4112): imagen en gris claro y los dispositivos en las posiciones de los símbolos del plano. */
   function svgHabitacionPlano(t, cant, pl) {
     const a = pl.a, one = (k) => (a[k] && a[k][0]) || null;
@@ -103,7 +132,7 @@
     const pts = ['T', 'ZRT', 'DF', 'CRN', 'V', 'LP'].flatMap((k) => (a[k] || []).map((p) => p[1])).concat(FB ? [FB[1]] : []);
     const y0 = Math.max(0, Math.min(...pts, pl.h) - 150), alto = pl.h - y0;
     const s = Math.min(470 / alto, 520 / pl.w), pw = pl.w * s, ph = alto * s;
-    const OX = 30, OY = 52, W = Math.round(OX + pw + 30 + 330), H = Math.round(OY + ph + 90);
+    const OX = 30, OY = 52, W = Math.round(OX + pw + 30 + 460), H = Math.round(Math.max(OY + ph + 90, OY + 560));
     const X = (x) => OX + x * s, Y = (y) => OY + (y - y0) * s;
     const sg = sv('svg', { xmlns: NS, viewBox: `0 0 ${W} ${H}`, 'font-family': 'Arial, Helvetica, sans-serif' });
     const halo = { 'paint-order': 'stroke', stroke: '#fff', 'stroke-width': 3, 'stroke-linejoin': 'round' };
@@ -152,6 +181,7 @@
     sg.append(tx(lx, y + 4, '* suministrado por otros', { 'font-size': 8, fill: '#667085' })); y += 28;
     sg.append(tx(lx, y, 'NOTAS', { 'font-weight': 700 })); y += 14;
     ['Plano de fondo: ' + t.plano + ' (BMS). Los símbolos T, X45B,', 'ZRT, DF, FCU y C siguen la ubicación del plano.', 'Los sensores de movimiento van en ubicación', 'indicativa: coordinar con los registros de equipos.', 'Integración con PMS, BMS/BAS y cerradura:', 'la interfaz va incluida en la licencia.', 'B578 en el pasillo de cada nivel, alimentado', 'desde switch PoE; a 1.8 m (6 ft) o más de un', 'punto de acceso Wi-Fi y fuera de gabinete metálico.'].forEach((t2) => { sg.append(tx(lx, y, t2, { 'font-size': 8.5 })); y += 11.5; });
+    esquemaHabitacion(sg, lx, y + 26, t);
     return sg;
   }
 
