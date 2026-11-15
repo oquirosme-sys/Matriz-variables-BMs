@@ -10,6 +10,7 @@ Abrir `index.html` (o publicar la carpeta en GitHub Pages). Los datos se guardan
 4. **Resumen**: AI/AO/DI/DO/INT por nivel, controlador, sistema y matriz nivel × controlador; exporta a Excel.
 5. **Controladores**: selección automática (con ajuste manual) para JCI, Honeywell o Schneider, protocolo BACnet/IP (por defecto) o MS/TP, lista de materiales, motor de red y licencias de software por hardware (Honeywell). Exporta a Word, PDF y Excel.
 6. **Secuencias**: secuencias de operación ligadas en vivo al proyecto, con exportación e importación en Word (formato Sinergia), anexos generados (diagrama, resúmenes y totales por nivel, controladores y dispositivos, variables por controlador) y validación contra el estándar del hotel.
+7. **GRMS**: gestión de habitaciones INNCOM / Honeywell. Tipos de habitación con sus dispositivos (e7, X45B-X06, sensor de movimiento, contacto de puerta), habitaciones y pasillos por nivel, cálculo de B578 y puertos PoE, diagramas de habitación, de nivel y de ascenso (SVG, DXF y PDF), lista de materiales, objetos BACnet y licencia para la integración al BMS; exporta a Excel.
 - **Catálogo de variables**: variables por tipo de equipo (sin equipos repetidos), editable.
 - **Catálogo de controladores**: modelos, canales y motores de red por marca, editable. Los datos de Honeywell son de referencia, por confirmar.
 
