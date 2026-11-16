@@ -9,6 +9,7 @@
     { id: 'controladores', n: '5 · Controladores', fn: () => BMS.pControladores },
     { id: 'secuencias', n: '6 · Secuencias', fn: () => BMS.pSecuencias },
     { id: 'grms', n: '7 · GRMS', fn: () => BMS.pGrms },
+    { id: 'revisor', n: '8 · Revisor', fn: () => BMS.pRevisor },
     { id: 'catalogo', sep: true, n: 'Catálogo de variables', fn: () => BMS.pCatalogo },
     { id: 'catctrl', n: 'Catálogo de controladores', fn: () => BMS.pCatCtrl }
   ];

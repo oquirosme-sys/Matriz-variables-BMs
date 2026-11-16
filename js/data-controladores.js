@@ -4,7 +4,7 @@
    Honeywell: Optimizer en Español (Honeywell LATAM 2023). Schneider: EcoStruxure Building Operation (SpaceLogic AS-P y módulos de E/S), por confirmar con el proveedor. Se corrigen en la pestaña "Catálogo de controladores".
    Schneider (v7): gateways y módulos de comunicación de distribución eléctrica de la presentación Smart Systems y la hoja de datos del Panel Server PAS600 (ver nota de la marca). */
 window.BMS_CATALOGO_CONTROLADORES = {
-  version: 9, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador y agrega las marcas nuevas
+  version: 11, // sube al cambiar los datos base: reemplaza la marca Honeywell guardada en el navegador y agrega las marcas nuevas
   marcas: {
     JCI: {
       nombre: 'Johnson Controls (Metasys)',
@@ -39,12 +39,16 @@ window.BMS_CATALOGO_CONTROLADORES = {
       nota: 'Fuente: presentación "Optimizer en Español" (Honeywell LATAM, 2023). UIO = entrada/salida universal (sirve como AI, DI, AO o DO). Por defecto se seleccionan controladores BACnet/IP (Unitary ES24) y módulos IO con terminales de tornillo (-S-S, los disponibles en Centroamérica); el selector de protocolo permite cambiar a BACnet MS/TP. Los módulos IO se conectan al Unitary por Modbus RTU (roadmap, lámina 14); el límite de 3 módulos por Unitary sale de la lámina de integración Modbus RTU (cadena de 3 dispositivos) y es conservador: confirmar con Honeywell. Cuando un panel necesitaría más de 2 Unitary, la selección automática usa un Optimizer Advanced con módulos IO (hasta 64 módulos por canal RS485).',
       /* Licenciamiento Niagara (Optimizer en Español, láminas 36-38 y 77-80). El hardware que coincide con "aplica" lleva una licencia núcleo según dispositivos, puntos globales y puntos del bus de paneles; se mejora con las licencias de ampliación. */
       licencias: {
-        aplica: '^N-ADV',
+        aplica: '^N-(ADV|EPC)',
         nucleo: [
           { cod: 'N-ADV-00050-100PC', desc: 'Licencia núcleo Advanced: 3 dispositivos, 50 puntos globales, 100 puntos del bus de paneles y 18 meses de SMA inicial, + E/S', disp: 3, ptsGlobal: 50, ptsBus: 100 },
           { cod: 'N-ADV-00500-100PC', desc: 'Licencia núcleo Advanced: 10 dispositivos, 500 puntos globales, 100 puntos del bus de paneles y 18 meses de SMA inicial, + E/S', disp: 10, ptsGlobal: 500, ptsBus: 100 },
           { cod: 'N-ADV-01250-255PC', desc: 'Licencia núcleo Advanced: 25 dispositivos, 1250 puntos globales, 255 puntos del bus de paneles y 18 meses de SMA inicial, + E/S', disp: 25, ptsGlobal: 1250, ptsBus: 255 },
           { cod: 'N-ADV-05000-255PC', desc: 'Licencia núcleo Advanced: 100 dispositivos, 5000 puntos globales, 255 puntos del bus de paneles y 18 meses de SMA inicial, + E/S', disp: 100, ptsGlobal: 5000, ptsBus: 255 },
+          { cod: 'N-ADV-00100-255PCA', desc: 'Licencia núcleo Advanced (SKU de la selección V3 del fabricante): 5 dispositivos, 100 puntos globales, 255 puntos del bus de paneles y SMA inicial, + E/S', disp: 5, ptsGlobal: 100, ptsBus: 255, hw: '^N-ADV' },
+          { cod: 'N-ADV-05000-255PCA', desc: 'Licencia núcleo Advanced (SKU de la selección V3 del fabricante): 100 dispositivos, 5000 puntos globales, 255 puntos del bus de paneles y SMA inicial, + E/S', disp: 100, ptsGlobal: 5000, ptsBus: 255, hw: '^N-ADV' },
+          { cod: 'N-ADV-10000-255PCA', desc: 'Licencia núcleo Advanced (SKU de la selección V3 del fabricante): 200 dispositivos, 10000 puntos globales, 255 puntos del bus de paneles y SMA inicial, + E/S', disp: 200, ptsGlobal: 10000, ptsBus: 255, hw: '^N-ADV' },
+          { cod: 'N-EPC-EDGE-CA', desc: 'Licencia Essential Edge (SKU de la selección V3 del fabricante): 5 dispositivos y 100 puntos totales; BACnet, Modbus y M-Bus; no ampliable; SMA ilimitado; cuenta 0.1 conexión Niagara', disp: 5, ptsGlobal: 100, ptsBus: 0, peso: 0.1, hw: '^N-EPC' },
           { cod: 'N-ADV-10000-255PC', desc: 'Licencia núcleo Advanced: 200 dispositivos, 10000 puntos globales, 255 puntos del bus de paneles y 18 meses de SMA inicial, + E/S', disp: 200, ptsGlobal: 10000, ptsBus: 255 }
         ],
         mejorasBus: [
@@ -82,7 +86,9 @@ window.BMS_CATALOGO_CONTROLADORES = {
         { cod: 'UN-RL1644ES24NMC', com: 'ip', desc: 'Optimizer Unitary Large, BACnet/IP: 24 puntos (16 UIO, 4 SSR, 4 relés); 1 puerto Modbus RS485. Otras versiones de comunicación: MS24 (BACnet MS/TP), TS24 (T1L), WAS24 (WiFi)', uio: 16, bo: 8, maxMod: 3, maxBases: 2, fuente: 'Optimizer Unitary, rev. 1.05 (jul-2023)' },
         { cod: 'UN-RL1644MS24NMC', com: 'mstp', desc: 'Optimizer Unitary Large, BACnet MS/TP: 24 puntos (16 UIO, 4 SSR, 4 relés); 1 puerto Modbus RS485. Otras versiones de comunicación: ES24 (IP), TS24 (T1L), WAS24 (WiFi)', uio: 16, bo: 8, maxMod: 3, maxBases: 2, fuente: 'Optimizer Unitary, rev. 1.05 (jul-2023)' },
         { cod: 'N-ADV-112-H-C', desc: 'Optimizer Advanced con módulos IO (sin entradas/salidas propias): 2 puertos RS485, hasta 64 módulos por canal', maxMod: 128, fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo: 64 × 2 canales)' },
-        { cod: 'N-ADV-133-H-C', desc: 'Optimizer Advanced con módulos IO (sin entradas/salidas propias): 3 puertos RS485, hasta 64 módulos por canal', maxMod: 192, fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo: 64 × 3 canales)' }
+        { cod: 'N-EPC28-H-S-C', desc: 'Optimizer Essential Edge, 28 puntos de E/S según la designación del modelo (tipo de canal, capacidad y terminales por confirmar con la ficha del fabricante); sin integraciones de terceros', uio: 28, maxMod: 3, fuente: 'Selección ajustada V3 del fabricante (modelo sin ficha en los insumos)' },
+        { cod: 'N-ADV-133-H-C', desc: 'Optimizer Advanced con módulos IO (sin entradas/salidas propias): 3 puertos RS485, hasta 64 módulos por canal', maxMod: 192, fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo: 64 × 3 canales)' },
+        { cod: 'N-ADV-134-H-C', desc: 'Optimizer Advanced con módulos IO (sin entradas/salidas propias): 4 puertos RS485 (próximo lanzamiento según Optimizer en Español, 2023), hasta 64 módulos por canal', maxMod: 256, fuente: 'Optimizer en Español, SKUs y capacidad de buses (cálculo: 64 × 3 canales)' }
       ],
       modulos: [
         { cod: 'IO-8UIO-S-S', desc: 'Módulo Optimizer IO de 8 entradas/salidas universales (terminales de tornillo, disponibles en Centroamérica; con HOA: IOD-8UIO-S-S; terminales push: IO-8UIO-S-P)', uio: 8, fuente: 'Optimizer en Español, SKUs disponibles' },

@@ -241,16 +241,29 @@
     const globalRed = mot.detalle.reduce((a, d) => a + pts(d.req) + (d.t.int || 0), 0);
     const estaciones = [];
     if (motorLic) {
-      const u0 = unidades.shift();
+      let ix = unidades.findIndex((u) => u.hw === mot.motor.cod && u.c.tipo === 'CP');
+      if (ix < 0) ix = unidades.findIndex((u) => u.hw === mot.motor.cod);
+      const u0 = ix >= 0 ? unidades.splice(ix, 1)[0] : null;
       estaciones.push({ nombre: 'Motor de red', hw: mot.motor.cod, c: u0 ? u0.c : null, disp: mot.disp, global: globalRed, bus: u0 ? u0.bus : 0 });
     }
-    unidades.forEach((u) => estaciones.push({ nombre: 'Controlador Advanced adicional', hw: u.hw, c: u.c, disp: u.disp, global: u.global, bus: u.bus }));
-    const nucleos = [...L.nucleo].sort((a, b) => a.ptsGlobal - b.ptsGlobal);
+    unidades.forEach((u) => estaciones.push({ nombre: /^N-EPC/.test(u.hw) ? 'Controlador Essential Edge' : 'Controlador Advanced adicional', hw: u.hw, c: u.c, disp: u.disp, global: u.global, bus: u.bus }));
+    /* los SKU con sufijo A (vigentes) van antes que los equivalentes sin sufijo; un núcleo con "hw" solo aplica a ese hardware, y los demás a los Advanced */
+    const nucleos = [...L.nucleo].sort((a, b) => a.ptsGlobal - b.ptsGlobal || (/PCA$/.test(b.cod) ? 1 : 0) - (/PCA$/.test(a.cod) ? 1 : 0));
+    const usados = new Set();
     estaciones.forEach((e) => {
-      let n = nucleos.find((x) => x.disp >= e.disp && x.ptsGlobal >= e.global);
+      const aplica = nucleos.filter((x) => (x.hw ? new RegExp(x.hw).test(e.hw) : /^N-ADV/.test(e.hw)));
+      let n = aplica.find((x) => x.disp >= e.disp && x.ptsGlobal >= e.global);
       const extra = [];
-      if (!n) {
-        n = nucleos[nucleos.length - 1];
+      /* licencia indicada para el controlador (por ejemplo, la del fabricante): reemplaza a la calculada */
+      if (e.c && e.c.licencia && !usados.has(e.c.id)) {
+        usados.add(e.c.id);
+        const cod = String(e.c.licencia);
+        n = L.nucleo.find((x) => x.cod === cod) || { cod, desc: 'Licencia indicada por el fabricante', disp: 0, ptsGlobal: 0, ptsBus: 255 };
+        e.nucleo = n; e.extra = extra; e.excedeBus = false; e.indicada = true;
+        return;
+      }
+      if (!n && aplica.length) {
+        n = aplica[aplica.length - 1];
         let dd = Math.max(0, e.disp - n.disp), gg = Math.max(0, e.global - n.ptsGlobal);
         for (const m of L.mejorasGlobal) { const q = Math.floor(Math.max(dd / m.disp, gg / m.ptsGlobal)); if (q > 0) { extra.push({ ...m, qty: q }); dd -= q * m.disp; gg -= q * m.ptsGlobal; } }
         if (dd > 0 || gg > 0) { const m = L.mejorasGlobal[L.mejorasGlobal.length - 1], q = Math.ceil(Math.max(dd / m.disp, gg / m.ptsGlobal)), ya = extra.find((x) => x.cod === m.cod); if (ya) ya.qty += q; else extra.push({ ...m, qty: q }); }
@@ -258,15 +271,17 @@
       e.nucleo = n; e.extra = extra; e.excedeBus = false;
       if (e.bus > n.ptsBus) { const up = [...L.mejorasBus].sort((a, b) => a.ptsBus - b.ptsBus).find((x) => x.ptsBus >= e.bus); if (up) extra.push({ ...up, qty: 1 }); else e.excedeBus = true; }
     });
+    for (let i = estaciones.length - 1; i >= 0; i--) if (!estaciones[i].nucleo) estaciones.splice(i, 1);
     const nEst = estaciones.length;
-    const sup = nEst ? [...L.supervisor].sort((a, b) => a.conex - b.conex).find((x) => x.conex >= nEst) : null;
+    const conexiones = Math.round(estaciones.reduce((a, e) => a + (e.nucleo && e.nucleo.peso != null ? e.nucleo.peso : 1), 0) * 100) / 100;
+    const sup = nEst ? [...L.supervisor].sort((a, b) => a.conex - b.conex).find((x) => x.conex >= conexiones) : null;
     const sd = [...(L.supervisorDisp || [])].sort((a, b) => a.disp - b.disp);
-    const supDisp = nEst && sd.length ? (sd.find((x) => x.disp >= mot.disp && x.pts >= globalRed) || sd[sd.length - 1]) : null;
+    const supDisp = nEst && sd.length && !BMS.estado.proyecto.licSinDisp ? (sd.find((x) => x.disp >= mot.disp && x.pts >= globalRed) || sd[sd.length - 1]) : null;
     const lista = [], suma = (cod, desc, tipo, qty) => { const ya = lista.find((r) => r.cod === cod); if (ya) ya.qty += qty; else lista.push({ cod, desc, tipo, qty }); };
     estaciones.forEach((e) => { suma(e.nucleo.cod, e.nucleo.desc, 'Licencia de controlador', 1); e.extra.forEach((x) => suma(x.cod, x.desc, 'Ampliación de licencia', x.qty)); });
     if (sup) { suma(sup.cod, sup.desc, 'Licencia de supervisor', 1); suma(sup.sma, 'Mantenimiento inicial de 18 meses del supervisor (SMA)', 'Mantenimiento', 1); }
     if (supDisp) suma(supDisp.cod, supDisp.desc, 'Licencia de supervisor', 1);
-    return { estaciones, supervisor: sup, supervisorDisp: supDisp, lista, global: globalRed, nota: L.nota || '', porCtrl: estaciones.reduce((m, e) => { if (e.c) (m[e.c.id] = m[e.c.id] || []).push(e); return m; }, {}) };
+    return { estaciones, supervisor: sup, supervisorDisp: supDisp, conexiones, lista, global: globalRed, nota: L.nota || '', porCtrl: estaciones.reduce((m, e) => { if (e.c) (m[e.c.id] = m[e.c.id] || []).push(e); return m; }, {}) };
   }
 
   /* Numeración de referencia por categoría (1.1, 1.2 …) para la matriz exportada. */
@@ -280,5 +295,5 @@
     return lista;
   }
 
-  Object.assign(BMS, { calc: { tagConNivel, habsDe, porHabCant, comDe, PANELES, panelCanon, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, licencias, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
+  Object.assign(BMS, { calc: { tagConNivel, habsDe, porHabCant, comDe, PANELES, panelCanon, panelModelo, gabDe, panelSugerido, unidadesPanel, esIP, todo, nivelDe, tipoDe, catDe, nombreCtrl, ctrlDe, cable, conReserva, sugerir, evaluar, configurar, motor, licencias, resolver, filasOrdenadas, asignar, CANALES, canalesDe, falta, vacio } });
 })();
