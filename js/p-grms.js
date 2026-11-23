@@ -12,6 +12,9 @@
   /* ---------- catálogo de dispositivos ---------- */
   const DISP = [
     { k: 'e7', parte: 'E7', nombre: 'Termostato digital INNCOM e7, 24 VAC, radio RF de 20 dB, con humedad y salida auxiliar 0-10 VDC (solo por software), color negro', fuente: 'ED-4102 (simbología GRMS); INNCOM e7 Datasheet (2021)' },
+    { k: 'd528', parte: 'D1-528-24', nombre: 'Termostato INNCOM Direct D1-528, 24 VAC, 5 relés a bordo, E/S digitales y analógicas, sensores de temperatura, humedad, movimiento y luz, RF Deep Mesh 802.15.4', fuente: 'INNCOM D1-528 Datasheet 31-00716-01 (rev. 06-24)' },
+    { k: 'd529', parte: 'D1-529-6V', nombre: 'Termostato INNCOM Direct D1-529, inalámbrico a batería (6 VDC, 4 pilas AA), con sensores de temperatura, humedad, movimiento y luz; requiere el controlador D-X47', fuente: 'INNCOM D1-529 Datasheet 31-00717-01 (rev. 06-24)' },
+    { k: 'dx47', parte: 'D-X47-24', nombre: 'Controlador HVAC INNCOM Direct D-X47, 24 VAC, 5 relés de salida y E/S digitales y analógicas (compañero del D1-529)', fuente: 'INNCOM DX47 Datasheet 31-00719-01' },
     { k: 'x45', parte: 'X45B-X06', nombre: 'Módulo de relés INNCOM X45B-X06: control maestro de iluminación y dampers, 5 relés', fuente: 'ED-4102' },
     { k: 'caja', parte: 'NSYCRN33200P', nombre: 'Caja de registro 300 × 300 × 200 mm para el módulo de relés', fuente: 'ED-4102' },
     { k: 'pirC', parte: 'K594C', nombre: 'Sensor de movimiento PIR INNCOM K594C, 12 VDC, en el cielo del baño; 3 conductores de entrada al e7', fuente: 'ED-4102 (esquema); Generic Thermostat Motion Sensor Design' },
@@ -19,14 +22,29 @@
     { k: 'puerta', parte: 'S241 / S541.RF', nombre: 'Contacto de puerta INNCOM S241 (cableado, empotrado) o S541.RF (transmisor inalámbrico)', fuente: 'ED-4102; Door Integration Brochure' },
     { k: 'pc502', parte: 'PC-502.4g', nombre: 'Repetidor RF / gateway S5bus-RF INNCOM PC-502.4g (solo donde el estudio de RF lo requiera)', fuente: 'PC-502.4g Datasheet v1.5' },
     { k: 'b578', parte: 'B578S', nombre: 'Edge router Deep Mesh B578 (personalidad S, PoE, montaje superficial) en el pasillo', fuente: 'B578 Datasheet; Generic Network Topologies' },
+    { k: 'd578', parte: 'D1-578-12', nombre: 'Edge router INNCOM Direct D-578 (módulo PoE 02-9499 o fuente 12 VDC) en el pasillo, para los termostatos D1; hasta 200 habitaciones por router en servicio limitado según el fabricante', fuente: 'INNCOM D578 Datasheet 31-00718-01 (rev. 06-24)' },
     { k: 'poe', parte: 'Switch PoE', nombre: 'Conmutador PoE de nivel, un puerto por B578 (suministrado por otros)', fuente: 'Generic Network Topologies (Typical Design)' },
+    { k: 'dash', parte: 'INNCOM Direct', nombre: 'Panel INNCOM Direct (en la nube) o INNcontrol 5 para los termostatos D1; el fabricante muestra la integración al BMS por una pasarela Niagara', fuente: 'IN-SS-INNCOMDirect brochure (jun-2024); D578 y D1 datasheets' },
     { k: 'ic3', parte: 'IC3 / INNcontrol', nombre: 'Servidor INNCOM (IC3 / INNcontrol) en el cuarto de IT, con interfaz BACnet/IP, PMS y cerradura', fuente: 'ED-4102 (notas); Selección V3 del fabricante' }
   ];
-  const POR_HAB = ['e7', 'x45', 'caja', 'pirC', 'pirRF', 'puerta', 'pc502'];
+  const POR_HAB = ['e7', 'd528', 'd529', 'dx47', 'x45', 'caja', 'pirC', 'pirRF', 'puerta', 'pc502'];
+  /* modelos de termostato disponibles: INNCOM e7 (Deep Mesh con B578 y servidor IC3) e INNCOM Direct D1 (D578 y panel INNCOM Direct) */
+  const TERMOS = { e7: { n: 'INNCOM e7', corto: 'e7', router: 'B578' }, d1_528: { n: 'INNCOM D1-528 (24 VAC)', corto: 'D1-528', router: 'D578' }, d1_529: { n: 'INNCOM D1-529 (batería) + D-X47', corto: 'D1-529', router: 'D578' } };
+  const termoDe = (t) => (t && TERMOS[t.termo] ? t.termo : 'e7');
+  const esD1 = (t) => /^d1/.test(termoDe(t));
+  /* cantidad por habitación de cada dispositivo según el modelo de termostato elegido */
+  const cantDisp = (t, k) => {
+    const m = termoDe(t), q = num(t.e7);
+    if (k === 'e7') return m === 'e7' ? q : 0;
+    if (k === 'd528') return m === 'd1_528' ? q : 0;
+    if (k === 'd529') return m === 'd1_529' ? q : 0;
+    if (k === 'dx47') return m === 'd1_529' ? q : 0;
+    return num(t[k]);
+  };
   const TIPOS_BASE = [
     ['King ADA', 'ED-4102'], ['King ADA V2', 'ED-4103'], ['King Ducto L', 'ED-4104'], ['King Esquinero', 'ED-4105'], ['King Suite ADA', 'ED-4106'], ['King Suite Espejo', 'ED-4107'],
     ['Queen ADA', 'ED-4108'], ['Queen Espejo', 'ED-4109'], ['Queen Suite Espejo', 'ED-4110'], ['Queen Suite', 'ED-4111'], ['King Suite', 'ED-4112']
-  ].map(([nombre, plano], i) => ({ id: 't' + (i + 1), nombre, plano, camas: /queen/i.test(nombre) ? 2 : 1, suite: /suite/i.test(nombre), e7: 1, x45: 1, caja: 1, pirC: 1, pirRF: /suite/i.test(nombre) ? 2 : 1, puerta: 1, pc502: 0 }));
+  ].map(([nombre, plano], i) => ({ id: 't' + (i + 1), nombre, plano, camas: /queen/i.test(nombre) ? 2 : 1, suite: /suite/i.test(nombre), termo: 'e7', e7: 1, x45: 1, caja: 1, pirC: 1, pirRF: /suite/i.test(nombre) ? 2 : 1, puerta: 1, pc502: 0 }));
   const OBJ_BASE = [
     ['Set_Temp', 'AV-10', 'R/W'], ['Humidity', 'AV-16', 'R'], ['Room_Temp', 'AV-17', 'R'], ['Occupied', 'BI-3', 'R'], ['AC_Mode', 'MV-15', 'R/W'], ['Fan_Speed_Actual', 'MSI-44', 'R'],
     ['Heating_Valve_Actual', 'AV-41', 'R'], ['Cooling_Valve_Actual', 'AV-43', 'R'], ['Window_Open', 'BI-77', 'R'], ['Door_Open', 'BI-75', 'R'], ['Guest Satisfaction Alarm', 'BI-29', 'R'],
@@ -50,7 +68,7 @@
     if (!E.grms) E.grms = { param: clone(PARAM_BASE), tipos: clone(TIPOS_BASE), niveles: {}, objetos: clone(OBJ_BASE) };
     const g = E.grms; g.param = Object.assign(clone(PARAM_BASE), g.param);
     if (!g.tipos || !g.tipos.length) g.tipos = clone(TIPOS_BASE);
-    g.tipos.forEach((t) => { if (t.pirC === undefined) { t.pirC = 1; t.pirRF = t.suite ? 2 : 1; } delete t.pir; });
+    g.tipos.forEach((t) => { if (!t.termo) t.termo = 'e7'; if (t.pirC === undefined) { t.pirC = 1; t.pirRF = t.suite ? 2 : 1; } delete t.pir; });
     if (g.notas === undefined) g.notas = NOTAS_BASE;
     if (!g.objetos) g.objetos = clone(OBJ_BASE);
     return g;
@@ -74,18 +92,20 @@
       let sinTipo = 0;
       if (!suma && habs && g.tipos[0]) { cant[g.tipos[0].id] = habs; sinTipo = habs; }
       const exceso = 0;
-      const disp = {}; POR_HAB.forEach((k) => { disp[k] = g.tipos.reduce((a, t) => a + (cant[t.id] || 0) * num(t[k]), 0); });
-      const pas = c.pasillos.map((p) => ({ ...p, habs: Math.max(0, Math.round(num(p.habs))), largo: Math.max(0, num(p.largo)), b578: 0 }));
-      pas.forEach((p) => { p.b578 = p.habs > 0 ? Math.max(1, Math.ceil(p.largo / Math.max(1, P.coberturaM))) : 0; });
-      const porCap = Math.ceil(habs / Math.max(1, P.habsPorB578));
-      let b578 = pas.reduce((a, p) => a + p.b578, 0);
-      if (b578 < porCap && pas.length) { const pm = pas.reduce((a, p) => (p.habs > a.habs ? p : a), pas[0]); pm.b578 += porCap - b578; b578 = porCap; }
-      const puertos = Math.ceil(b578 * (1 + P.reservaPoE / 100)), switches = Math.ceil(puertos / Math.max(1, P.puertosSwitch));
-      const sumaP = pas.reduce((a, p) => a + p.habs, 0);
-      return { n, c, habs, cant, sinTipo, exceso, disp, pas, b578, puertos, switches, avisoPas: sumaP !== habs, sumaP };
+      const disp = {}; POR_HAB.forEach((k) => { disp[k] = g.tipos.reduce((a2, t) => a2 + (cant[t.id] || 0) * cantDisp(t, k), 0); });
+      const habsD1 = g.tipos.reduce((a2, t) => a2 + (cant[t.id] || 0) * (esD1(t) ? 1 : 0), 0), habsE7 = habs - habsD1, rD = habs ? habsD1 / habs : 0;
+      const pas = c.pasillos.map((p) => { const hh = Math.max(0, Math.round(num(p.habs))), hD = Math.round(hh * rD); return { ...p, habs: hh, hE: hh - hD, hD, largo: Math.max(0, num(p.largo)), b578: 0, d578: 0 }; });
+      const nR = (p, hx) => (hx > 0 ? Math.max(1, Math.ceil(p.largo / Math.max(1, P.coberturaM))) : 0);
+      pas.forEach((p) => { p.b578 = nR(p, p.hE); p.d578 = nR(p, p.hD); });
+      const cap = Math.max(1, P.habsPorB578);
+      const completa = (key, habsF) => { const porCap = Math.ceil(habsF / cap); let sm = pas.reduce((a2, p) => a2 + p[key], 0); if (sm < porCap && pas.length) { const pm = pas.reduce((a2, p) => (p.habs > a2.habs ? p : a2), pas[0]); pm[key] += porCap - sm; sm = porCap; } return sm; };
+      const b578 = completa('b578', habsE7), d578 = completa('d578', habsD1);
+      const puertos = Math.ceil((b578 + d578) * (1 + P.reservaPoE / 100)), switches = Math.ceil(puertos / Math.max(1, P.puertosSwitch));
+      const sumaP = pas.reduce((a2, p) => a2 + p.habs, 0);
+      return { n, c, habs, cant, sinTipo, exceso, disp, pas, b578, d578, habsD1, habsE7, puertos, switches, avisoPas: sumaP !== habs, sumaP };
     }).filter((l) => l.habs > 0);
-    const tot = { habs: 0, b578: 0, puertos: 0, switches: 0 }; POR_HAB.forEach((k) => { tot[k] = 0; });
-    niveles.forEach((l) => { tot.habs += l.habs; tot.b578 += l.b578; tot.puertos += l.puertos; tot.switches += l.switches; POR_HAB.forEach((k) => { tot[k] += l.disp[k]; }); });
+    const tot = { habs: 0, b578: 0, d578: 0, habsD1: 0, habsE7: 0, puertos: 0, switches: 0 }; POR_HAB.forEach((k) => { tot[k] = 0; });
+    niveles.forEach((l) => { tot.habs += l.habs; tot.habsD1 += l.habsD1; tot.habsE7 += l.habsE7; tot.d578 += l.d578; tot.b578 += l.b578; tot.puertos += l.puertos; tot.switches += l.switches; POR_HAB.forEach((k) => { tot[k] += l.disp[k]; }); });
     const hab = g.objetos.filter((o) => !o.g && o.on).length, glo = g.objetos.filter((o) => o.g && o.on).length;
     const f = 1 + P.reservaLic / 100;
     const devices = tot.habs ? tot.habs + 1 : 0, puntos = tot.habs * hab + (tot.habs ? glo : 0);
@@ -95,7 +115,7 @@
     const bom = [];
     if (tot.habs) {
       DISP.forEach((d) => {
-        const q = POR_HAB.includes(d.k) ? tot[d.k] : d.k === 'b578' ? tot.b578 : d.k === 'poe' ? tot.puertos : d.k === 'ic3' ? 1 : 0;
+        const q = POR_HAB.includes(d.k) ? tot[d.k] : d.k === 'b578' ? tot.b578 : d.k === 'd578' ? tot.d578 : d.k === 'poe' ? tot.puertos : d.k === 'ic3' ? (tot.habsE7 > 0 ? 1 : 0) : d.k === 'dash' ? (tot.habsD1 > 0 ? 1 : 0) : 0;
         if (q) bom.push({ ...d, cant: q, unidad: d.k === 'poe' ? 'puertos (' + tot.switches + ' switch de ' + P.puertosSwitch + ')' : 'u' });
       });
     }
@@ -108,23 +128,27 @@
   const marco = (W, H) => sv('rect', { x: 0, y: 0, width: W, height: H, fill: '#fff' });
 
   /* ---- Cableados numerados: ligan la planta, el esquema, la leyenda y la tabla ---- */
-  const CABLES = [
-    { n: 1, de: 'Termostato e7 (T)', a: 'Módulo X45B-X06', c: 'Tubería A 25 mm; cable de control (por el integrador)', k: ['e7', 'x45'] },
-    { n: 2, de: 'Termostato e7 (T)', a: 'Válvula de agua helada 24 V (FCU-HAB)', c: 'Tubería A 25 mm; 18 AWG, 8 conductores (18-8)', k: ['e7', 'valvula', 'fcu'] },
+  let TA = null; /* tipo de habitación en curso: define los nombres del termostato y del router */
+  const termoTxt = () => (TA && TERMOS[termoDe(TA)] ? 'Termostato ' + TERMOS[termoDe(TA)].corto : 'Termostato e7');
+  const routerTxt = () => (TA && esD1(TA) ? 'D578' : 'B578');
+  const cables = () => [
+    { n: 1, de: termoTxt() + ' (T)', a: 'Módulo X45B-X06', c: 'Tubería A 25 mm; cable de control (por el integrador)', k: ['e7', 'x45'] },
+    { n: 2, de: termoTxt() + ' (T)', a: 'Válvula de agua helada 24 V (FCU-HAB)', c: 'Tubería A 25 mm; 18 AWG, 8 conductores (18-8)', k: ['e7', 'valvula', 'fcu'] },
     { n: 3, de: 'Módulo X45B-X06', a: 'Relé de iluminación', c: 'Tubería B 13 mm; circuito del plano de iluminación', k: ['x45', 'luz'] },
     { n: 4, de: 'Módulo X45B-X06', a: 'Damper ZRT (extracción)', c: 'Tubería B 13 mm', k: ['x45', 'zrt'] },
     { n: 5, de: 'Módulo X45B-X06', a: 'Damper DF (aire fresco)', c: 'Tubería B 13 mm', k: ['x45', 'df'] },
     { n: 6, de: 'Contacto de puerta (C)', a: 'Módulo X45B-X06', c: 'Tubería B 13 mm; S241 cableado', k: ['puerta', 'x45'] },
-    { n: 7, de: 'Sensor K594C (baño)', a: 'Termostato e7', c: '3 conductores de entrada, 18 AWG', k: ['pirC', 'e7'] },
-    { n: 8, de: 'Sensor K594.RF (pared)', a: 'Termostato e7', c: 'RF a batería, sin cable', k: ['pirRF', 'e7'] },
-    { n: 9, de: 'Termostato e7', a: 'Gateway B578', c: 'RF 802.15.4 Deep Mesh, sin cable', k: ['e7', 'b578'] },
-    { n: 10, de: 'Gateway B578', a: 'Switch PoE del nivel', c: 'UTP Cat 6A, canalización de 19 mm; alimenta al B578', k: ['b578', 'poe'] },
-    { n: 11, de: 'Cerradura VingCard (CELS)', a: 'Termostato e7 / B578', c: 'RF; suministra otros; interfaz en la licencia', k: ['vingcard', 'e7'] }
-  ];
-  const nCab = (k) => CABLES.filter((c) => c.k.includes(k)).map((c) => c.n);
+    { n: 7, de: 'Sensor K594C (baño)', a: termoTxt(), c: '3 conductores de entrada, 18 AWG', k: ['pirC', 'e7'] },
+    { n: 8, de: 'Sensor K594.RF (pared)', a: termoTxt(), c: 'RF a batería, sin cable', k: ['pirRF', 'e7'] },
+    { n: 9, de: termoTxt(), a: 'Gateway ' + routerTxt(), c: 'RF 802.15.4 Deep Mesh, sin cable', k: ['e7', 'b578'] },
+    { n: 10, de: 'Gateway ' + routerTxt(), a: 'Switch PoE del nivel', c: 'UTP Cat 6A, canalización de 19 mm; alimenta al ' + routerTxt(), k: ['b578', 'poe'] },
+    { n: 11, de: 'Cerradura VingCard (CELS)', a: termoTxt() + ' / ' + routerTxt(), c: 'RF; suministra otros; interfaz en la licencia', k: ['vingcard', 'e7'] }
+  ].concat(TA && termoDe(TA) === 'd1_529' ? [{ n: 12, de: 'Controlador D-X47', a: termoTxt(), c: 'RF 802.15.4 Deep Mesh, sin cable; 24 VAC al D-X47', k: ['dx47', 'e7'] }] : []);
+  const nCab = (k) => cables().filter((c) => c.k.includes(k)).map((c) => c.n);
   /* leyenda: cada fila lleva la cantidad por habitación, las claves de dispositivo que dibuja y los cableados que la tocan */
   const LEYENDA = (t) => [
-    { k: ['e7'], q: num(t.e7), t: 'Termostato e7 (T), 24 VAC, RF, con humedad' },
+    { k: ['e7'], q: num(t.e7), t: ({ e7: 'Termostato e7 (T), 24 VAC, RF, con humedad', d1_528: 'Termostato D1-528-24 (T), 24 VAC, 5 relés, RF, con humedad', d1_529: 'Termostato D1-529-6V (T), a batería, RF, con humedad' })[termoDe(t)] },
+    ...(termoDe(t) === 'd1_529' ? [{ k: ['dx47'], q: num(t.e7), t: 'Controlador D-X47-24, 5 relés (del D1-529)' }] : []),
     { k: ['x45'], q: num(t.x45), t: 'Módulo X45B-X06 en caja NSYCRN33200P' },
     { k: ['pirC'], q: num(t.pirC), t: 'Sensor K594C mini PIR, baño (S punteado)' },
     { k: ['pirRF'], q: num(t.pirRF), t: 'Sensor K594.RF de pared (S)' },
@@ -133,7 +157,7 @@
     { k: ['zrt', 'df'], q: 1, t: 'Dampers de extracción (ZRT) y aire fresco (DF), por otros', otros: true },
     { k: ['fcu', 'valvula'], q: 1, t: 'FCU-HAB con válvula de agua helada 24 V, por otros', otros: true },
     { k: ['luz'], q: 1, t: 'Relé de iluminación (circuito del plano de iluminación), por otros', otros: true },
-    { k: ['b578', 'poe'], q: 1, t: 'Gateway B578 en el pasillo (1 por nivel) y switch PoE del nivel, por otros' }
+    { k: ['b578', 'poe'], q: 1, t: 'Gateway ' + (esD1(t) ? 'D578' : 'B578') + ' en el pasillo (1 por nivel) y switch PoE del nivel, por otros' }
   ].concat(num(t.pc502) ? [{ k: ['pc502'], q: num(t.pc502), t: 'Repetidor PC-502.4g (solo si el estudio de RF lo pide)' }] : []);
   const wrap = (txt, n) => { const out = []; String(txt || '').split('\n').forEach((l) => { let cur = ''; l.split(/\s+/).forEach((w) => { if ((cur + ' ' + w).trim().length > n) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }); out.push(cur); }); return out; };
   const badge = (sg, x, y, n, dev) => { sg.append(sv('circle', Object.assign({ cx: x, cy: y, r: 7.5, fill: '#fff', stroke: '#1a1a1b', 'stroke-width': 1.2 }, dev ? { 'data-cab': n } : { 'data-cab': n })), tx(x, y + 3, String(n), { 'text-anchor': 'middle', 'font-size': 8.5, 'font-weight': 700 })); };
@@ -147,7 +171,8 @@
     const flecha = (x1, y1, x2, y2, o) => { Ln(x1, y1, x2, y2, o); const a = Math.atan2(y2 - y1, x2 - x1), L = 6; g.append(sv('polygon', { points: `${x2},${y2} ${x2 - L * Math.cos(a - 0.4)},${y2 - L * Math.sin(a - 0.4)} ${x2 - L * Math.cos(a + 0.4)},${y2 - L * Math.sin(a + 0.4)}`, fill: (o && o.stroke) || '#1a1a1b' })); };
     const B = (bx, by, n) => badge(g, bx, by, n);
     g.append(tx(0, -4, 'ESQUEMA DE CONEXIÓN DE LA HABITACIÓN', { 'font-weight': 700, 'font-size': 10 }));
-    T(0, 38, 'TERMOSTATO INNCOM E7'); flecha(30, 42, 30, 62);
+    T(0, 38, 'TERMOSTATO INNCOM ' + TERMOS[termoDe(t)].corto.toUpperCase()); flecha(30, 42, 30, 62);
+    if (termoDe(t) === 'd1_529') { R(62, 96, 52, 18, 'dx47'); T(88, 108, 'D-X47', { 'text-anchor': 'middle', 'font-size': 7.5, 'font-weight': 700 }); Ln(44, 88, 62, 102, { stroke: '#7c3aed', 'stroke-dasharray': '3 2' }); B(70, 90, 12); }
     R(16, 62, 28, 28, 'e7'); T(30, 82, 'T', { 'text-anchor': 'middle', 'font-size': 17 });
     Ln(44, 76, 118, 76); g.append(sv('circle', { cx: 68, cy: 76, r: 8, fill: '#fff', stroke: '#1a1a1b', 'stroke-width': 1.2 })); T(68, 79, 'A', { 'text-anchor': 'middle', 'font-size': 9 }); B(96, 66, 1);
     R(100, 6, 214, 104, null);
@@ -170,7 +195,7 @@
     /* gateway, switch PoE y cerradura */
     const y0 = 222;
     R(16, y0, 28, 28, 'b578'); T(30, y0 + 20, 'G', { 'text-anchor': 'middle', 'font-size': 15 });
-    T(50, y0 + 9, 'GATEWAY B578 UBICADO EN', { 'font-size': 6.5 }); T(50, y0 + 18, 'PASILLO DE CADA NIVEL', { 'font-size': 6.5 }); T(50, y0 + 27, 'ALIMENTADO DESDE SWITCH POE', { 'font-size': 6.5 });
+    T(50, y0 + 9, 'GATEWAY ' + (esD1(t) ? 'D578' : 'B578') + ' UBICADO EN', { 'font-size': 6.5 }); T(50, y0 + 18, 'PASILLO DE CADA NIVEL', { 'font-size': 6.5 }); T(50, y0 + 27, 'ALIMENTADO DESDE SWITCH POE', { 'font-size': 6.5 });
     R(214, y0, 104, 28, 'poe'); T(266, y0 + 12, 'SWITCH PoE DEL NIVEL', { 'text-anchor': 'middle', 'font-size': 7, 'font-weight': 700 }); T(266, y0 + 22, 'UTP Cat 6A', { 'text-anchor': 'middle', 'font-size': 6.5 });
     R(340, y0, 120, 28, 'vingcard'); T(400, y0 + 12, 'CERRADURA VINGCARD', { 'text-anchor': 'middle', 'font-size': 7, 'font-weight': 700 }); T(400, y0 + 22, '(CELS, por otros)', { 'text-anchor': 'middle', 'font-size': 6.5 });
     Ln(30, y0 + 28, 30, y0 + 40, { stroke: '#1a1a1b' }); Ln(30, y0 + 40, 266, y0 + 40); flecha(266, y0 + 40, 266, y0 + 29); B(150, y0 + 40, 10);
@@ -184,7 +209,7 @@
   function tablaCables(sg, x, y, w) {
     const g = sv('g', { transform: `translate(${x},${y})` });
     g.append(tx(0, -4, 'CABLEADOS', { 'font-weight': 700, 'font-size': 10 }));
-    CABLES.forEach((c, i) => {
+    cables().forEach((c, i) => {
       const ry = 6 + i * 24;
       g.append(sv('line', { x1: 0, y1: ry - 6, x2: w, y2: ry - 6, stroke: '#d1d5db', 'stroke-width': 0.6 }));
       badge(g, 9, ry + 5, c.n);
@@ -215,6 +240,7 @@
 
   /* Habitación sobre el plano real de BMS del modelo (ED-4102 a ED-4112) o, sin plano, sobre una planta esquemática */
   function svgHabitacionPlano(t, cant, pl) {
+    TA = t;
     const a = pl.a, one = (k) => (a[k] && a[k][0]) || null;
     const T = one('T'), ZRT = one('ZRT'), DF = one('DF'), FB = one('FB'), CRN = one('CRN'), V = one('V');
     const pts = ['T', 'ZRT', 'DF', 'CRN', 'V', 'LP'].flatMap((k) => (a[k] || []).map((p) => p[1])).concat(FB ? [FB[1]] : []);
@@ -261,13 +287,14 @@
     if (FB) sg.append(sv('rect', { x: X(FB[0]), y: Y(FB[1]), width: (FB[2] - FB[0]) * s, height: (FB[3] - FB[1]) * s, fill: 'none', stroke: '#1b7f3b', 'stroke-width': 2, 'data-dev': 'fcu' }), tx(X(FB[0]) + 3, Y(FB[1]) - 3, 'FCU-HAB', Object.assign({ 'font-size': 8.5, 'font-weight': 700, fill: '#1b7f3b' }, halo)));
     [ZRT && ['ZRT', ZRT, 'zrt'], DF && ['DF', DF, 'df']].filter(Boolean).forEach(([n2, p, dv]) => sg.append(sv('rect', { x: X(p[0]) - 12, y: Y(p[1]) - 7, width: 24, height: 14, fill: '#fff', stroke: '#b42318', 'stroke-width': 1.2, 'data-dev': dv }), tx(X(p[0]), Y(p[1]) + 3, n2, { 'text-anchor': 'middle', 'font-size': 8, fill: '#b42318' })));
     if (X45) { sg.append(sv('rect', { x: X(X45[0]) - 22, y: Y(X45[1]) - 14, width: 44, height: 28, fill: '#fff', stroke: '#1a1a1b', 'stroke-width': 1.6, 'data-dev': 'x45' }), tx(X(X45[0]), Y(X45[1]) - 2, 'X45B', { 'text-anchor': 'middle', 'font-weight': 700, 'font-size': 8 }), tx(X(X45[0]), Y(X45[1]) + 9, 'X06', { 'text-anchor': 'middle', 'font-weight': 700, 'font-size': 8 })); }
-    if (T) dev(T, 'T', 'e7', 'e7');
+    if (T) dev(T, 'T', TERMOS[termoDe(t)].corto, 'e7');
+    if (T && termoDe(t) === 'd1_529') { const dp = [T[0] - 52, T[1] + 34]; sg.append(sv('line', { x1: X(T[0]), y1: Y(T[1]), x2: X(dp[0]), y2: Y(dp[1]), stroke: '#7c3aed', 'stroke-dasharray': '3 2', 'stroke-width': 1 }), sv('rect', { x: X(dp[0]) - 18, y: Y(dp[1]) - 8, width: 36, height: 16, fill: '#fff', stroke: '#1a1a1b', 'stroke-width': 1.4, 'data-dev': 'dx47' }), tx(X(dp[0]), Y(dp[1]) + 3.5, 'D-X47', { 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700 })); marcas.push([(T[0] + dp[0]) / 2, (T[1] + dp[1]) / 2 - 8, 12]); }
     if (BA && num(t.pirC) > 0) dev(BA, 'S', 'K594C (baño)', 'pirC', { 'stroke-dasharray': '3 2' });
     if (bed1 && num(t.pirRF) > 0) dev(bed1, 'S', 'K594.RF (dormitorio)', 'pirRF');
     if (bed2 && num(t.pirRF) > 1) dev(bed2, 'S', 'K594.RF (sala)', 'pirRF');
     if (door) dev(door, 'C', 'S241 / S541.RF', 'puerta', { r: 9 });
     if (V) dev(V, 'V', 'VingCard', 'vingcard', { r: 8 });
-    sg.append(sv('rect', { x: X(bB[0]) - 30, y: yB - 6, width: 60, height: 26, fill: '#ede9fe', stroke: '#7c3aed', 'stroke-width': 1.5, 'data-dev': 'b578' }), tx(X(bB[0]), yB + 11, 'G · B578', { 'text-anchor': 'middle', 'font-weight': 700, fill: '#5b21b6' }));
+    sg.append(sv('rect', { x: X(bB[0]) - 30, y: yB - 6, width: 60, height: 26, fill: '#ede9fe', stroke: '#7c3aed', 'stroke-width': 1.5, 'data-dev': 'b578' }), tx(X(bB[0]), yB + 11, 'G · ' + (esD1(t) ? 'D578' : 'B578'), { 'text-anchor': 'middle', 'font-weight': 700, fill: '#5b21b6' }));
     sg.append(sv('line', { x1: X(bB[0]), y1: yB + 20, x2: X(bB[0]), y2: yB + 38, stroke: '#1a1a1b', 'stroke-width': 1.3, 'data-dev': 'poe' }), tx(X(bB[0]) + 6, yB + 38, 'a switch PoE', Object.assign({ 'font-size': 8 }, halo)));
     marcas.push([bB[0] - 0, pl.h + 10 + 0, 10, false, true]);
     marcas.forEach((m) => { if (m[4]) badge(sg, X(bB[0]) + 16, yB + 29, 10); else badge(sg, X(m[0]), m[3] ? Math.min(Y(m[1]), yB - 20) : Y(m[1]), m[2]); });
@@ -284,12 +311,13 @@
 
   /* Verifica que cada dispositivo calce entre la lista, la planta, el esquema y los cableados */
   function verificar(t, svg) {
+    TA = t;
     const tiene = (sel) => !!svg.querySelector(sel);
     const ESQ = {};
     const filas = [
-      ['e7', 'Termostato e7 (T)', num(t.e7)], ['x45', 'Módulo X45B-X06 y caja', num(t.x45)], ['pirC', 'Sensor K594C (baño)', num(t.pirC)], ['pirRF', 'Sensor K594.RF (pared)', num(t.pirRF)],
+      ['e7', 'Termostato ' + TERMOS[termoDe(t)].corto + ' (T)', num(t.e7)], ['dx47', 'Controlador D-X47', termoDe(t) === 'd1_529' ? num(t.e7) : 0], ['x45', 'Módulo X45B-X06 y caja', num(t.x45)], ['pirC', 'Sensor K594C (baño)', num(t.pirC)], ['pirRF', 'Sensor K594.RF (pared)', num(t.pirRF)],
       ['puerta', 'Contacto de puerta (C)', num(t.puerta)], ['vingcard', 'Cerradura VingCard (V), por otros', 1], ['zrt', 'Damper ZRT, por otros', 1], ['df', 'Damper DF, por otros', 1],
-      ['fcu', 'FCU-HAB, por otros', 1], ['valvula', 'Válvula de agua helada 24 V, por otros', 1], ['luz', 'Relé de iluminación, por otros', 1], ['b578', 'Gateway B578 (1 por nivel)', 1], ['poe', 'Switch PoE del nivel, por otros', 1]
+      ['fcu', 'FCU-HAB, por otros', 1], ['valvula', 'Válvula de agua helada 24 V, por otros', 1], ['luz', 'Relé de iluminación, por otros', 1], ['b578', 'Gateway ' + (esD1(t) ? 'D578' : 'B578') + ' (1 por nivel)', 1], ['poe', 'Switch PoE del nivel, por otros', 1]
     ];
     return filas.map(([k, nombre, q]) => {
       const lis = q > 0 ? tiene('[data-lis~="' + k + '"]') : true, pl = q > 0 ? tiene('[data-dev="' + k + '"]') : true, esq = q > 0 ? tiene('[data-esq="' + k + '"]') : true, cab = nCab(k);
@@ -306,7 +334,7 @@
 
   function svgNivel(l) {
     const g = G(), W = 900, H = 400, s = sv('svg', { xmlns: NS, viewBox: `0 0 ${W} ${H}`, 'font-family': 'Arial, Helvetica, sans-serif' });
-    s.append(marco(W, H), tx(20, 24, 'NIVEL ' + (l.n.codigo || '') + ' — ' + (l.n.nombre || '') + ' · ' + l.habs + ' habitaciones · ' + l.b578 + ' B578 · ' + l.puertos + ' puertos PoE', { 'font-size': 13, 'font-weight': 700 }));
+    s.append(marco(W, H), tx(20, 24, 'NIVEL ' + (l.n.codigo || '') + ' — ' + (l.n.nombre || '') + ' · ' + l.habs + ' habitaciones · ' + l.b578 + ' B578' + (l.d578 ? ' · ' + l.d578 + ' D578' : '') + ' · ' + l.puertos + ' puertos PoE', { 'font-size': 13, 'font-weight': 700 }));
     const X0 = 190, X1 = 880, Y = 170;
     s.append(sv('rect', { x: 20, y: 120, width: 120, height: 110, fill: '#f3f4f6', stroke: '#1a1a1b' }), tx(80, 140, 'IDF / CUARTO', { 'text-anchor': 'middle', 'font-weight': 700, 'font-size': 8 }), tx(80, 152, 'DE TELECOM', { 'text-anchor': 'middle', 'font-weight': 700, 'font-size': 8 }));
     s.append(sv('rect', { x: 35, y: 165, width: 90, height: 30, fill: '#fff', stroke: '#1a1a1b' }), tx(80, 184, 'Switch PoE ×' + l.switches, { 'text-anchor': 'middle', 'font-size': 9 }));
@@ -326,18 +354,19 @@
         s.append(sv('circle', { cx: rx + (cw - 3) / 2, cy: arriba ? ry + 62 : ry + 8, r: 3, fill: '#fff', stroke: '#1a1a1b' }));
         n++;
       }
-      for (let k = 0; k < p.b578; k++) {
-        const bx = x + w * (k + 0.5) / p.b578;
-        s.append(sv('circle', { cx: bx, cy: Y, r: Math.min(ancho * (G().param.coberturaM / Math.max(l.pas.reduce((a, q) => a + q.largo, 0), G().param.coberturaM)) / 2, 150), fill: 'none', stroke: '#7c3aed', 'stroke-dasharray': '3 4', opacity: 0.35 }));
-        s.append(sv('rect', { x: bx - 14, y: Y - 10, width: 28, height: 20, fill: '#ede9fe', stroke: '#7c3aed', 'stroke-width': 1.4 }), tx(bx, Y + 4, 'B578', { 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700, fill: '#5b21b6' }));
+      const nRt = p.b578 + p.d578;
+      for (let k = 0; k < nRt; k++) {
+        const bx = x + w * (k + 0.5) / nRt, esD = k >= p.b578;
+        s.append(sv('circle', { cx: bx, cy: Y, r: Math.min(ancho * (G().param.coberturaM / Math.max(l.pas.reduce((a, q) => a + q.largo, 0), G().param.coberturaM)) / 2, 150), fill: 'none', stroke: esD ? '#b45309' : '#7c3aed', 'stroke-dasharray': '3 4', opacity: 0.35 }));
+        s.append(sv('rect', { x: bx - 14, y: Y - 10, width: 28, height: 20, fill: esD ? '#fef3c7' : '#ede9fe', stroke: esD ? '#b45309' : '#7c3aed', 'stroke-width': 1.4 }), tx(bx, Y + 4, esD ? 'D578' : 'B578', { 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700, fill: esD ? '#92400e' : '#5b21b6' }));
       }
-      s.append(tx(x + w / 2, 52, p.nombre + ' · ' + p.habs + ' hab. · ' + p.largo + ' m · ' + p.b578 + ' B578', { 'text-anchor': 'middle', 'font-size': 8.5, fill: '#374151' }));
+      s.append(tx(x + w / 2, 52, p.nombre + ' · ' + p.habs + ' hab. · ' + p.largo + ' m · ' + p.b578 + ' B578' + (p.d578 ? ' + ' + p.d578 + ' D578' : ''), { 'text-anchor': 'middle', 'font-size': 8.5, fill: '#374151' }));
       x += w;
     });
     let ly = 300; s.append(tx(20, ly, 'TIPOS DE HABITACIÓN', { 'font-weight': 700, 'font-size': 9 })); ly += 14; let lx = 20;
     g.tipos.filter((t) => l.cant[t.id]).forEach((t) => { s.append(sv('rect', { x: lx, y: ly - 9, width: 12, height: 12, fill: colorTipo(t.id), stroke: '#6b7280' }), tx(lx + 16, ly + 1, t.nombre + ' (' + l.cant[t.id] + ')', { 'font-size': 8.5 })); lx += 28 + t.nombre.length * 5 + 22; if (lx > 760) { lx = 20; ly += 16; } });
     ly += 28;
-    s.append(tx(20, ly, 'POR NIVEL: ' + POR_HAB.filter((k) => l.disp[k]).map((k) => l.disp[k] + '× ' + DISP.find((d) => d.k === k).parte).join(' · ') + ' · ' + l.b578 + '× B578', { 'font-size': 8.5 }));
+    s.append(tx(20, ly, 'POR NIVEL: ' + POR_HAB.filter((k) => l.disp[k]).map((k) => l.disp[k] + '× ' + DISP.find((d) => d.k === k).parte).join(' · ') + ' · ' + l.b578 + '× B578' + (l.d578 ? ' · ' + l.d578 + '× D578' : ''), { 'font-size': 8.5 }));
     s.append(tx(20, ly + 14, 'El número de B578 se calcula por capacidad y por cobertura RF; debe confirmarse con un estudio de RF (las losas de concreto no dejan pasar la señal).', { 'font-size': 8, fill: '#667085' }));
     return s;
   }
@@ -351,8 +380,8 @@
       s.append(sv('rect', { x: 20, y: y - 20, width: 110, height: 36, fill: '#f3f4f6', stroke: '#1a1a1b' }), tx(75, y - 4, 'NIVEL ' + (l.n.codigo || ''), { 'text-anchor': 'middle', 'font-weight': 700 }), tx(75, y + 9, l.habs + ' hab.', { 'text-anchor': 'middle', 'font-size': 8, fill: '#667085' }));
       s.append(sv('rect', { x: 170, y: y - 18, width: 120, height: 32, fill: '#fff', stroke: '#1a1a1b' }), tx(230, y + 1, 'Switch PoE ×' + l.switches, { 'text-anchor': 'middle' }));
       s.append(sv('line', { x1: 150, y1: y - 2, x2: 170, y2: y - 2, stroke: '#b42318', 'stroke-width': 1.5 }));
-      for (let k = 0; k < Math.min(l.b578, 12); k++) s.append(sv('rect', { x: 320 + k * 50, y: y - 16, width: 42, height: 26, fill: '#ede9fe', stroke: '#7c3aed' }), tx(341 + k * 50, y + 1, 'B578', { 'text-anchor': 'middle', 'font-size': 8, fill: '#5b21b6', 'font-weight': 700 }));
-      s.append(sv('line', { x1: 290, y1: y - 2, x2: 320, y2: y - 2, stroke: '#b42318' }), tx(W - 20, y + 2, l.b578 + ' B578 · ' + l.puertos + ' puertos', { 'text-anchor': 'end', 'font-size': 8.5, fill: '#374151' }));
+      for (let k = 0; k < Math.min(l.b578 + l.d578, 12); k++) { const esD = k >= l.b578; s.append(sv('rect', { x: 320 + k * 50, y: y - 16, width: 42, height: 26, fill: esD ? '#fef3c7' : '#ede9fe', stroke: esD ? '#b45309' : '#7c3aed' }), tx(341 + k * 50, y + 1, esD ? 'D578' : 'B578', { 'text-anchor': 'middle', 'font-size': 8, fill: esD ? '#92400e' : '#5b21b6', 'font-weight': 700 })); }
+      s.append(sv('line', { x1: 290, y1: y - 2, x2: 320, y2: y - 2, stroke: '#b42318' }), tx(W - 20, y + 2, l.b578 + ' B578' + (l.d578 ? ' + ' + l.d578 + ' D578' : '') + ' · ' + l.puertos + ' puertos', { 'text-anchor': 'end', 'font-size': 8.5, fill: '#374151' }));
     });
     const y0 = H - 80;
     s.append(sv('rect', { x: 20, y: y0, width: 860, height: 60, fill: '#f9fafb', stroke: '#1a1a1b' }), tx(30, y0 + 16, 'MDF / CUARTO DE IT', { 'font-weight': 700 }));
@@ -368,8 +397,8 @@
   const descargaSvg = (svg, nombre) => BMS.descargar(nombre + '.svg', '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(svg), 'image/svg+xml');
   const nodoPdf = (svg, ancho) => { const c = svg.cloneNode(true), vb = svg.viewBox.baseVal, w = ancho || 156, hh = w * vb.height / vb.width; c.setAttribute('width', w + 'mm'); c.setAttribute('height', hh.toFixed(2) + 'mm'); c.setAttribute('style', 'display:block;max-width:none;width:' + w + 'mm;height:' + hh.toFixed(2) + 'mm'); return c; };
   const tabla = (cols, filas, alin) => h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, cols.map((x) => h('th', null, x)))), h('tbody', null, filas.map((f) => h('tr', null, f.map((v, i) => h('td', { class: (alin && alin[i]) || '' }, v)))))));
-  const filasNivel = (c) => c.niveles.map((l) => [l.n.codigo || '', l.habs, ...POR_HAB.map((k) => l.disp[k]), l.b578, l.puertos, l.switches]);
-  const COLS_NIVEL = ['Nivel', 'Hab.', ...POR_HAB.map((k) => DISP.find((d) => d.k === k).parte), 'B578', 'Puertos PoE', 'Switch'];
+  const filasNivel = (c) => c.niveles.map((l) => [l.n.codigo || '', l.habs, ...POR_HAB.map((k) => l.disp[k]), l.b578, l.d578, l.puertos, l.switches]);
+  const COLS_NIVEL = ['Nivel', 'Hab.', ...POR_HAB.map((k) => DISP.find((d) => d.k === k).parte), 'B578', 'D578', 'Puertos PoE', 'Switch'];
 
   const exportarXlsx = async (c) => {
     if (!window.ExcelJS) { alert('No se pudo cargar la librería de Excel (se necesita internet).'); return; }
@@ -379,11 +408,11 @@
       filas.forEach((f) => ws.addRow(f)); (anchos || []).forEach((w, i) => { ws.getColumn(i + 1).width = w; });
       ws.getRow(1).border = { bottom: { style: 'medium' } }; ws.views = [{ state: 'frozen', ySplit: 1 }];
     };
-    hoja('Dispositivos por nivel', COLS_NIVEL, filasNivel(c).concat([['TOTAL', c.tot.habs, ...POR_HAB.map((k) => c.tot[k]), c.tot.b578, c.tot.puertos, c.tot.switches]]), [10, 8, 12, 12, 16, 14, 16, 12, 10, 12, 10]);
-    const pas = []; c.niveles.forEach((l) => l.pas.forEach((p) => pas.push([l.n.codigo || '', p.nombre, p.habs, p.largo, p.b578])));
-    hoja('Pasillos', ['Nivel', 'Pasillo', 'Habitaciones', 'Largo (m)', 'B578'], pas, [10, 24, 14, 12, 8]);
-    const tp = []; G().tipos.forEach((t) => tp.push([t.nombre, t.plano, c.niveles.reduce((a, l) => a + (l.cant[t.id] || 0), 0), num(t.e7), num(t.x45), num(t.pirC), num(t.pirRF), num(t.puerta), num(t.pc502)]));
-    hoja('Tipos de habitación', ['Tipo', 'Plano', 'Cantidad', 'e7', 'X45B-X06', 'K594C (baño)', 'K594.RF (pared)', 'Contacto de puerta', 'PC-502'], tp, [26, 12, 10, 8, 12, 14, 16, 18, 10]);
+    hoja('Dispositivos por nivel', COLS_NIVEL, filasNivel(c).concat([['TOTAL', c.tot.habs, ...POR_HAB.map((k) => c.tot[k]), c.tot.b578, c.tot.d578, c.tot.puertos, c.tot.switches]]), [10, 8, 12, 12, 12, 12, 12, 16, 14, 16, 12, 10, 10, 12, 10]);
+    const pas = []; c.niveles.forEach((l) => l.pas.forEach((p) => pas.push([l.n.codigo || '', p.nombre, p.habs, p.largo, p.b578, p.d578])));
+    hoja('Pasillos', ['Nivel', 'Pasillo', 'Habitaciones', 'Largo (m)', 'B578', 'D578'], pas, [10, 24, 14, 12, 8, 8]);
+    const tp = []; G().tipos.forEach((t) => tp.push([t.nombre, t.plano, c.niveles.reduce((a, l) => a + (l.cant[t.id] || 0), 0), TERMOS[termoDe(t)].corto + ' × ' + num(t.e7), num(t.x45), num(t.pirC), num(t.pirRF), num(t.puerta), num(t.pc502)]));
+    hoja('Tipos de habitación', ['Tipo', 'Plano', 'Cantidad', 'Termostato', 'X45B-X06', 'K594C (baño)', 'K594.RF (pared)', 'Contacto de puerta', 'PC-502'], tp, [26, 12, 10, 8, 12, 14, 16, 18, 10]);
     hoja('Lista de materiales', ['Número de parte', 'Descripción', 'Cantidad', 'Unidad', 'Fuente'], c.bom.map((b) => [b.parte, b.nombre, b.cant, b.unidad, b.fuente]), [20, 90, 10, 28, 50]);
     hoja('Objetos BACnet', ['Parámetro', 'Object ID', 'Acceso', 'Alcance', 'Incluido', 'Nota'], G().objetos.map((o) => [o.n, o.id, o.ac, o.g ? 'Global (65999)' : 'Por habitación', o.on ? 'Sí' : 'No', o.nota]), [30, 12, 10, 18, 10, 70]);
     const buf = await wb.xlsx.writeBuffer();
@@ -448,13 +477,14 @@
     const filasT = g.tipos.map((t, i) => h('tr', null,
       h('td', null, h('input', { class: 'in', value: t.nombre, style: { width: '150px' }, onchange: (e) => { t.nombre = e.target.value; guarda(); } })),
       h('td', null, h('input', { class: 'in', value: t.plano || '', style: { width: '80px' }, onchange: (e) => { t.plano = e.target.value; guarda(); } })),
+      h('td', { class: 'c' }, h('select', { class: 'in', value: termoDe(t), title: 'Modelo de termostato del GRMS: INNCOM e7 (Deep Mesh, router B578, servidor IC3) o INNCOM D1 (INNCOM Direct, router D578)', onchange: (e) => { t.termo = e.target.value; guarda(); } }, Object.keys(TERMOS).map((k) => h('option', { value: k }, TERMOS[k].n)))),
       ['e7', 'x45', 'caja', 'pirC', 'pirRF', 'puerta', 'pc502'].map((k) => h('td', { class: 'c' }, nin(num(t[k]), (v) => { t[k] = v; guarda(); }))),
       h('td', { class: 'c' }, h('select', { class: 'in', value: String(t.camas), onchange: (e) => { t.camas = Number(e.target.value); guarda(); } }, h('option', { value: '1' }, '1 cama'), h('option', { value: '2' }, '2 camas'))),
       h('td', { class: 'c' }, h('input', { type: 'checkbox', checked: !!t.suite, onchange: (e) => { t.suite = e.target.checked; guarda(); } })),
       h('td', { class: 'c' }, h('button', { class: 'b x', onclick: () => { if (g.tipos.length > 1) { g.tipos.splice(i, 1); guarda(); } } }, '✕'))));
     root.append(h('h3', null, 'Tipos de habitación y dispositivos por habitación'),
-      h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tipo', 'Plano', 'Termostato e7', 'Módulo X45B-X06', 'Caja', 'Sensor K594C (baño)', 'Sensor K594.RF (pared)', 'Contacto de puerta', 'PC-502', 'Camas', 'Suite', ''].map((x) => h('th', null, x)))), h('tbody', null, filasT))),
-      h('div', { class: 'fila' }, h('button', { class: 'b', onclick: () => { g.tipos.push({ id: 't' + Date.now(), nombre: 'Nuevo tipo', plano: '', camas: 1, suite: false, e7: 1, x45: 1, caja: 1, pirC: 1, pirRF: 1, puerta: 1, pc502: 0 }); guarda(); } }, '+ Agregar tipo de habitación'),
+      h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tipo', 'Plano', 'Modelo de termostato', 'Termostatos por habitación', 'Módulo X45B-X06', 'Caja', 'Sensor K594C (baño)', 'Sensor K594.RF (pared)', 'Contacto de puerta', 'PC-502', 'Camas', 'Suite', ''].map((x) => h('th', null, x)))), h('tbody', null, filasT))),
+      h('div', { class: 'fila' }, h('button', { class: 'b', onclick: () => { g.tipos.push({ id: 't' + Date.now(), nombre: 'Nuevo tipo', plano: '', camas: 1, suite: false, termo: 'e7', e7: 1, x45: 1, caja: 1, pirC: 1, pirRF: 1, puerta: 1, pc502: 0 }); guarda(); } }, '+ Agregar tipo de habitación'),
         h('button', { class: 'b', onclick: () => { if (confirm('Se restablecen los tipos de habitación de los planos ED-4102 a ED-4112. ¿Continuar?')) { g.tipos = clone(TIPOS_BASE); g.niveles = {}; guarda(); } } }, 'Restablecer tipos de los planos')));
 
     /* por nivel */
@@ -506,10 +536,10 @@
 
     /* resultados */
     root.append(h('h3', null, 'Dispositivos por nivel'),
-      tabla(COLS_NIVEL, filasNivel(c).concat([[h('b', null, 'TOTAL'), h('b', null, c.tot.habs), ...POR_HAB.map((k) => h('b', null, c.tot[k])), h('b', null, c.tot.b578), h('b', null, c.tot.puertos), h('b', null, c.tot.switches)]]), ['', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r']));
-    const filasPas = []; c.niveles.forEach((l) => l.pas.forEach((p) => filasPas.push([l.n.codigo || '', p.nombre, p.habs, p.largo + ' m', p.b578])));
-    root.append(h('h3', null, 'Dispositivos por pasillo'), tabla(['Nivel', 'Pasillo', 'Habitaciones', 'Largo', 'B578'], filasPas, ['', '', 'r', 'r', 'r']),
-      h('p', { class: 'hint' }, 'En cada habitación: termostato e7, módulo de relés X45B-X06 en su caja, sensor de movimiento y contacto de puerta, según el tipo. Los dampers de extracción (ZRT) y aire fresco (DF), el FCU y su válvula los suministran otros.'));
+      tabla(COLS_NIVEL, filasNivel(c).concat([[h('b', null, 'TOTAL'), h('b', null, c.tot.habs), ...POR_HAB.map((k) => h('b', null, c.tot[k])), h('b', null, c.tot.b578), h('b', null, c.tot.d578), h('b', null, c.tot.puertos), h('b', null, c.tot.switches)]]), ['', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r']));
+    const filasPas = []; c.niveles.forEach((l) => l.pas.forEach((p) => filasPas.push([l.n.codigo || '', p.nombre, p.habs, p.largo + ' m', p.b578, p.d578])));
+    root.append(h('h3', null, 'Dispositivos por pasillo'), tabla(['Nivel', 'Pasillo', 'Habitaciones', 'Largo', 'B578', 'D578'], filasPas, ['', '', 'r', 'r', 'r', 'r']),
+      h('p', { class: 'hint' }, 'En cada habitación: termostato (INNCOM e7 o D1, según el tipo; los e7 usan routers B578 y los D1 routers D578), módulo de relés X45B-X06 en su caja, sensor de movimiento y contacto de puerta, según el tipo. Los dampers de extracción (ZRT) y aire fresco (DF), el FCU y su válvula los suministran otros.'));
 
     /* diagramas */
     const tSel = g.tipos.find((t) => t.id === vista.tipo) || g.tipos[0], lSel = c.niveles.find((l) => l.n.id === vista.nivel) || c.niveles[0];
