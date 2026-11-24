@@ -497,18 +497,23 @@
     const hab = (n) => { const l = c.niveles.find((x) => x.n.id === n.id); return l ? l.habs : 0; };
     const nc = (v, f) => h('input', { class: 'in n', type: 'number', min: 0, value: v || 0, style: { width: '54px', padding: '3px 4px', textAlign: 'center' }, onchange: (e) => f(Math.max(0, Math.round(num(e.target.value)))) });
     const totTipo = (t) => E.niveles.reduce((a2, n) => a2 + Math.max(0, Math.round(num(cfgNivel(n).tipos[t.id]))), 0);
+    const conD = c.tot.d578 > 0;
+    const sinTipoTot = c.niveles.reduce((a2, l) => a2 + l.sinTipo, 0);
     root.append(h('div', { class: 'scroll' }, h('table', { class: 't' },
-      h('thead', null, h('tr', null, [h('th', null, 'Nivel'), ...g.tipos.map((t) => h('th', { class: 'c', title: t.plano ? 'Plano ' + t.plano : '' }, t.nombre)), h('th', { class: 'c' }, 'Total'), h('th', { class: 'c' }, 'B578')])),
+      h('thead', null, h('tr', null, [h('th', null, 'Nivel'), ...g.tipos.map((t) => h('th', { class: 'c', title: t.plano ? 'Plano ' + t.plano : '' }, t.nombre)), h('th', { class: 'c', title: 'Habitaciones del nivel que aún no tienen tipo (se cuentan como ' + g.tipos[0].nombre + '). Póngalas en cero si no existen.' }, 'Sin tipo'), h('th', { class: 'c' }, 'Total'), h('th', { class: 'c' }, 'B578'), conD ? h('th', { class: 'c' }, 'D578') : null])),
       h('tbody', null,
         E.niveles.map((n) => {
           const cfg = cfgNivel(n), l = c.niveles.find((x) => x.n.id === n.id);
           return h('tr', null,
             h('td', { style: { whiteSpace: 'nowrap', fontWeight: 600 }, title: n.nombre }, (n.codigo || '') + ' · ' + (n.nombre || '')),
-            g.tipos.map((t) => h('td', { class: 'c' }, nc(cfg.tipos[t.id], (v) => { cfg.tipos[t.id] = v; const s2 = sumaN(cfg); if (s2 > 0) n.habs = s2; guarda(); }))),
-            h('td', { class: 'c', style: { fontWeight: 700 } }, hab(n), l && l.sinTipo ? h('span', { class: 'chip warn', style: { marginLeft: '6px' }, title: 'Habitaciones sin tipo: se cuentan como ' + g.tipos[0].nombre }, l.sinTipo + ' sin tipo') : null),
-            h('td', { class: 'c' }, l ? l.b578 : 0));
+            g.tipos.map((t) => h('td', { class: 'c' }, nc(cfg.tipos[t.id], (v) => { cfg.tipos[t.id] = v; n.habs = sumaN(cfg); guarda(); }))),
+            h('td', { class: 'c' }, sumaN(cfg) > 0 ? h('span', { class: 'mute' }, '—') : nc(l ? l.sinTipo : Math.round(num(n.habs)), (v) => { n.habs = v; guarda(); })),
+            h('td', { class: 'c', style: { fontWeight: 700 } }, hab(n)),
+            h('td', { class: 'c' }, l ? l.b578 : 0),
+            conD ? h('td', { class: 'c' }, l ? l.d578 : 0) : null);
         }),
-        h('tr', { style: { fontWeight: 700 } }, h('td', null, 'TOTAL'), g.tipos.map((t) => h('td', { class: 'c' }, totTipo(t))), h('td', { class: 'c' }, est.total), h('td', { class: 'c' }, c.tot.b578))))));
+        h('tr', { style: { fontWeight: 700 } }, h('td', null, 'TOTAL'), g.tipos.map((t) => h('td', { class: 'c' }, totTipo(t))), h('td', { class: 'c' }, sinTipoTot), h('td', { class: 'c' }, est.total), h('td', { class: 'c' }, c.tot.b578), conD ? h('td', { class: 'c' }, c.tot.d578) : null)))),
+      sinTipoTot ? h('p', { class: 'hint' }, 'Hay ' + sinTipoTot + ' habitación(es) sin tipo: el total del hotel las incluye y los dispositivos se calculan como ' + g.tipos[0].nombre + '. Asígneles su tipo o póngalas en cero.') : h('p', { class: 'hint' }, 'El total del hotel es la suma de los tipos de todos los niveles.'));
 
     /* pasillos por nivel (tabla compacta): cada pasillo se liga a un nivel con su selector de nivel */
     const filasP = [];
