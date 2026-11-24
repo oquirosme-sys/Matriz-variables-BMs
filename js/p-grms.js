@@ -99,7 +99,8 @@
       pas.forEach((p) => { p.b578 = nR(p, p.hE); p.d578 = nR(p, p.hD); });
       const cap = Math.max(1, P.habsPorB578);
       const completa = (key, habsF) => { const porCap = Math.ceil(habsF / cap); let sm = pas.reduce((a2, p) => a2 + p[key], 0); if (sm < porCap && pas.length) { const pm = pas.reduce((a2, p) => (p.habs > a2.habs ? p : a2), pas[0]); pm[key] += porCap - sm; sm = porCap; } return sm; };
-      const b578 = completa('b578', habsE7), d578 = completa('d578', habsD1);
+      let b578 = completa('b578', habsE7), d578 = completa('d578', habsD1);
+      pas.forEach((p) => { p.rec = p.b578 + p.d578; p.extra = Math.max(0, Math.round(num(p.extra))); if (p.extra) { if (p.hE >= p.hD) { p.b578 += p.extra; b578 += p.extra; } else { p.d578 += p.extra; d578 += p.extra; } } });
       const puertos = Math.ceil((b578 + d578) * (1 + P.reservaPoE / 100)), switches = Math.ceil(puertos / Math.max(1, P.puertosSwitch));
       const sumaP = pas.reduce((a2, p) => a2 + p.habs, 0);
       return { n, c, habs, cant, sinTipo, exceso, disp, pas, b578, d578, habsD1, habsE7, puertos, switches, avisoPas: sumaP !== habs, sumaP };
@@ -360,7 +361,7 @@
         s.append(sv('circle', { cx: bx, cy: Y, r: Math.min(ancho * (G().param.coberturaM / Math.max(l.pas.reduce((a, q) => a + q.largo, 0), G().param.coberturaM)) / 2, 150), fill: 'none', stroke: esD ? '#b45309' : '#7c3aed', 'stroke-dasharray': '3 4', opacity: 0.35 }));
         s.append(sv('rect', { x: bx - 14, y: Y - 10, width: 28, height: 20, fill: esD ? '#fef3c7' : '#ede9fe', stroke: esD ? '#b45309' : '#7c3aed', 'stroke-width': 1.4 }), tx(bx, Y + 4, esD ? 'D578' : 'B578', { 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700, fill: esD ? '#92400e' : '#5b21b6' }));
       }
-      s.append(tx(x + w / 2, 52, p.nombre + ' · ' + p.habs + ' hab. · ' + p.largo + ' m · ' + p.b578 + ' B578' + (p.d578 ? ' + ' + p.d578 + ' D578' : ''), { 'text-anchor': 'middle', 'font-size': 8.5, fill: '#374151' }));
+      s.append(tx(x + w / 2, 52, p.nombre + ' · ' + p.habs + ' hab. · ' + p.largo + ' m · ' + p.b578 + ' B578' + (p.d578 ? ' + ' + p.d578 + ' D578' : '') + (p.extra ? ' (' + p.extra + ' adicional' + (p.extra > 1 ? 'es' : '') + ')' : ''), { 'text-anchor': 'middle', 'font-size': 8.5, fill: '#374151' }));
       x += w;
     });
     let ly = 300; s.append(tx(20, ly, 'TIPOS DE HABITACIÓN', { 'font-weight': 700, 'font-size': 9 })); ly += 14; let lx = 20;
@@ -409,8 +410,8 @@
       ws.getRow(1).border = { bottom: { style: 'medium' } }; ws.views = [{ state: 'frozen', ySplit: 1 }];
     };
     hoja('Dispositivos por nivel', COLS_NIVEL, filasNivel(c).concat([['TOTAL', c.tot.habs, ...POR_HAB.map((k) => c.tot[k]), c.tot.b578, c.tot.d578, c.tot.puertos, c.tot.switches]]), [10, 8, 12, 12, 12, 12, 12, 16, 14, 16, 12, 10, 10, 12, 10]);
-    const pas = []; c.niveles.forEach((l) => l.pas.forEach((p) => pas.push([l.n.codigo || '', p.nombre, p.habs, p.largo, p.b578, p.d578])));
-    hoja('Pasillos', ['Nivel', 'Pasillo', 'Habitaciones', 'Largo (m)', 'B578', 'D578'], pas, [10, 24, 14, 12, 8, 8]);
+    const pas = []; c.niveles.forEach((l) => l.pas.forEach((p) => pas.push([l.n.codigo || '', p.nombre, p.habs, p.largo, p.rec, p.extra, p.b578, p.d578, p.motivo || ''])));
+    hoja('Pasillos', ['Nivel', 'Pasillo', 'Habitaciones', 'Largo (m)', 'Routers recomendados', 'Adicionales', 'B578', 'D578', 'Motivo de los adicionales'], pas, [10, 24, 14, 12, 20, 12, 8, 8, 40]);
     const tp = []; G().tipos.forEach((t) => tp.push([t.nombre, t.plano, c.niveles.reduce((a, l) => a + (l.cant[t.id] || 0), 0), TERMOS[termoDe(t)].corto + ' × ' + num(t.e7), num(t.x45), num(t.pirC), num(t.pirRF), num(t.puerta), num(t.pc502)]));
     hoja('Tipos de habitación', ['Tipo', 'Plano', 'Cantidad', 'Termostato', 'X45B-X06', 'K594C (baño)', 'K594.RF (pared)', 'Contacto de puerta', 'PC-502'], tp, [26, 12, 10, 8, 12, 14, 16, 18, 10]);
     hoja('Lista de materiales', ['Número de parte', 'Descripción', 'Cantidad', 'Unidad', 'Fuente'], c.bom.map((b) => [b.parte, b.nombre, b.cant, b.unidad, b.fuente]), [20, 90, 10, 28, 50]);
@@ -526,7 +527,10 @@
         h('td', null, h('input', { class: 'in', value: p.nombre, style: { width: '130px', padding: '3px 6px' }, onchange: (e) => { p.nombre = e.target.value; guarda(); } })),
         h('td', { class: 'c' }, nc(num(p.largo), (v) => { p.largo = v; guarda(); })),
         h('td', { class: 'c' }, cfg.pasillos.length === 1 && l ? h('span', null, l.habs) : nc(num(p.habs), (v) => { p.habs = v; guarda(); })),
-        h('td', { class: 'c' }, l && l.pas[i] ? l.pas[i].b578 : 0),
+        h('td', { class: 'c', title: 'Cantidad recomendada por capacidad y cobertura RF' }, l && l.pas[i] ? l.pas[i].rec : 0),
+        h('td', { class: 'c', title: 'Agregue routers si el pasillo es más largo de lo previsto o hay paredes de concreto' }, nc(num(p.extra), (v) => { p.extra = v; guarda(); })),
+        h('td', { class: 'c', style: { fontWeight: 700 } }, l && l.pas[i] ? (l.pas[i].b578 + l.pas[i].d578) : 0),
+        h('td', null, h('input', { class: 'in', value: p.motivo || '', placeholder: 'Motivo (distancia, concreto…)', style: { width: '170px', padding: '3px 6px' }, onchange: (e) => { p.motivo = e.target.value; BMS.touch(); } })),
         h('td', { class: 'c' }, cfg.pasillos.length > 1 ? h('button', { class: 'b x s', title: 'Quitar este pasillo', onclick: () => { cfg.pasillos.splice(i, 1); guarda(); } }, '✕') : null),
         h('td', null, i === 0 && l && l.avisoPas ? h('span', { class: 'chip bad' }, 'Pasillos suman ' + l.sumaP + ' de ' + l.habs) : null))));
     });
@@ -535,15 +539,15 @@
       h('label', { class: 'f' }, 'Agregar pasillo al nivel', selNivel(nuevoNivel.v, (e) => { nuevoNivel.v = e.target.value; BMS.ui.grmsPasNivel = e.target.value; }, '180px')),
       h('button', { class: 'b p', onclick: () => { const nn = E.niveles.find((x) => x.id === nuevoNivel.v), cf = cfgNivel(nn); cf.pasillos.push({ id: BMS.uid(), nombre: 'Pasillo ' + (cf.pasillos.length + 1), largo: 40, habs: 0 }); BMS.ui.grmsPasNivel = nn.id; guarda(); } }, '+ Agregar pasillo'));
     root.append(h('h3', null, 'Pasillos por nivel'), agregar,
-      filasP.length ? h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '860px' } }, h('thead', null, h('tr', null, ['Nivel', 'Pasillo', 'Largo (m)', 'Habitaciones', 'B578', '', ''].map((x, i) => h('th', { class: i > 1 ? 'c' : '' }, x)))), h('tbody', null, filasP))) : h('p', { class: 'hint' }, 'Los niveles con habitaciones aparecen aquí con su pasillo. Con más de un pasillo en un nivel, indique cuántas habitaciones atiende cada uno; el selector «Nivel» de cada fila permite pasarlo a otro nivel.'));
+      filasP.length ? h('div', { class: 'scroll' }, h('table', { class: 't', style: { maxWidth: '1180px' } }, h('thead', null, h('tr', null, ['Nivel', 'Pasillo', 'Largo (m)', 'Habitaciones', 'Recomendados', 'Adicionales', 'Total routers', 'Motivo de los adicionales', '', ''].map((x, i) => h('th', { class: i > 1 ? 'c' : '' }, x)))), h('tbody', null, filasP))) : h('p', { class: 'hint' }, 'Los niveles con habitaciones aparecen aquí con su pasillo. Con más de un pasillo en un nivel, indique cuántas habitaciones atiende cada uno; el selector «Nivel» de cada fila permite pasarlo a otro nivel.'));
 
     if (!c.niveles.length) { root.append(h('div', { class: 'warnbox' }, 'Ningún nivel tiene habitaciones. Indique la cantidad por tipo en la tabla de arriba.')); plegar(); return; }
 
     /* resultados */
     root.append(h('h3', null, 'Dispositivos por nivel'),
       tabla(COLS_NIVEL, filasNivel(c).concat([[h('b', null, 'TOTAL'), h('b', null, c.tot.habs), ...POR_HAB.map((k) => h('b', null, c.tot[k])), h('b', null, c.tot.b578), h('b', null, c.tot.d578), h('b', null, c.tot.puertos), h('b', null, c.tot.switches)]]), ['', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r']));
-    const filasPas = []; c.niveles.forEach((l) => l.pas.forEach((p) => filasPas.push([l.n.codigo || '', p.nombre, p.habs, p.largo + ' m', p.b578, p.d578])));
-    root.append(h('h3', null, 'Dispositivos por pasillo'), tabla(['Nivel', 'Pasillo', 'Habitaciones', 'Largo', 'B578', 'D578'], filasPas, ['', '', 'r', 'r', 'r', 'r']),
+    const filasPas = []; c.niveles.forEach((l) => l.pas.forEach((p) => filasPas.push([l.n.codigo || '', p.nombre, p.habs, p.largo + ' m', p.b578, p.d578, p.extra ? '+' + p.extra : '—'])));
+    root.append(h('h3', null, 'Dispositivos por pasillo'), tabla(['Nivel', 'Pasillo', 'Habitaciones', 'Largo', 'B578', 'D578', 'Adicionales'], filasPas, ['', '', 'r', 'r', 'r', 'r', 'r']),
       h('p', { class: 'hint' }, 'En cada habitación: termostato (INNCOM e7 o D1, según el tipo; los e7 usan routers B578 y los D1 routers D578), módulo de relés X45B-X06 en su caja, sensor de movimiento y contacto de puerta, según el tipo. Los dampers de extracción (ZRT) y aire fresco (DF), el FCU y su válvula los suministran otros.'));
 
     /* diagramas */
